@@ -99,7 +99,7 @@ export const editorTools = [
       type: "object",
       properties: {
         path: { type: "string", description: "Hierarchy path or name of the GameObject to delete" },
-        instanceId: { type: "number", description: "Instance ID (alternative to path)" },
+        instanceId: { type: "string", description: "Instance ID (alternative to path)" },
       },
     },
     handler: async (params) => JSON.stringify(await bridge.deleteGameObject(params), null, 2),
@@ -111,7 +111,7 @@ export const editorTools = [
       type: "object",
       properties: {
         path: { type: "string", description: "Hierarchy path or name" },
-        instanceId: { type: "number", description: "Instance ID (alternative to path)" },
+        instanceId: { type: "string", description: "Instance ID (alternative to path)" },
       },
     },
     handler: async (params) => JSON.stringify(await bridge.getGameObjectInfo(params), null, 2),
@@ -123,7 +123,7 @@ export const editorTools = [
       type: "object",
       properties: {
         path: { type: "string", description: "Hierarchy path or name" },
-        instanceId: { type: "number", description: "Instance ID (alternative)" },
+        instanceId: { type: "string", description: "Instance ID (alternative)" },
         position: { type: "object", properties: { x: { type: "number" }, y: { type: "number" }, z: { type: "number" } } },
         rotation: { type: "object", properties: { x: { type: "number" }, y: { type: "number" }, z: { type: "number" } } },
         scale: { type: "object", properties: { x: { type: "number" }, y: { type: "number" }, z: { type: "number" } } },
@@ -214,7 +214,7 @@ export const editorTools = [
       type: "object",
       properties: {
         path: { type: "string", description: "Hierarchy path or name of the target GameObject" },
-        instanceId: { type: "number", description: "Instance ID of the target GameObject (alternative to path)" },
+        instanceId: { type: "string", description: "Instance ID of the target GameObject (alternative to path)" },
         componentType: { type: "string", description: "Component type containing the property (optional â€” will auto-search all components)" },
         propertyName: { type: "string", description: "Name of the ObjectReference property to set" },
         assetPath: { type: "string", description: "Asset path to assign (e.g. 'Assets/Materials/MyMat.mat', 'Assets/Prefabs/Enemy.prefab')" },
@@ -240,7 +240,7 @@ export const editorTools = [
             type: "object",
             properties: {
               path: { type: "string", description: "Target GameObject path or name" },
-              instanceId: { type: "number", description: "Target GameObject instance ID" },
+              instanceId: { type: "string", description: "Target GameObject instance ID" },
               componentType: { type: "string", description: "Component type (optional)" },
               propertyName: { type: "string", description: "Property name to set" },
               assetPath: { type: "string", description: "Asset path to assign" },
@@ -264,7 +264,7 @@ export const editorTools = [
       type: "object",
       properties: {
         path: { type: "string", description: "Target GameObject path or name" },
-        instanceId: { type: "number", description: "Target GameObject instance ID" },
+        instanceId: { type: "string", description: "Target GameObject instance ID" },
         componentType: { type: "string", description: "Component type containing the property" },
         propertyName: { type: "string", description: "ObjectReference property name to inspect" },
         maxResults: { type: "number", description: "Maximum results to return (default: 50)" },
@@ -720,7 +720,7 @@ export const editorTools = [
       type: "object",
       properties: {
         path: { type: "string", description: "Hierarchy path or name of the target GameObject" },
-        instanceId: { type: "number", description: "Instance ID (alternative to path)" },
+        instanceId: { type: "string", description: "Instance ID (alternative to path)" },
         controllerPath: { type: "string", description: "Asset path of the Animator Controller to assign" },
       },
       required: ["controllerPath"],
@@ -943,7 +943,7 @@ export const editorTools = [
       properties: {
         assetPath: { type: "string", description: "Asset path of the prefab (e.g. 'Assets/Prefabs/Player.prefab')" },
         path: { type: "string", description: "Hierarchy path of a prefab instance in the scene" },
-        instanceId: { type: "number", description: "Instance ID of a prefab instance" },
+        instanceId: { type: "string", description: "Instance ID of a prefab instance" },
       },
     },
     handler: async (params) => JSON.stringify(await bridge.getPrefabInfo(params), null, 2),
@@ -968,7 +968,7 @@ export const editorTools = [
       type: "object",
       properties: {
         path: { type: "string", description: "Hierarchy path of the prefab instance" },
-        instanceId: { type: "number", description: "Instance ID (alternative to path)" },
+        instanceId: { type: "string", description: "Instance ID (alternative to path)" },
       },
     },
     handler: async (params) => JSON.stringify(await bridge.applyPrefabOverrides(params), null, 2),
@@ -980,7 +980,7 @@ export const editorTools = [
       type: "object",
       properties: {
         path: { type: "string", description: "Hierarchy path of the prefab instance" },
-        instanceId: { type: "number", description: "Instance ID (alternative to path)" },
+        instanceId: { type: "string", description: "Instance ID (alternative to path)" },
       },
     },
     handler: async (params) => JSON.stringify(await bridge.revertPrefabOverrides(params), null, 2),
@@ -992,7 +992,7 @@ export const editorTools = [
       type: "object",
       properties: {
         path: { type: "string", description: "Hierarchy path of the prefab instance" },
-        instanceId: { type: "number", description: "Instance ID (alternative to path)" },
+        instanceId: { type: "string", description: "Instance ID (alternative to path)" },
         completely: { type: "boolean", description: "If true, unpack completely including nested prefabs (default: false)" },
       },
     },
@@ -1005,7 +1005,7 @@ export const editorTools = [
       type: "object",
       properties: {
         path: { type: "string", description: "Hierarchy path of the target GameObject" },
-        instanceId: { type: "number", description: "Instance ID (alternative to path)" },
+        instanceId: { type: "string", description: "Instance ID (alternative to path)" },
         componentType: { type: "string", description: "Component type name (optional - will search all components)" },
         propertyName: { type: "string", description: "Name of the ObjectReference property to set" },
         referencePath: { type: "string", description: "Asset path of the reference (for assets like prefabs, materials, textures)" },
@@ -1022,7 +1022,7 @@ export const editorTools = [
       type: "object",
       properties: {
         path: { type: "string", description: "Hierarchy path or name of the GameObject to duplicate" },
-        instanceId: { type: "number", description: "Instance ID (alternative to path)" },
+        instanceId: { type: "string", description: "Instance ID (alternative to path)" },
         newName: { type: "string", description: "Name for the duplicate (default: original name + ' (Copy)')" },
       },
     },
@@ -1035,7 +1035,7 @@ export const editorTools = [
       type: "object",
       properties: {
         path: { type: "string", description: "Hierarchy path or name of the GameObject" },
-        instanceId: { type: "number", description: "Instance ID (alternative to path)" },
+        instanceId: { type: "string", description: "Instance ID (alternative to path)" },
         active: { type: "boolean", description: "Whether the GameObject should be active" },
       },
       required: ["active"],
@@ -1049,7 +1049,7 @@ export const editorTools = [
       type: "object",
       properties: {
         path: { type: "string", description: "Hierarchy path or name of the GameObject to move" },
-        instanceId: { type: "number", description: "Instance ID (alternative to path)" },
+        instanceId: { type: "string", description: "Instance ID (alternative to path)" },
         newParent: { type: "string", description: "Path of the new parent (empty string for scene root)" },
         worldPositionStays: { type: "boolean", description: "Maintain world position after reparenting (default: true)" },
       },
@@ -1415,7 +1415,7 @@ export const editorTools = [
       properties: {
         name: { type: "string", description: "Name for new GameObject (if not attaching to existing)" },
         path: { type: "string", description: "Path of existing GameObject to attach AudioSource to" },
-        instanceId: { type: "integer", description: "Instance ID of existing GameObject" },
+        instanceId: { type: "string", description: "Instance ID of existing GameObject" },
         clipPath: { type: "string", description: "Asset path to AudioClip (e.g. 'Assets/Audio/music.wav')" },
         volume: { type: "number", description: "Volume (0-1)" },
         pitch: { type: "number", description: "Pitch multiplier" },
@@ -1468,7 +1468,7 @@ export const editorTools = [
       type: "object",
       properties: {
         path: { type: "string", description: "GameObject path" },
-        instanceId: { type: "integer", description: "GameObject instance ID" },
+        instanceId: { type: "string", description: "GameObject instance ID" },
         tag: { type: "string", description: "Tag to assign" },
       },
       required: ["tag"],
@@ -1482,7 +1482,7 @@ export const editorTools = [
       type: "object",
       properties: {
         path: { type: "string", description: "GameObject path" },
-        instanceId: { type: "integer", description: "GameObject instance ID" },
+        instanceId: { type: "string", description: "GameObject instance ID" },
         layer: { type: "integer", description: "Layer index (0-31)" },
         layerName: { type: "string", description: "Layer name (alternative to index)" },
         includeChildren: { type: "boolean", description: "Apply to all children recursively" },
@@ -1497,7 +1497,7 @@ export const editorTools = [
       type: "object",
       properties: {
         path: { type: "string", description: "GameObject path" },
-        instanceId: { type: "integer", description: "GameObject instance ID" },
+        instanceId: { type: "string", description: "GameObject instance ID" },
         isStatic: { type: "boolean", description: "True to mark static" },
         includeChildren: { type: "boolean", description: "Apply to all children recursively" },
       },
@@ -1520,7 +1520,7 @@ export const editorTools = [
       properties: {
         path: { type: "string", description: "Single GameObject path to select" },
         paths: { type: "array", items: { type: "string" }, description: "Multiple GameObject paths to select" },
-        instanceId: { type: "integer", description: "Instance ID of GameObject to select" },
+        instanceId: { type: "string", description: "Instance ID of GameObject to select" },
       },
     },
     handler: async (params) => JSON.stringify(await bridge.setSelection(params), null, 2),
@@ -1532,7 +1532,7 @@ export const editorTools = [
       type: "object",
       properties: {
         path: { type: "string", description: "GameObject to frame in scene view" },
-        instanceId: { type: "integer", description: "Instance ID of GameObject to frame" },
+        instanceId: { type: "string", description: "Instance ID of GameObject to frame" },
         position: { type: "object", properties: { x: { type: "number" }, y: { type: "number" }, z: { type: "number" } }, description: "Scene view pivot position" },
         rotation: { type: "object", properties: { x: { type: "number" }, y: { type: "number" }, z: { type: "number" } }, description: "Scene view rotation (euler angles)" },
         size: { type: "number", description: "Scene view zoom (camera distance)" },
@@ -3526,7 +3526,7 @@ export const editorTools = [
       type: "object",
       properties: {
         path: { type: "string", description: "GameObject path" },
-        instanceId: { type: "number", description: "Instance ID (alternative)" },
+        instanceId: { type: "string", description: "Instance ID (alternative)" },
       },
     },
     handler: async (params) => JSON.stringify(await bridge.getParticleSystemInfo(params), null, 2),
@@ -3538,7 +3538,7 @@ export const editorTools = [
       type: "object",
       properties: {
         path: { type: "string", description: "GameObject path" },
-        instanceId: { type: "number", description: "Instance ID (alternative)" },
+        instanceId: { type: "string", description: "Instance ID (alternative)" },
         duration: { type: "number" }, loop: { type: "boolean" },
         startLifetime: { type: "number" }, startSpeed: { type: "number" },
         startSize: { type: "number" }, startRotation: { type: "number" },
@@ -3556,7 +3556,7 @@ export const editorTools = [
       type: "object",
       properties: {
         path: { type: "string", description: "GameObject path" },
-        instanceId: { type: "number", description: "Instance ID (alternative)" },
+        instanceId: { type: "string", description: "Instance ID (alternative)" },
         enabled: { type: "boolean" },
         rateOverTime: { type: "number", description: "Particles emitted per second" },
         rateOverDistance: { type: "number", description: "Particles emitted per unit distance" },
@@ -3571,7 +3571,7 @@ export const editorTools = [
       type: "object",
       properties: {
         path: { type: "string", description: "GameObject path" },
-        instanceId: { type: "number", description: "Instance ID (alternative)" },
+        instanceId: { type: "string", description: "Instance ID (alternative)" },
         enabled: { type: "boolean" },
         shapeType: { type: "string", description: "Shape type: Sphere, Hemisphere, Cone, Box, Circle, Edge, Rectangle, etc." },
         radius: { type: "number" }, angle: { type: "number" },
@@ -3587,7 +3587,7 @@ export const editorTools = [
       type: "object",
       properties: {
         path: { type: "string", description: "GameObject path" },
-        instanceId: { type: "number", description: "Instance ID (alternative)" },
+        instanceId: { type: "string", description: "Instance ID (alternative)" },
         action: { type: "string", description: "play, stop, pause, restart, or clear" },
       },
       required: ["action"],
