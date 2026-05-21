@@ -28,6 +28,9 @@ const ROUTE_OVERRIDES = {
   unity_mppm_start: "scenario/start",
   unity_mppm_stop: "scenario/stop",
   unity_mppm_info: "scenario/info",
+  unity_mppm_list_players: "mppm/list-players",
+  unity_mppm_activate_player: "mppm/activate-player",
+  unity_mppm_deactivate_player: "mppm/deactivate-player",
 };
 
 /**

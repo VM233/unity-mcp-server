@@ -4151,21 +4151,119 @@ export const editorTools = [
   },
   {
     name: "unity_mppm_start",
-    description: "Start the currently active scenario.",
-    inputSchema: { type: "object", properties: {} },
-    handler: async () => JSON.stringify(await bridge.sendCommand("scenario/start", {}), null, 2),
+    description:
+      "Start the currently active scenario. By default also enters Play mode on the main editor " +
+      "so MPPM's Play-mode hooks fire (virtual players launch, scene tick starts). " +
+      "Set enterPlayMode=false to only mark the scenario running without entering Play.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        enterPlayMode: {
+          type: "boolean",
+          description: "Enter Play mode after starting the scenario. Default true.",
+        },
+      },
+    },
+    handler: async (args) =>
+      JSON.stringify(await bridge.sendCommand("scenario/start", args || {}), null, 2),
   },
   {
     name: "unity_mppm_stop",
-    description: "Stop the running scenario.",
-    inputSchema: { type: "object", properties: {} },
-    handler: async () => JSON.stringify(await bridge.sendCommand("scenario/stop", {}), null, 2),
+    description:
+      "Stop the running scenario. By default also exits Play mode on the main editor so " +
+      "virtual-player processes shut down. Set exitPlayMode=false to leave Play mode running.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        exitPlayMode: {
+          type: "boolean",
+          description: "Exit Play mode after stopping the scenario. Default true.",
+        },
+      },
+    },
+    handler: async (args) =>
+      JSON.stringify(await bridge.sendCommand("scenario/stop", args || {}), null, 2),
   },
   {
     name: "unity_mppm_info",
     description: "Get multiplayer play mode information including CurrentPlayer state, tags, and MPPM package version.",
     inputSchema: { type: "object", properties: {} },
     handler: async () => JSON.stringify(await bridge.sendCommand("scenario/info", {}), null, 2),
+  },
+  {
+    name: "unity_mppm_create_scenario",
+    description:
+      "Create an MPPM ScenarioConfig asset programmatically. Unity 6+ (MPPM 2.0). " +
+      "Produces 1 MainEditor instance + N VirtualEditor instances, saved as a .asset " +
+      "file you can then activate with unity_mppm_activate_scenario and run with unity_mppm_start.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string", description: "Scenario name (also used as the default asset file name)." },
+        path: { type: "string", description: "Optional asset path. Defaults to 'Assets/MPPM/{name}.asset'." },
+        mainRole: {
+          type: "string",
+          enum: ["Host", "Client", "Server"],
+          description: "Role for the Main Editor instance. 'Host' = ClientAndServer (default).",
+        },
+        virtualEditors: {
+          type: "integer",
+          minimum: 0,
+          description: "Number of Virtual Editor instances (clones) to add. Default 1.",
+        },
+        virtualRole: {
+          type: "string",
+          enum: ["Client", "Server", "Host"],
+          description: "Role for each Virtual Editor instance. Default 'Client'.",
+        },
+        description: { type: "string", description: "Optional human-readable description." },
+      },
+      required: ["name"],
+    },
+    handler: async (args) =>
+      JSON.stringify(await bridge.sendCommand("scenario/create", args || {}), null, 2),
+  },
+
+  // ─── MPPM Virtual Players (direct lifecycle, no scenario asset needed) ───
+  {
+    name: "unity_mppm_list_players",
+    description:
+      "List the 4 MPPM virtual-player slots and their current state " +
+      "(NotLaunched / Launching / Launched / Communicative). Use this before " +
+      "activating a player to verify slot availability.",
+    inputSchema: { type: "object", properties: {} },
+    handler: async () => JSON.stringify(await bridge.sendCommand("mppm/list-players", {}), null, 2),
+  },
+  {
+    name: "unity_mppm_activate_player",
+    description:
+      "Activate a Virtual Player (clone Unity Editor process). index must be 2, 3, or 4 " +
+      "(Player 1 is the main editor). Returns immediately while the player is in 'Launching' " +
+      "state — poll unity_mppm_list_players or unity_list_instances to detect when ready " +
+      "(typically 30-60s on a cold project). Refuses to activate if there are pending compile " +
+      "errors (returns ActivationError=CompileErrors).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        index: { type: "integer", description: "Player slot to activate: 2, 3, or 4.", minimum: 2, maximum: 4 },
+      },
+      required: ["index"],
+    },
+    handler: async ({ index }) => JSON.stringify(await bridge.sendCommand("mppm/activate-player", { index }), null, 2),
+  },
+  {
+    name: "unity_mppm_deactivate_player",
+    description:
+      "Deactivate a Virtual Player previously activated via unity_mppm_activate_player. " +
+      "index must be 2, 3, or 4.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        index: { type: "integer", description: "Player slot to deactivate: 2, 3, or 4.", minimum: 2, maximum: 4 },
+      },
+      required: ["index"],
+    },
+    handler: async ({ index }) => JSON.stringify(await bridge.sendCommand("mppm/deactivate-player", { index }), null, 2),
   },
 
   // ─── Testing ───
@@ -4200,7 +4298,11 @@ export const editorTools = [
         groupNames: {
           type: "array",
           items: { type: "string" },
-          description: "Run only tests in these groups",
+          description: "Regex patterns matched against the test fixture's FullName (Unity's Filter.groupNames). Class name like 'MountSmokeTests' runs every method on that class.",
+        },
+        filter: {
+          type: "string",
+          description: "Convenience alias forwarded into Unity's Filter.groupNames as a regex. Pass a class name (e.g. 'MountSmokeTests') or a regex; comma-separated values are split into multiple groupNames entries. Merges with any explicit groupNames array.",
         },
         clearStuck: {
           type: "boolean",

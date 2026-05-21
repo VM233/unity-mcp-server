@@ -2,6 +2,11 @@
 
 All notable changes to this package will be documented in this file.
 
+## [2.29.0] - 2026-05-21
+
+### Added
+- **MPPM virtual player & scenario tools** — `unity_mppm_list_players`, `unity_mppm_activate_player`, `unity_mppm_deactivate_player` (manage Multiplayer Play Mode virtual players) and `unity_mppm_create_scenario` (create a ScenarioConfig asset). Companion to the `unity-mcp-plugin` 2.31.0 MPPM changes; the existing `unity_mppm_*` scenario tools also got clearer descriptions.
+
 ## [2.28.3] - 2026-05-21
 
 ### Changed
