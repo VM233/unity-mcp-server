@@ -2695,6 +2695,24 @@ export const editorTools = [
     handler: async (params) => JSON.stringify(await bridge.captureSceneView(params), null, 2),
   },
   {
+    name: "unity_screenshot_editor_window",
+    description:
+      "Capture a screenshot of a specific Editor window (Inspector, Project, Console, custom editor windows) to a PNG file, via the Win32 PrintWindow API — occlusion-proof (grabs the real editor UI even when the window is hidden behind others, without raising it or stealing focus). " +
+      "USE ONLY ON EXPLICIT USER REQUEST: call this tool ONLY when the user specifically asks to take a screenshot / screen capture of an editor window. Do NOT call it proactively, to visually inspect the editor for your own reasoning, or as an implicit step toward another task — if you merely think a capture might help, do not call it unless the user asked. " +
+      "WINDOWS EDITOR ONLY: it relies on a Win32 API with no macOS/Linux equivalent. On macOS/Linux it returns { success:false, error, platform }; when that happens (or if you already know the user is not on the Windows editor), do NOT retry — tell the user this feature is unavailable on their operating system. " +
+      "For the game or scene view use unity_screenshot_game / unity_screenshot_scene instead (camera-based, cross-platform).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        window: { type: "string", description: "Target window: EditorWindow type FullName (e.g. 'UnityEditor.InspectorWindow'), simple type name, or visible tab title." },
+        path: { type: "string", description: "Save path (default: Assets/Screenshots/EditorWindow_timestamp.png). Must end in .png; any folder is allowed." },
+        maxDimension: { type: "number", description: "Max pixels per side before the capture is rejected (default: 8192; also clamped to the GPU max texture size)." },
+      },
+      required: ["window"],
+    },
+    handler: async (params) => JSON.stringify(await bridge.captureEditorWindow(params), null, 2),
+  },
+  {
     name: "unity_sceneview_info",
     description: "Get Scene View camera info: pivot position, rotation, zoom, orthographic mode, 2D mode.",
     inputSchema: { type: "object", properties: {} },

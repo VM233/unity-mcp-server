@@ -289,6 +289,10 @@ If Unity MCP helps your workflow, consider supporting its development! Your supp
 
 **Sponsor tiers include priority feature requests** — your ideas get bumped up the roadmap! Check out the tiers on [GitHub Sponsors](https://github.com/sponsors/AnkleBreaker-Studio) or [Patreon](https://www.patreon.com/AnkleBreakerStudio).
 
+## What's New in v2.30.0
+
+- **`unity_screenshot_editor_window` tool** — capture any Editor window (Inspector, Project, Console, custom editor windows) to a PNG. Unlike the game/scene capture tools (which render a camera), it grabs the real editor UI via the Win32 `PrintWindow` API, so it works even when the window is hidden behind other windows — no raising or focus-stealing. **Windows editor only**: on macOS/Linux it returns a clear "unsupported platform" message instead of capturing, and the assistant will tell you the feature isn't available on your OS. Defaults to `Assets/Screenshots/`, accepts any user-chosen `.png` path. The assistant only invokes it when you explicitly ask for an editor-window screenshot. Companion to `unity-mcp-plugin` v2.32.0.
+
 ## What's New in v2.28.2
 
 - **Codex CLI compatibility** — Two diagnostic `console.debug(...)` calls in the bridge were writing to stdout, corrupting the MCP JSON-RPC framing. Strict clients like Codex CLI closed the transport as soon as they hit the non-JSON line; the bug was invisible on Claude Desktop / Claude Code which tolerate the framing violation. Both call sites now log to stderr.

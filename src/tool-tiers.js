@@ -132,6 +132,7 @@ const CORE_TOOLS = new Set([
   // Screenshots & capture
   "unity_screenshot_game",
   "unity_screenshot_scene",
+  "unity_screenshot_editor_window",
   "unity_graphics_scene_capture",
   "unity_graphics_game_capture",
 

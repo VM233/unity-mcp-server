@@ -146,6 +146,7 @@
     { "name": "unity_search_missing_references", "description": "Find missing references in scene" },
     { "name": "unity_screenshot_game", "description": "Capture Game View screenshot" },
     { "name": "unity_screenshot_scene", "description": "Capture Scene View screenshot" },
+    { "name": "unity_screenshot_editor_window", "description": "Capture any Editor window (Inspector, Project, custom) to PNG — Windows only" },
     { "name": "unity_graphics_scene_capture", "description": "Capture Scene View as inline image" },
     { "name": "unity_graphics_game_capture", "description": "Capture Game View as inline image" },
     { "name": "unity_prefab_info", "description": "Get prefab information and overrides" },

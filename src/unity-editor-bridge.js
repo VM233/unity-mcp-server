@@ -1258,6 +1258,10 @@ export async function captureSceneView(params) {
   return sendCommand("screenshot/scene", params);
 }
 
+export async function captureEditorWindow(params) {
+  return sendCommand("screenshot/editor-window", params);
+}
+
 export async function getSceneViewInfo(params) {
   return sendCommand("sceneview/info", params);
 }
