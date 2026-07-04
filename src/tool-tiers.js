@@ -219,6 +219,7 @@ export function splitToolTiers(allEditorTools) {
       let dynamicRoutes = null;
       try {
         dynamicRoutes = await sendCommand("_meta/routes", {});
+        dynamicRoutes = dynamicRoutes?.data ?? dynamicRoutes;
       } catch (_) {
         // Plugin might not support _meta/routes yet, use cached list only
       }
