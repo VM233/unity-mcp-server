@@ -52,6 +52,44 @@ function toolNameToRoute(toolName) {
   return `${category}/${action}`;
 }
 
+function routeToToolName(route) {
+  return "unity_" + route.replace(/\//g, "_").replace(/-/g, "_");
+}
+
+async function fetchPluginTools() {
+  try {
+    let metaTools = await sendCommand("_meta/tools", {});
+    metaTools = metaTools?.data ?? metaTools;
+    if (Array.isArray(metaTools?.tools)) {
+      return metaTools.tools;
+    }
+  } catch (_) {
+    // Older plugin builds only support _meta/routes.
+  }
+
+  try {
+    let dynamicRoutes = await sendCommand("_meta/routes", {});
+    dynamicRoutes = dynamicRoutes?.data ?? dynamicRoutes;
+    if (Array.isArray(dynamicRoutes?.routes)) {
+      return dynamicRoutes.routes.map((route) => ({
+        route,
+        toolName: routeToToolName(route),
+        category: route.split("/")[0],
+        description: `Lazy Unity route: ${route}`,
+        inputSchema: {
+          type: "object",
+          properties: {},
+          additionalProperties: true,
+        },
+      }));
+    }
+  } catch (_) {
+    // Plugin might not support dynamic metadata yet.
+  }
+
+  return [];
+}
+
 // ─── Core tool names (always exposed individually) ───
 const CORE_TOOLS = new Set([
   // Connection & state
@@ -212,16 +250,17 @@ export function splitToolTiers(allEditorTools) {
           description:
             'Filter by category name (e.g. "animation", "prefab", "shadergraph"). Omit for full list.',
         },
+        includeSchema: {
+          type: "boolean",
+          description: "Include inputSchema for dynamically discovered tools. Defaults to false.",
+        },
       },
     },
-    handler: async ({ category } = {}) => {
-      // Try to fetch dynamic routes from Unity plugin for lazy discovery
-      let dynamicRoutes = null;
-      try {
-        dynamicRoutes = await sendCommand("_meta/routes", {});
-        dynamicRoutes = dynamicRoutes?.data ?? dynamicRoutes;
-      } catch (_) {
-        // Plugin might not support _meta/routes yet, use cached list only
+    handler: async ({ category, includeSchema } = {}) => {
+      const pluginTools = await fetchPluginTools();
+      const pluginToolsByName = new Map();
+      for (const tool of pluginTools) {
+        if (tool.toolName) pluginToolsByName.set(tool.toolName, tool);
       }
 
       // Merge dynamic routes into the advanced tool list
@@ -229,21 +268,20 @@ export function splitToolTiers(allEditorTools) {
       let mergedCategories = { ...categories };
       let dynamicCount = 0;
 
-      if (dynamicRoutes && dynamicRoutes.routes) {
-        for (const route of dynamicRoutes.routes) {
-          // Convert route to tool name: terrain/list → unity_terrain_list
-          const toolName = "unity_" + route.replace(/\//g, "_").replace(/-/g, "_");
-          const cat = route.split("/")[0];
+      for (const tool of pluginTools) {
+        const route = tool.route;
+        const toolName = tool.toolName || (route ? routeToToolName(route) : null);
+        const cat = tool.category || route?.split("/")[0];
+        if (!toolName || !cat) continue;
 
-          // Skip if already in our cached map
-          if (advancedMap.has(toolName) || CORE_TOOLS.has(toolName)) continue;
+        // Skip if already in our cached map
+        if (advancedMap.has(toolName) || CORE_TOOLS.has(toolName)) continue;
 
-          // Add to merged categories
-          if (!mergedCategories[cat]) mergedCategories[cat] = [];
-          if (!mergedCategories[cat].includes(toolName)) {
-            mergedCategories[cat].push(toolName);
-            dynamicCount++;
-          }
+        // Add to merged categories
+        if (!mergedCategories[cat]) mergedCategories[cat] = [];
+        if (!mergedCategories[cat].includes(toolName)) {
+          mergedCategories[cat].push(toolName);
+          dynamicCount++;
         }
       }
 
@@ -259,7 +297,20 @@ export function splitToolTiers(allEditorTools) {
         // Also include dynamic-only tools for this category
         const dynamicTools = (mergedCategories[cat] || [])
           .filter((name) => !advancedMap.has(name))
-          .map((name) => ({ name, description: `(lazy-loaded from Unity plugin)` }));
+          .map((name) => {
+            const meta = pluginToolsByName.get(name);
+            const result = {
+              name,
+              description: meta?.description || `(lazy-loaded from Unity plugin)`,
+            };
+            if (includeSchema && meta?.inputSchema) {
+              result.inputSchema = meta.inputSchema;
+            }
+            if (meta?.route) {
+              result.route = meta.route;
+            }
+            return result;
+          });
 
         const all = [
           ...matching.map((t) => ({ name: t.name, description: t.description })),
@@ -282,6 +333,16 @@ export function splitToolTiers(allEditorTools) {
           totalAdvancedTools: advanced.length + dynamicCount,
           dynamicTools: dynamicCount,
           categories: result,
+          dynamicToolDetails: includeSchema
+            ? pluginTools
+                .filter((tool) => tool.toolName && !advancedMap.has(tool.toolName) && !CORE_TOOLS.has(tool.toolName))
+                .map((tool) => ({
+                  name: tool.toolName,
+                  route: tool.route,
+                  description: tool.description,
+                  inputSchema: tool.inputSchema,
+                }))
+            : undefined,
         },
         null,
         2
@@ -321,6 +382,18 @@ export function splitToolTiers(allEditorTools) {
       const targetTool = advancedMap.get(tool);
       if (targetTool) {
         return await targetTool.handler(params || {});
+      }
+
+      const pluginTools = await fetchPluginTools();
+      const dynamicTool = pluginTools.find((item) => item.toolName === tool);
+      if (dynamicTool?.route) {
+        try {
+          console.error(`[MCP] Lazy-loading tool "${tool}" via plugin route "${dynamicTool.route}"`);
+          const result = await sendCommand(dynamicTool.route, params || {});
+          return JSON.stringify(result, null, 2);
+        } catch (err) {
+          return `Error executing "${tool}" (lazy route: ${dynamicTool.route}): ${err.message}`;
+        }
       }
 
       // ─── Lazy loading fallback ───

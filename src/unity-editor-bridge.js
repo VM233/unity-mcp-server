@@ -29,6 +29,7 @@ export function setAgentId(agentId) {
 // Retry settings â€" handles Unity domain reloads (1-3 sec server downtime)
 const MAX_RETRIES = 4;
 const RETRY_BASE_DELAY_MS = 800; // 800ms, 1600ms, 3200ms, 6400ms
+const POLL_TRANSIENT_RETRY_BASE_MS = 500;
 
 /**
  * Sleep helper for retry backoff
@@ -59,6 +60,10 @@ function isTransientError(error, response) {
     return true;
   }
   return false;
+}
+
+function canReplayAfterLostTicket(command) {
+  return command.startsWith("_meta/") || command.startsWith("packages/");
 }
 
 /**
@@ -103,6 +108,8 @@ async function pollQueueStatus(ticketId) {
   // Use dedicated poll timeout (longer than bridge timeout to handle slow operations like execute_code)
   const timeoutMs = CONFIG.queuePollTimeoutMs || CONFIG.editorBridgeTimeout;
   let consecutive404s = 0;
+  let sawTransientPollError = false;
+  let transientRetryCount = 0;
   const max404Grace = 5; // Allow a few 404s during the dequeueâ†'execute race window
 
   while (true) {
@@ -126,6 +133,19 @@ async function pollQueueStatus(ticketId) {
       });
 
       if (!response.ok) {
+        if (isTransientError(null, response)) {
+          sawTransientPollError = true;
+          const delay = Math.min(
+            POLL_TRANSIENT_RETRY_BASE_MS * Math.pow(1.5, transientRetryCount++),
+            maxIntervalMs
+          );
+          console.error(
+            `[MCP Bridge] Queue poll HTTP ${response.status} for ticket ${ticketId}; retrying in ${delay}ms...`
+          );
+          await sleep(delay);
+          continue;
+        }
+
         // Grace period for 404 â€" ticket may be between dequeue and execution tracking
         if (response.status === 404) {
           consecutive404s++;
@@ -136,6 +156,14 @@ async function pollQueueStatus(ticketId) {
           }
         }
         const text = await response.text();
+        if (response.status === 404 && sawTransientPollError) {
+          return {
+            success: false,
+            retryable: true,
+            error: `Queue ticket ${ticketId} was lost after a Unity reload: ${text}`,
+          };
+        }
+
         return {
           success: false,
           error: `Failed to poll queue status: HTTP ${response.status}: ${text}`,
@@ -144,6 +172,7 @@ async function pollQueueStatus(ticketId) {
 
       // Reset 404 counter on successful poll
       consecutive404s = 0;
+      transientRetryCount = 0;
 
       const statusData = await response.json();
 
@@ -170,6 +199,19 @@ async function pollQueueStatus(ticketId) {
         maxIntervalMs
       );
     } catch (error) {
+      if (isTransientError(error, null)) {
+        sawTransientPollError = true;
+        const delay = Math.min(
+          POLL_TRANSIENT_RETRY_BASE_MS * Math.pow(1.5, transientRetryCount++),
+          maxIntervalMs
+        );
+        console.error(
+          `[MCP Bridge] Queue poll transient error for ticket ${ticketId}: ${error.message}; retrying in ${delay}ms...`
+        );
+        await sleep(delay);
+        continue;
+      }
+
       return {
         success: false,
         error: `Error polling queue: ${error.message}`,
@@ -291,6 +333,15 @@ export async function sendCommand(command, params = {}) {
           // Queue submission succeeded (we got a ticket), so queue mode is confirmed
           _queueModeDetermined = true;
           _useQueueMode = true;
+          if (!result.success && result.retryable && canReplayAfterLostTicket(command) && attempt < MAX_RETRIES) {
+            const delay = RETRY_BASE_DELAY_MS * Math.pow(2, attempt);
+            console.error(
+              `[MCP Bridge] Replaying "${command}" after lost queue ticket ${ticketId} in ${delay}ms (${attempt + 1}/${MAX_RETRIES})...`
+            );
+            await sleep(delay);
+            continue;
+          }
+
           return result;
         } catch (submitError) {
           submitLastError = submitError;
