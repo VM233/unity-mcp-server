@@ -700,6 +700,35 @@ export const editorTools = [
     handler: async (params) => JSON.stringify(await bridge.setAnimationClipCurve(params), null, 2),
   },
   {
+    name: "unity_animation_set_object_reference_curve",
+    description: "Set an object reference animation curve on a clip, such as SpriteRenderer.m_Sprite keyframes for sprite animation.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        clipPath: { type: "string", description: "Asset path of the Animation Clip" },
+        relativePath: { type: "string", description: "Relative path to the animated object (empty for root)" },
+        propertyName: { type: "string", description: "Object reference property to animate (e.g. 'm_Sprite')" },
+        type: { type: "string", description: "Component type that owns the property (default: 'SpriteRenderer')" },
+        keyframes: {
+          type: "array",
+          description: "Array of object reference keyframes. Use assetPath for a single asset, or assetPath + assetName for a sub-asset Sprite in a sheet.",
+          items: {
+            type: "object",
+            properties: {
+              time: { type: "number", description: "Time in seconds" },
+              assetPath: { type: "string", description: "Asset path to reference" },
+              assetName: { type: "string", description: "Optional sub-asset name, useful for sprites packed in one texture" },
+              objectType: { type: "string", description: "Optional object type override (e.g. 'Sprite')" },
+              value: { description: "Optional generic object reference value. Can be null, an asset path, or an object reference descriptor." },
+            },
+          },
+        },
+      },
+      required: ["clipPath", "propertyName", "keyframes"],
+    },
+    handler: async (params) => JSON.stringify(await bridge.setAnimationObjectReferenceCurve(params), null, 2),
+  },
+  {
     name: "unity_animation_add_layer",
     description: "Add a new layer to an Animator Controller.",
     inputSchema: {
