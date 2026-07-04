@@ -1586,6 +1586,26 @@ export async function setUIImage(params) {
   return sendCommand("ui/set-image", params);
 }
 
+export async function listEditorUIWindows(params) {
+  return sendCommand("uitoolkit/windows", params);
+}
+
+export async function getEditorUITree(params) {
+  return sendCommand("uitoolkit/tree", params);
+}
+
+export async function queryEditorUI(params) {
+  return sendCommand("uitoolkit/query", params);
+}
+
+export async function getEditorUIStyle(params) {
+  return sendCommand("uitoolkit/style", params);
+}
+
+export async function repaintEditorUI(params) {
+  return sendCommand("uitoolkit/repaint", params);
+}
+
 // â"€â"€â"€ Package Manager â"€â"€â"€
 
 export async function listPackages(params) {

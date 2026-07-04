@@ -3919,6 +3919,86 @@ export const editorTools = [
     },
     handler: async (params) => JSON.stringify(await bridge.setUIImage(params), null, 2),
   },
+  {
+    name: "unity_uitoolkit_windows",
+    description: "List open Unity Editor windows with UI Toolkit root metadata.",
+    inputSchema: { type: "object", properties: {} },
+    handler: async (params) => JSON.stringify(await bridge.listEditorUIWindows(params), null, 2),
+  },
+  {
+    name: "unity_uitoolkit_tree",
+    description:
+      "Read a UI Toolkit visual tree from an EditorWindow. Targets the focused window by default, or pass instanceId/window/windowType/title.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        instanceId: { type: "number", description: "EditorWindow instance id from unity_uitoolkit_windows." },
+        window: { type: "string", description: "Window title, type name, full type name, or instance id." },
+        windowType: { type: "string", description: "EditorWindow type name or full type name." },
+        title: { type: "string", description: "EditorWindow title text." },
+        maxDepth: { type: "number", description: "Maximum tree depth. Defaults to 8." },
+        maxNodes: { type: "number", description: "Maximum returned nodes. Defaults to 300." },
+        includeStyle: { type: "boolean", description: "Include inline and resolved style summaries. Defaults to false." },
+      },
+    },
+    handler: async (params) => JSON.stringify(await bridge.getEditorUITree(params), null, 2),
+  },
+  {
+    name: "unity_uitoolkit_query",
+    description:
+      "Query UI Toolkit elements in an EditorWindow by name, className, typeName, or text. Returns element paths for style/repaint calls.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        instanceId: { type: "number", description: "EditorWindow instance id from unity_uitoolkit_windows." },
+        window: { type: "string", description: "Window title, type name, full type name, or instance id." },
+        windowType: { type: "string", description: "EditorWindow type name or full type name." },
+        title: { type: "string", description: "EditorWindow title text." },
+        name: { type: "string", description: "VisualElement.name exact match." },
+        className: { type: "string", description: "USS class name exact match." },
+        typeName: { type: "string", description: "VisualElement type name or full type name contains match." },
+        text: { type: "string", description: "TextElement text contains match." },
+        maxResults: { type: "number", description: "Maximum returned elements. Defaults to 50." },
+        includeStyle: { type: "boolean", description: "Include inline and resolved style summaries. Defaults to false." },
+      },
+    },
+    handler: async (params) => JSON.stringify(await bridge.queryEditorUI(params), null, 2),
+  },
+  {
+    name: "unity_uitoolkit_style",
+    description:
+      "Read inline and resolved style for a UI Toolkit element. Pass an element path from tree/query, or query filters to pick the first match.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        instanceId: { type: "number", description: "EditorWindow instance id from unity_uitoolkit_windows." },
+        window: { type: "string", description: "Window title, type name, full type name, or instance id." },
+        windowType: { type: "string", description: "EditorWindow type name or full type name." },
+        title: { type: "string", description: "EditorWindow title text." },
+        path: { type: "string", description: "Element path from unity_uitoolkit_tree/query, e.g. 'root/0/2'." },
+        name: { type: "string", description: "VisualElement.name exact match if path is omitted." },
+        className: { type: "string", description: "USS class name exact match if path is omitted." },
+        typeName: { type: "string", description: "VisualElement type name contains match if path is omitted." },
+        text: { type: "string", description: "TextElement text contains match if path is omitted." },
+      },
+    },
+    handler: async (params) => JSON.stringify(await bridge.getEditorUIStyle(params), null, 2),
+  },
+  {
+    name: "unity_uitoolkit_repaint",
+    description: "Trigger repaint on a UI Toolkit EditorWindow, optionally marking a specific element path dirty first.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        instanceId: { type: "number", description: "EditorWindow instance id from unity_uitoolkit_windows." },
+        window: { type: "string", description: "Window title, type name, full type name, or instance id." },
+        windowType: { type: "string", description: "EditorWindow type name or full type name." },
+        title: { type: "string", description: "EditorWindow title text." },
+        path: { type: "string", description: "Optional element path from unity_uitoolkit_tree/query." },
+      },
+    },
+    handler: async (params) => JSON.stringify(await bridge.repaintEditorUI(params), null, 2),
+  },
 
   // â”€â”€â”€ Package Manager â”€â”€â”€
 
