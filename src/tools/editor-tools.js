@@ -3976,6 +3976,51 @@ export const editorTools = [
     },
     handler: async (params) => JSON.stringify(await bridge.getPackageInfo(params), null, 2),
   },
+  {
+    name: "unity_packages_update_git",
+    description:
+      "Update a Git-based Unity package to latest main or a specified branch/commit, then report the packages-lock hash Unity resolved.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string", description: "Package name, e.g. 'com.example.package'" },
+        gitUrl: {
+          type: "string",
+          description: "Optional Git URL. If omitted, the current Git URL is read from Packages/manifest.json.",
+        },
+        ref: {
+          type: "string",
+          description: "Optional branch, tag, or commit. Defaults to 'main'.",
+        },
+        commit: {
+          type: "string",
+          description: "Optional commit hash alias for ref.",
+        },
+        branch: {
+          type: "string",
+          description: "Optional branch alias for ref.",
+        },
+      },
+      required: ["name"],
+    },
+    handler: async (params) => JSON.stringify(await bridge.updateGitPackage(params), null, 2),
+  },
+  {
+    name: "unity_packages_lint_metas",
+    description:
+      "Lint a Unity package root for files or directories missing matching .meta files, useful for immutable Git package cache errors.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string", description: "Installed package name to lint." },
+        path: { type: "string", description: "Absolute path or project-relative package path to lint." },
+        all: { type: "boolean", description: "Lint all resolved package roots. Defaults to false." },
+        checkDirectories: { type: "boolean", description: "Also require directory .meta files. Defaults to true." },
+        maxResults: { type: "number", description: "Maximum missing entries returned per package. Defaults to 200." },
+      },
+    },
+    handler: async (params) => JSON.stringify(await bridge.lintPackageMetas(params), null, 2),
+  },
 
   // â”€â”€â”€ Constraints & LOD â”€â”€â”€
 

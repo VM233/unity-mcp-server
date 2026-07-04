@@ -146,6 +146,8 @@ const CORE_TOOLS = new Set([
   "unity_packages_remove",
   "unity_packages_search",
   "unity_packages_info",
+  "unity_packages_update_git",
+  "unity_packages_lint_metas",
 
   // Queue & agents
   "unity_queue_info",

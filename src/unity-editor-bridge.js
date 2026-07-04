@@ -1608,6 +1608,14 @@ export async function getPackageInfo(params) {
   return sendCommand("packages/info", params);
 }
 
+export async function updateGitPackage(params) {
+  return sendCommand("packages/update-git", params);
+}
+
+export async function lintPackageMetas(params) {
+  return sendCommand("packages/lint-metas", params);
+}
+
 // â"€â"€â"€ Constraints & LOD â"€â"€â"€
 
 export async function addConstraint(params) {
