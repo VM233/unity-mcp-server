@@ -110,6 +110,13 @@ To avoid overwhelming MCP clients with 288 tools, the server uses a two-tier arc
 
 This keeps the tool count manageable for clients like Claude Desktop and Cowork while still providing access to every Unity feature. Use `unity_list_advanced_tools` to discover all advanced tools by category.
 
+`unity_advanced_tool` is also the stable generic fallback when tool metadata is stale. Its `tool` field accepts:
+- A registered MCP tool name, such as `unity_animation_create_controller`
+- A raw Unity route, such as `packages/update-git`
+- A project tool shortcut, such as `project-tool:add-property`
+
+Use `params` for the route or project tool arguments. This lets new Unity plugin routes and project-defined tools run before the MCP client's tool list has refreshed.
+
 ### Multi-Instance Support
 
 The server automatically discovers all running Unity Editor instances on startup. If only one instance is found, it auto-connects. If multiple instances are running (e.g., main editor + ParrelSync clones), it prompts you to select which one to work with.

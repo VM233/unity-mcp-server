@@ -9,10 +9,10 @@
 // larger than working servers). This keeps us under the safe limit.
 //
 // Lazy loading: Advanced tools support dynamic dispatch. If a tool
-// isn't in the cached map, the route is derived from the tool name
-// (unity_terrain_list → terrain/list) and called directly via sendCommand.
-// This means new tools added to the C# plugin work immediately without
-// restarting the MCP server.
+// isn't in the cached map, callers can pass a raw Unity route directly,
+// use a project-tool:<name> shortcut, or rely on route derivation
+// (unity_terrain_list → terrain/list). This means new C# plugin routes
+// and project-defined tools can run before MCP client metadata refreshes.
 
 import { sendCommand } from "./unity-editor-bridge.js";
 
@@ -54,6 +54,24 @@ function toolNameToRoute(toolName) {
 
 function routeToToolName(route) {
   return "unity_" + route.replace(/\//g, "_").replace(/-/g, "_");
+}
+
+function isUnityRoute(value) {
+  return typeof value === "string" && value.includes("/") && !value.startsWith("/") && !value.includes("..");
+}
+
+function getProjectToolName(value) {
+  if (typeof value !== "string") return null;
+
+  const prefixes = ["project-tool:", "project:"];
+  for (const prefix of prefixes) {
+    if (value.startsWith(prefix)) {
+      const toolName = value.slice(prefix.length).trim();
+      return toolName || null;
+    }
+  }
+
+  return null;
 }
 
 async function fetchPluginTools() {
@@ -353,22 +371,20 @@ export function splitToolTiers(allEditorTools) {
   const advancedTool = {
     name: "unity_advanced_tool",
     description:
-      "Execute an advanced/specialized Unity tool by name. Use unity_list_advanced_tools " +
-      "to discover available tools and their parameters. This provides access to 200+ " +
-      "specialized tools for animation, prefabs, physics, shaders, terrain, particles, " +
-      "UI, profiling, and more.",
+      "Execute an advanced/specialized Unity tool by name, a raw Unity route, or a project tool " +
+      "via project-tool:<name>. Use this as the stable generic entry when tool metadata is stale.",
     inputSchema: {
       type: "object",
       properties: {
         tool: {
           type: "string",
           description:
-            'The tool name to execute (e.g. "unity_animation_create_controller", "unity_shadergraph_create")',
+            'Tool name, raw route, or project tool shortcut. Examples: "unity_animation_create_controller", "packages/update-git", "project-tool:add-property".',
         },
         params: {
           type: "object",
           description:
-            "Parameters to pass to the tool. Use unity_list_advanced_tools to see required parameters.",
+            "Parameters to pass to the tool, raw route, or project tool.",
           additionalProperties: true,
         },
       },
@@ -377,6 +393,30 @@ export function splitToolTiers(allEditorTools) {
     handler: async ({ tool, params } = {}) => {
       if (!tool) {
         return "Error: 'tool' parameter is required. Use unity_list_advanced_tools to see available tools.";
+      }
+
+      const projectToolName = getProjectToolName(tool);
+      if (projectToolName) {
+        try {
+          console.error(`[MCP] Calling project tool "${projectToolName}" via stable generic entry`);
+          const result = await sendCommand("project-tools/execute", {
+            toolName: projectToolName,
+            args: params || {},
+          });
+          return JSON.stringify(result, null, 2);
+        } catch (err) {
+          return `Error executing project tool "${projectToolName}": ${err.message}`;
+        }
+      }
+
+      if (isUnityRoute(tool)) {
+        try {
+          console.error(`[MCP] Calling raw Unity route "${tool}" via stable generic entry`);
+          const result = await sendCommand(tool, params || {});
+          return JSON.stringify(result, null, 2);
+        } catch (err) {
+          return `Error executing route "${tool}": ${err.message}`;
+        }
       }
 
       const targetTool = advancedMap.get(tool);
