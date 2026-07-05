@@ -4080,6 +4080,15 @@ export const editorTools = [
           type: "string",
           description: "Optional branch alias for ref.",
         },
+        skipIfResolved: {
+          type: "boolean",
+          description:
+            "Skip Package Manager resolve when packages-lock already matches the requested Git commit. Defaults to true.",
+        },
+        force: {
+          type: "boolean",
+          description: "Force Package Manager resolve even when packages-lock already matches. Defaults to false.",
+        },
       },
       required: ["name"],
     },
