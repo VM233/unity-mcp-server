@@ -15,6 +15,10 @@
 // and project-defined tools can run before MCP client metadata refreshes.
 
 import { sendCommand } from "./unity-editor-bridge.js";
+import { loadState, persistState } from "./state-persistence.js";
+import { staticFirstClassPluginTools } from "./tools/plugin-first-class-tools.js";
+
+const PLUGIN_TOOLS_CACHE_KEY = "pluginToolsMetadata";
 
 /**
  * Explicit route overrides for tools whose API endpoints
@@ -92,11 +96,23 @@ function getProjectToolName(value) {
   return null;
 }
 
-async function fetchPluginTools() {
+function loadPluginToolsCache() {
+  const cached = loadState(PLUGIN_TOOLS_CACHE_KEY);
+  return Array.isArray(cached) ? cached : [];
+}
+
+function savePluginToolsCache(tools) {
+  if (Array.isArray(tools) && tools.length > 0) {
+    persistState(PLUGIN_TOOLS_CACHE_KEY, tools);
+  }
+}
+
+async function fetchPluginToolsLive() {
   try {
     let metaTools = await sendCommand("_meta/tools", {});
     metaTools = metaTools?.data ?? metaTools;
     if (Array.isArray(metaTools?.tools)) {
+      savePluginToolsCache(metaTools.tools);
       return metaTools.tools;
     }
   } catch (_) {
@@ -107,7 +123,7 @@ async function fetchPluginTools() {
     let dynamicRoutes = await sendCommand("_meta/routes", {});
     dynamicRoutes = dynamicRoutes?.data ?? dynamicRoutes;
     if (Array.isArray(dynamicRoutes?.routes)) {
-      return dynamicRoutes.routes.map((route) => ({
+      const tools = dynamicRoutes.routes.map((route) => ({
         route,
         toolName: routeToToolName(route),
         category: route.split("/")[0],
@@ -118,12 +134,23 @@ async function fetchPluginTools() {
           additionalProperties: true,
         },
       }));
+      savePluginToolsCache(tools);
+      return tools;
     }
   } catch (_) {
     // Plugin might not support dynamic metadata yet.
   }
 
   return [];
+}
+
+function fetchPluginToolsForToolList() {
+  return loadPluginToolsCache();
+}
+
+async function fetchPluginToolsForCatalog() {
+  const liveTools = await fetchPluginToolsLive();
+  return liveTools.length > 0 ? liveTools : loadPluginToolsCache();
 }
 
 function isFirstClassProjectTool(tool) {
@@ -198,28 +225,28 @@ export function sanitizeToolMetadata(value) {
 }
 
 export async function fetchFirstClassPluginTools() {
-  const pluginTools = await fetchPluginTools();
-  const exposed = [];
-  const seen = new Set();
+  const pluginTools = fetchPluginToolsForToolList();
+  const candidatesByName = new Map();
+
+  for (const tool of staticFirstClassPluginTools) {
+    candidatesByName.set(tool.toolName, tool);
+  }
 
   for (const tool of pluginTools) {
-    if (
-      (!isFirstClassProjectTool(tool) && !isFirstClassRouteTool(tool)) ||
-      seen.has(tool.toolName)
-    ) {
-      continue;
-    }
+    if (!isFirstClassProjectTool(tool) && !isFirstClassRouteTool(tool)) continue;
+    if (!tool.toolName) continue;
+    candidatesByName.set(tool.toolName, tool);
+  }
 
-    seen.add(tool.toolName);
+  const exposed = [];
+  for (const tool of candidatesByName.values()) {
     exposed.push({
       name: tool.toolName,
       description: sanitizeToolMetadata(
         tool.description || `Unity MCP route: ${tool.route}`),
       inputSchema: normalizeInputSchema(tool.inputSchema),
-      handler: async (params = {}) => {
-        const result = await sendCommand(tool.route, params || {});
-        return JSON.stringify(result, null, 2);
-      },
+      handler: async (params = {}) =>
+        JSON.stringify(await sendCommand(tool.route, params || {}), null, 2),
     });
   }
 
@@ -394,7 +421,7 @@ export function splitToolTiers(allEditorTools) {
       },
     },
     handler: async ({ category, includeSchema } = {}) => {
-      const pluginTools = await fetchPluginTools();
+      const pluginTools = await fetchPluginToolsForCatalog();
       const pluginToolsByName = new Map();
       for (const tool of pluginTools) {
         if (tool.toolName) pluginToolsByName.set(tool.toolName, tool);
@@ -550,7 +577,7 @@ export function splitToolTiers(allEditorTools) {
         return await targetTool.handler(params || {});
       }
 
-      const pluginTools = await fetchPluginTools();
+      const pluginTools = await fetchPluginToolsLive();
       const dynamicTool = pluginTools.find((item) => item.toolName === tool);
       if (dynamicTool?.route) {
         try {
