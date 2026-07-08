@@ -33,7 +33,7 @@ import { editorTools } from "./tools/editor-tools.js";
 import { umaTools } from "./tools/uma-tools.js";
 import { contextTools } from "./tools/context-tools.js";
 import { instanceTools } from "./tools/instance-tools.js";
-import { splitToolTiers } from "./tool-tiers.js";
+import { fetchFirstClassProjectTools, splitToolTiers } from "./tool-tiers.js";
 import { setAgentId, getProjectContext } from "./unity-editor-bridge.js";
 import {
   autoSelectInstance,
@@ -306,46 +306,66 @@ const TOOLS_SKIP_PORT_INJECT = new Set([
   "unity_list_instances",
 ]);
 
+function toolWithPortSchema({ name, description, inputSchema }) {
+  // Inject port into unity_* tools that target an Editor instance
+  if (
+    name.startsWith("unity_") &&
+    !name.startsWith("unity_hub_") &&
+    !TOOLS_SKIP_PORT_INJECT.has(name)
+  ) {
+    const schema = inputSchema || { type: "object", properties: {} };
+    const augmented = {
+      ...schema,
+      properties: {
+        ...(schema.properties || {}),
+        port: {
+          type: "number",
+          description:
+            "Target Unity instance port for parallel-safe routing. " +
+            "Get this from unity_select_instance. When working with " +
+            "multiple Unity instances, ALWAYS include this parameter.",
+        },
+      },
+    };
+    return { name, description, inputSchema: augmented };
+  }
+
+  return { name, description, inputSchema };
+}
+
+async function getExposedTools() {
+  const tools = [...ALL_TOOLS];
+  const names = new Set(tools.map((tool) => tool.name));
+  const projectTools = await fetchFirstClassProjectTools();
+
+  for (const tool of projectTools) {
+    if (names.has(tool.name)) continue;
+    names.add(tool.name);
+    tools.push(tool);
+  }
+
+  return tools;
+}
+
+async function findExposedTool(name) {
+  const staticTool = ALL_TOOLS.find((tool) => tool.name === name);
+  if (staticTool) return staticTool;
+
+  const projectTools = await fetchFirstClassProjectTools();
+  return projectTools.find((tool) => tool.name === name) || null;
+}
+
 server.setRequestHandler(ListToolsRequestSchema, async () => {
+  const tools = await getExposedTools();
   return {
-    tools: ALL_TOOLS.map(({ name, description, inputSchema }) => {
-      // Inject port into unity_* tools that target an Editor instance
-      if (
-        name.startsWith("unity_") &&
-        !name.startsWith("unity_hub_") &&
-        !TOOLS_SKIP_PORT_INJECT.has(name)
-      ) {
-        const augmented = {
-          ...inputSchema,
-          properties: {
-            ...(inputSchema.properties || {}),
-            port: {
-              type: "number",
-              description:
-                "Target Unity instance port for parallel-safe routing. " +
-                "Get this from unity_select_instance. When working with " +
-                "multiple Unity instances, ALWAYS include this parameter.",
-            },
-          },
-        };
-        return { name, description, inputSchema: augmented };
-      }
-      return { name, description, inputSchema };
-    }),
+    tools: tools.map(toolWithPortSchema),
   };
 });
 
 // ─── Call Tool Handler ───
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
-
-  const tool = ALL_TOOLS.find((t) => t.name === name);
-  if (!tool) {
-    return {
-      content: [{ type: "text", text: `Unknown tool: ${name}` }],
-      isError: true,
-    };
-  }
+  let tool = ALL_TOOLS.find((t) => t.name === name);
 
   try {
     // Allow per-request agent ID override from MCP metadata, but default to
@@ -404,6 +424,17 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               "Multiple Unity instances are running. You must call unity_list_instances and then unity_select_instance before using other Unity tools.",
           },
         ],
+        isError: true,
+      };
+    }
+
+    if (!tool) {
+      tool = await findExposedTool(name);
+    }
+
+    if (!tool) {
+      return {
+        content: [{ type: "text", text: `Unknown tool: ${name}` }],
         isError: true,
       };
     }

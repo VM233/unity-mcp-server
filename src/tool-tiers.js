@@ -108,6 +108,53 @@ async function fetchPluginTools() {
   return [];
 }
 
+function isFirstClassProjectTool(tool) {
+  return (
+    tool &&
+    typeof tool.toolName === "string" &&
+    typeof tool.projectToolName === "string" &&
+    tool.projectToolName.length > 0 &&
+    typeof tool.route === "string" &&
+    tool.route.startsWith("project-tools/call/")
+  );
+}
+
+function normalizeInputSchema(schema) {
+  if (schema && typeof schema === "object" && !Array.isArray(schema)) {
+    return schema;
+  }
+
+  return {
+    type: "object",
+    properties: {},
+    additionalProperties: true,
+  };
+}
+
+export async function fetchFirstClassProjectTools() {
+  const pluginTools = await fetchPluginTools();
+  const exposed = [];
+  const seen = new Set();
+
+  for (const tool of pluginTools) {
+    if (!isFirstClassProjectTool(tool) || seen.has(tool.toolName)) continue;
+
+    seen.add(tool.toolName);
+    exposed.push({
+      name: tool.toolName,
+      description:
+        tool.description || `Project MCP tool: ${tool.projectToolName}`,
+      inputSchema: normalizeInputSchema(tool.inputSchema),
+      handler: async (params = {}) => {
+        const result = await sendCommand(tool.route, params || {});
+        return JSON.stringify(result, null, 2);
+      },
+    });
+  }
+
+  return exposed;
+}
+
 // ─── Core tool names (always exposed individually) ───
 const CORE_TOOLS = new Set([
   // Connection & state
