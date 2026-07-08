@@ -117,6 +117,7 @@
     { "name": "unity_component_get_referenceable", "description": "Discover assignable objects for a property" },
     { "name": "unity_asset_list", "description": "List assets in the project" },
     { "name": "unity_asset_import", "description": "Import a file as an asset" },
+    { "name": "unity_asset_refresh", "description": "Refresh AssetDatabase or import specific asset paths" },
     { "name": "unity_asset_delete", "description": "Delete an asset from the project" },
     { "name": "unity_asset_create_prefab", "description": "Create a prefab from a GameObject" },
     { "name": "unity_asset_instantiate_prefab", "description": "Instantiate a prefab in the scene" },

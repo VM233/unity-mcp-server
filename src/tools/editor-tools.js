@@ -304,6 +304,31 @@ export const editorTools = [
     handler: async (params) => JSON.stringify(await bridge.importAsset(params), null, 2),
   },
   {
+    name: "unity_asset_refresh",
+    description: "Refresh AssetDatabase, optionally forcing update or importing specific asset paths.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        assetPaths: {
+          type: "array",
+          description: "Optional Unity asset paths to import individually.",
+          items: { type: "string" },
+        },
+        assetPath: { type: "string", description: "Single asset path alias." },
+        path: { type: "string", description: "Single asset path alias." },
+        forceUpdate: {
+          type: "boolean",
+          description: "Use ImportAssetOptions.ForceUpdate. Defaults to true.",
+        },
+        saveAssets: {
+          type: "boolean",
+          description: "Call AssetDatabase.SaveAssets after refresh/import. Defaults to false.",
+        },
+      },
+    },
+    handler: async (params) => JSON.stringify(await bridge.refreshAssets(params), null, 2),
+  },
+  {
     name: "unity_asset_delete",
     description: "Delete an asset from the project.",
     inputSchema: {
