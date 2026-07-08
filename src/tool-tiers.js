@@ -119,6 +119,16 @@ function isFirstClassProjectTool(tool) {
   );
 }
 
+function isFirstClassRouteTool(tool) {
+  return (
+    tool &&
+    tool.firstClass === true &&
+    typeof tool.toolName === "string" &&
+    typeof tool.route === "string" &&
+    tool.route.length > 0
+  );
+}
+
 function normalizeInputSchema(schema) {
   if (schema && typeof schema === "object" && !Array.isArray(schema)) {
     return schema;
@@ -131,19 +141,24 @@ function normalizeInputSchema(schema) {
   };
 }
 
-export async function fetchFirstClassProjectTools() {
+export async function fetchFirstClassPluginTools() {
   const pluginTools = await fetchPluginTools();
   const exposed = [];
   const seen = new Set();
 
   for (const tool of pluginTools) {
-    if (!isFirstClassProjectTool(tool) || seen.has(tool.toolName)) continue;
+    if (
+      (!isFirstClassProjectTool(tool) && !isFirstClassRouteTool(tool)) ||
+      seen.has(tool.toolName)
+    ) {
+      continue;
+    }
 
     seen.add(tool.toolName);
     exposed.push({
       name: tool.toolName,
       description:
-        tool.description || `Project MCP tool: ${tool.projectToolName}`,
+        tool.description || `Unity MCP route: ${tool.route}`,
       inputSchema: normalizeInputSchema(tool.inputSchema),
       handler: async (params = {}) => {
         const result = await sendCommand(tool.route, params || {});

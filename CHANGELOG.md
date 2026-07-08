@@ -7,6 +7,7 @@ All notable changes to this package will be documented in this file.
 ### Added
 - **First-class project tools** — Unity plugin tools with `projectToolName` metadata are now exposed directly in MCP `tools/list` with their declared schemas, while still remaining callable through `unity_advanced_tool` as a stale-metadata fallback.
 - **`unity_asset_refresh` core tool** — Expose AssetDatabase refresh/import-specific-path refresh as a first-class MCP tool instead of requiring `unity_advanced_tool`.
+- **First-class Unity plugin routes** — `_meta/tools` entries with `firstClass=true` are now exposed directly in MCP `tools/list` with their route-owned schemas and descriptions, instead of requiring `unity_advanced_tool`.
 
 ## [2.30.0] - 2026-06-02
 

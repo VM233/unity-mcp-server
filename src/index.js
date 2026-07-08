@@ -33,7 +33,7 @@ import { editorTools } from "./tools/editor-tools.js";
 import { umaTools } from "./tools/uma-tools.js";
 import { contextTools } from "./tools/context-tools.js";
 import { instanceTools } from "./tools/instance-tools.js";
-import { fetchFirstClassProjectTools, splitToolTiers } from "./tool-tiers.js";
+import { fetchFirstClassPluginTools, splitToolTiers } from "./tool-tiers.js";
 import { setAgentId, getProjectContext } from "./unity-editor-bridge.js";
 import {
   autoSelectInstance,
@@ -336,7 +336,7 @@ function toolWithPortSchema({ name, description, inputSchema }) {
 async function getExposedTools() {
   const tools = [...ALL_TOOLS];
   const names = new Set(tools.map((tool) => tool.name));
-  const projectTools = await fetchFirstClassProjectTools();
+  const projectTools = await fetchFirstClassPluginTools();
 
   for (const tool of projectTools) {
     if (names.has(tool.name)) continue;
@@ -351,7 +351,7 @@ async function findExposedTool(name) {
   const staticTool = ALL_TOOLS.find((tool) => tool.name === name);
   if (staticTool) return staticTool;
 
-  const projectTools = await fetchFirstClassProjectTools();
+  const projectTools = await fetchFirstClassPluginTools();
   return projectTools.find((tool) => tool.name === name) || null;
 }
 
