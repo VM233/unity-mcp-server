@@ -1,8 +1,8 @@
-// AnkleBreaker Unity MCP — Two-tier tool system
+// AnkleBreaker Unity MCP - two-tier tool system
 // Reduces the exposed tool count to avoid overwhelming MCP clients.
 //
 // Core tools: Always exposed as individual MCP tools (~60 tools)
-// Advanced tools: Accessed via unity_advanced_tool (200+ tools)
+// Advanced tools: Fallback access through unity_advanced_tool (200+ tools)
 //
 // Why: MCP clients like Claude Cowork silently fail when a server
 // exposes too many tools (our 268 tools / 125KB response was ~5x
@@ -11,17 +11,19 @@
 // Lazy loading: Advanced tools support dynamic dispatch. If a tool
 // isn't in the cached map, callers can pass a raw Unity route directly,
 // use a project-tool:<name> shortcut, or rely on route derivation
-// (unity_terrain_list → terrain/list). This means new C# plugin routes
+// (unity_terrain_list -> terrain/list). This means new C# plugin routes
 // and project-defined tools can run before MCP client metadata refreshes.
 
 import { sendCommand } from "./unity-editor-bridge.js";
 
 /**
  * Explicit route overrides for tools whose API endpoints
- * don't follow the standard name → route derivation pattern.
+ * don't follow the standard name -> route derivation pattern.
  * E.g. unity_mppm_* tools use "scenario/*" endpoints on the C# side.
  */
 const ROUTE_OVERRIDES = {
+  unity_asset_export_unitypackage: "asset/export-unitypackage",
+  unity_compilation_errors: "compilation/errors",
   unity_mppm_list_scenarios: "scenario/list",
   unity_mppm_status: "scenario/status",
   unity_mppm_activate_scenario: "scenario/activate",
@@ -33,10 +35,17 @@ const ROUTE_OVERRIDES = {
   unity_mppm_deactivate_player: "mppm/deactivate-player",
 };
 
+const ROUTE_CATEGORY_PREFIXES = [
+  ["prefab_asset", "prefab-asset"],
+  ["serialized_object", "serialized-object"],
+  ["scene_view", "scene-view"],
+];
+
 /**
  * Derive an HTTP route from a tool name.
- * unity_terrain_raise_lower → terrain/raise-lower
- * unity_animation_create_clip → animation/create-clip
+ * unity_terrain_raise_lower -> terrain/raise-lower
+ * unity_prefab_asset_set_property -> prefab-asset/set-property
+ * unity_serialized_object_get -> serialized-object/get
  */
 function toolNameToRoute(toolName) {
   // Check explicit overrides first (for tools whose API routes don't match their name)
@@ -44,6 +53,15 @@ function toolNameToRoute(toolName) {
 
   // Remove unity_ prefix
   const withoutPrefix = toolName.replace(/^unity_/, "");
+
+  for (const [toolPrefix, routeCategory] of ROUTE_CATEGORY_PREFIXES) {
+    const exactPrefix = `${toolPrefix}_`;
+    if (withoutPrefix.startsWith(exactPrefix)) {
+      const action = withoutPrefix.slice(exactPrefix.length).replace(/_/g, "-");
+      return action ? `${routeCategory}/${action}` : null;
+    }
+  }
+
   // Split into parts: first part is category, rest is action
   const parts = withoutPrefix.split("_");
   if (parts.length < 2) return null;
@@ -111,6 +129,7 @@ async function fetchPluginTools() {
 function isFirstClassProjectTool(tool) {
   return (
     tool &&
+    !isFallbackTool(tool) &&
     typeof tool.toolName === "string" &&
     typeof tool.projectToolName === "string" &&
     tool.projectToolName.length > 0 &&
@@ -119,10 +138,20 @@ function isFirstClassProjectTool(tool) {
   );
 }
 
+function isFallbackTool(tool) {
+  return tool?.exposure === "fallback" || tool?.fallback === true;
+}
+
 function isFirstClassRouteTool(tool) {
+  const explicitlyFirstClass =
+    tool?.firstClass === true ||
+    tool?.exposure === "first-class" ||
+    tool?.preferred === true;
+
   return (
     tool &&
-    tool.firstClass === true &&
+    explicitlyFirstClass &&
+    !isFallbackTool(tool) &&
     typeof tool.toolName === "string" &&
     typeof tool.route === "string" &&
     tool.route.length > 0
@@ -131,7 +160,7 @@ function isFirstClassRouteTool(tool) {
 
 function normalizeInputSchema(schema) {
   if (schema && typeof schema === "object" && !Array.isArray(schema)) {
-    return schema;
+    return sanitizeToolMetadata(schema);
   }
 
   return {
@@ -139,6 +168,33 @@ function normalizeInputSchema(schema) {
     properties: {},
     additionalProperties: true,
   };
+}
+
+export function sanitizeToolMetadata(value) {
+  if (typeof value === "string") {
+    return value
+      .replace(/â€”|â€“|—|–/g, "-")
+      .replace(/â†’|→/g, "->")
+      .replace(/â€¦|…/g, "...")
+      .replace(/â€˜|â€™|‘|’/g, "'")
+      .replace(/â€œ|â€�|“|”/g, '"')
+      .replace(/â€¢|•/g, "-")
+      .replace(/⚠️|⚠/g, "Warning:");
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => sanitizeToolMetadata(item));
+  }
+
+  if (value && typeof value === "object") {
+    const result = {};
+    for (const [key, item] of Object.entries(value)) {
+      result[key] = sanitizeToolMetadata(item);
+    }
+    return result;
+  }
+
+  return value;
 }
 
 export async function fetchFirstClassPluginTools() {
@@ -157,8 +213,8 @@ export async function fetchFirstClassPluginTools() {
     seen.add(tool.toolName);
     exposed.push({
       name: tool.toolName,
-      description:
-        tool.description || `Unity MCP route: ${tool.route}`,
+      description: sanitizeToolMetadata(
+        tool.description || `Unity MCP route: ${tool.route}`),
       inputSchema: normalizeInputSchema(tool.inputSchema),
       handler: async (params = {}) => {
         const result = await sendCommand(tool.route, params || {});
@@ -170,7 +226,7 @@ export async function fetchFirstClassPluginTools() {
   return exposed;
 }
 
-// ─── Core tool names (always exposed individually) ───
+// Core tool names (always exposed individually)
 const CORE_TOOLS = new Set([
   // Connection & state
   "unity_editor_ping",
@@ -299,7 +355,7 @@ export function splitToolTiers(allEditorTools) {
   // Group advanced tools by category for the catalog
   const categories = {};
   for (const t of advanced) {
-    // Extract category from tool name: unity_animation_create_clip → animation
+    // Extract category from tool name: unity_animation_create_clip -> animation
     const parts = t.name.replace(/^unity_/, "").split("_");
     const cat = parts[0];
     if (!categories[cat]) categories[cat] = [];
@@ -312,13 +368,13 @@ export function splitToolTiers(allEditorTools) {
     advancedMap.set(t.name, t);
   }
 
-  // ─── Meta-tools ───
+  // Meta-tools
 
   const catalogTool = {
     name: "unity_list_advanced_tools",
     description:
-      "List all available advanced/specialized Unity tools organized by category. " +
-      "These tools are not directly exposed but can be called via unity_advanced_tool. " +
+      "List fallback Unity tools organized by category. Prefer directly exposed unity_* tools first; " +
+      "use unity_advanced_tool only when no concrete tool exists or metadata is stale. " +
       "Categories include: uma, animation, prefab, physics, lighting, audio, shadergraph, " +
       "amplify, terrain, particle, navmesh, ui, texture, profiler, memory, settings, " +
       "input, asmdef, scriptableobject, constraint, lod, editorprefs, playerprefs, " +
@@ -350,6 +406,8 @@ export function splitToolTiers(allEditorTools) {
       let dynamicCount = 0;
 
       for (const tool of pluginTools) {
+        if (isFirstClassProjectTool(tool) || isFirstClassRouteTool(tool)) continue;
+
         const route = tool.route;
         const toolName = tool.toolName || (route ? routeToToolName(route) : null);
         const cat = tool.category || route?.split("/")[0];
@@ -382,10 +440,10 @@ export function splitToolTiers(allEditorTools) {
             const meta = pluginToolsByName.get(name);
             const result = {
               name,
-              description: meta?.description || `(lazy-loaded from Unity plugin)`,
+              description: sanitizeToolMetadata(meta?.description || `(lazy-loaded from Unity plugin)`),
             };
             if (includeSchema && meta?.inputSchema) {
-              result.inputSchema = meta.inputSchema;
+              result.inputSchema = sanitizeToolMetadata(meta.inputSchema);
             }
             if (meta?.route) {
               result.route = meta.route;
@@ -394,7 +452,7 @@ export function splitToolTiers(allEditorTools) {
           });
 
         const all = [
-          ...matching.map((t) => ({ name: t.name, description: t.description })),
+          ...matching.map((t) => ({ name: t.name, description: sanitizeToolMetadata(t.description) })),
           ...dynamicTools,
         ];
 
@@ -416,12 +474,17 @@ export function splitToolTiers(allEditorTools) {
           categories: result,
           dynamicToolDetails: includeSchema
             ? pluginTools
-                .filter((tool) => tool.toolName && !advancedMap.has(tool.toolName) && !CORE_TOOLS.has(tool.toolName))
+                .filter((tool) =>
+                  tool.toolName &&
+                  !advancedMap.has(tool.toolName) &&
+                  !CORE_TOOLS.has(tool.toolName) &&
+                  !isFirstClassProjectTool(tool) &&
+                  !isFirstClassRouteTool(tool))
                 .map((tool) => ({
                   name: tool.toolName,
                   route: tool.route,
-                  description: tool.description,
-                  inputSchema: tool.inputSchema,
+                  description: sanitizeToolMetadata(tool.description),
+                  inputSchema: sanitizeToolMetadata(tool.inputSchema),
                 }))
             : undefined,
         },
@@ -434,15 +497,15 @@ export function splitToolTiers(allEditorTools) {
   const advancedTool = {
     name: "unity_advanced_tool",
     description:
-      "Execute an advanced/specialized Unity tool by name, a raw Unity route, or a project tool " +
-      "via project-tool:<name>. Use this as the stable generic entry when tool metadata is stale.",
+      "Fallback generic Unity entrypoint. Prefer directly exposed unity_* tools first. " +
+      "Use this only when no concrete tool exists, a route is new, or metadata is stale.",
     inputSchema: {
       type: "object",
       properties: {
         tool: {
           type: "string",
           description:
-            'Tool name, raw route, or project tool shortcut. Examples: "unity_animation_create_controller", "packages/update-git", "project-tool:add-property".',
+            'Fallback tool name, raw route, or project tool shortcut. Examples: "unity_animation_create_controller", "packages/update-git", "project-tool:add-property".',
         },
         params: {
           type: "object",
@@ -461,7 +524,7 @@ export function splitToolTiers(allEditorTools) {
       const projectToolName = getProjectToolName(tool);
       if (projectToolName) {
         try {
-          console.error(`[MCP] Calling project tool "${projectToolName}" via stable generic entry`);
+          console.error(`[MCP] Calling project tool "${projectToolName}" via fallback generic entry`);
           const result = await sendCommand("project-tools/execute", {
             toolName: projectToolName,
             args: params || {},
@@ -474,7 +537,7 @@ export function splitToolTiers(allEditorTools) {
 
       if (isUnityRoute(tool)) {
         try {
-          console.error(`[MCP] Calling raw Unity route "${tool}" via stable generic entry`);
+          console.error(`[MCP] Calling raw Unity route "${tool}" via fallback generic entry`);
           const result = await sendCommand(tool, params || {});
           return JSON.stringify(result, null, 2);
         } catch (err) {
@@ -500,12 +563,12 @@ export function splitToolTiers(allEditorTools) {
       }
 
       // ─── Lazy loading fallback ───
-      // Tool not in cached map — derive the route from the name and call Unity directly.
+      // Tool not in cached map - derive the route from the name and call Unity directly.
       // This allows new tools added to the C# plugin to work without restarting the MCP server.
       const route = toolNameToRoute(tool);
       if (route) {
         try {
-          // Log to stderr, not stdout — stdout carries the MCP JSON-RPC transport.
+          // Log to stderr, not stdout - stdout carries the MCP JSON-RPC transport.
           console.error(`[MCP] Lazy-loading tool "${tool}" via route "${route}"`);
           const result = await sendCommand(route, params || {});
           return JSON.stringify(result, null, 2);

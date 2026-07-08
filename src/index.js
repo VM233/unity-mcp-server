@@ -33,7 +33,7 @@ import { editorTools } from "./tools/editor-tools.js";
 import { umaTools } from "./tools/uma-tools.js";
 import { contextTools } from "./tools/context-tools.js";
 import { instanceTools } from "./tools/instance-tools.js";
-import { fetchFirstClassPluginTools, splitToolTiers } from "./tool-tiers.js";
+import { fetchFirstClassPluginTools, sanitizeToolMetadata, splitToolTiers } from "./tool-tiers.js";
 import { setAgentId, getProjectContext } from "./unity-editor-bridge.js";
 import {
   autoSelectInstance,
@@ -327,10 +327,18 @@ function toolWithPortSchema({ name, description, inputSchema }) {
         },
       },
     };
-    return { name, description, inputSchema: augmented };
+    return {
+      name,
+      description: sanitizeToolMetadata(description),
+      inputSchema: sanitizeToolMetadata(augmented),
+    };
   }
 
-  return { name, description, inputSchema };
+  return {
+    name,
+    description: sanitizeToolMetadata(description),
+    inputSchema: sanitizeToolMetadata(inputSchema),
+  };
 }
 
 async function getExposedTools() {

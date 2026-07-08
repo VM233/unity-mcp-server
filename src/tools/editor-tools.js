@@ -209,13 +209,13 @@ export const editorTools = [
   },
   {
     name: "unity_component_set_reference",
-    description: "Set an object reference on a component property. Dedicated tool for wiring references between GameObjects, components, and assets. More powerful than set_property for ObjectReference fields â€” supports resolution by asset path, scene GameObject name, component type, or instance ID.",
+    description: "Set an object reference on a component property. Dedicated tool for wiring references between GameObjects, components, and assets. More powerful than set_property for ObjectReference fields; supports resolution by asset path, scene GameObject name, component type, or instance ID.",
     inputSchema: {
       type: "object",
       properties: {
         path: { type: "string", description: "Hierarchy path or name of the target GameObject" },
         instanceId: { type: "string", description: "Instance ID of the target GameObject (alternative to path)" },
-        componentType: { type: "string", description: "Component type containing the property (optional â€” will auto-search all components)" },
+        componentType: { type: "string", description: "Component type containing the property (optional; will auto-search all components)" },
         propertyName: { type: "string", description: "Name of the ObjectReference property to set" },
         assetPath: { type: "string", description: "Asset path to assign (e.g. 'Assets/Materials/MyMat.mat', 'Assets/Prefabs/Enemy.prefab')" },
         referenceGameObject: { type: "string", description: "Name or hierarchy path of a scene GameObject to assign" },
@@ -1054,7 +1054,7 @@ export const editorTools = [
   },
   {
     name: "unity_set_object_reference",
-    description: "[LEGACY â€” prefer unity_component_set_reference] Set an object reference property on a component via the prefab system. Use unity_component_set_reference instead for richer resolution options.",
+    description: "[LEGACY - prefer unity_component_set_reference] Set an object reference property on a component via the prefab system. Use unity_component_set_reference instead for richer resolution options.",
     inputSchema: {
       type: "object",
       properties: {

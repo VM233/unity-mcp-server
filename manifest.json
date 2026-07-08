@@ -3,8 +3,8 @@
   "name": "unity-mcp",
   "display_name": "AnkleBreaker Unity MCP",
   "version": "2.18.0",
-  "description": "Multi-agent MCP server for Unity Editor — 259 tools (66 core + 193 advanced via two-tier system) across 24 categories with multi-instance support. Designed for Claude Cowork with async queue and fair scheduling across agents.",
-  "long_description": "AnkleBreaker Unity MCP connects Claude to your Unity Editor with 259 tools across 24 categories. Built for Claude Cowork's multi-agent architecture, where multiple AI agents collaborate on the same Unity project in parallel.\n\n**Key features:**\n- 259 tools via two-tier system: 66 core tools always available + 193 advanced tools on-demand via unity_advanced_tool\n- Two-tier architecture keeps MCP payload under 32KB for reliable client registration\n- Multi-instance support: run multiple Unity Editors simultaneously, auto-port selection (7890–7899), shared instance registry\n- ParrelSync clone detection for multiplayer development workflows\n- Multi-agent async queue with fair round-robin scheduling\n- Read batching (up to 5/frame) and write serialization (1/frame)\n- Agent session tracking and action logging\n- Project Context auto-injection for project-aware AI assistance\n- Automatic fallback to legacy sync mode for older plugin versions\n\n**Requires the companion Unity Editor plugin:** Install via Unity Package Manager → Add package from git URL → `https://github.com/AnkleBreaker-Studio/unity-mcp-plugin.git`\n\nAfter installing the plugin, open Window → AB Unity MCP in Unity and verify the bridge is running.",
+  "description": "Multi-agent MCP server for Unity Editor - exposes core and plugin-declared first-class tools, with fallback advanced routes for rare or stale metadata cases.",
+  "long_description": "AnkleBreaker Unity MCP connects Claude to your Unity Editor with a direct core tool surface, plugin-declared first-class tools, and fallback advanced routes for rare or stale metadata cases. Built for Claude Cowork's multi-agent architecture, where multiple AI agents collaborate on the same Unity project in parallel.\n\n**Key features:**\n- Core tools and plugin-declared first-class tools are exposed directly with visible schemas\n- Fallback advanced route remains available for rare routes without concrete tool metadata\n- Multi-instance support: run multiple Unity Editors simultaneously, auto-port selection (7890-7899), shared instance registry\n- ParrelSync clone detection for multiplayer development workflows\n- Multi-agent async queue with fair round-robin scheduling\n- Read batching (up to 5/frame) and write serialization (1/frame)\n- Agent session tracking and action logging\n- Project Context auto-injection for project-aware AI assistance\n- Automatic fallback to legacy sync mode for older plugin versions\n\n**Requires the companion Unity Editor plugin:** Install via Unity Package Manager -> Add package from git URL -> `https://github.com/AnkleBreaker-Studio/unity-mcp-plugin.git`\n\nAfter installing the plugin, open Window -> AB Unity MCP in Unity and verify the bridge is running.",
   "author": {
     "name": "AnkleBreaker Studio",
     "email": "francois@anklebreaker-studio.com",
@@ -70,7 +70,7 @@
     "unity_hub_path": {
       "type": "file",
       "title": "Unity Hub Path",
-      "description": "Path to Unity Hub executable. On Windows: C:\\Program Files\\Unity Hub\\Unity Hub.exe — On macOS: /Applications/Unity Hub.app/Contents/MacOS/Unity Hub",
+      "description": "Path to Unity Hub executable. On Windows: C:\\Program Files\\Unity Hub\\Unity Hub.exe - On macOS: /Applications/Unity Hub.app/Contents/MacOS/Unity Hub",
       "required": false,
       "default": "C:\\Program Files\\Unity Hub\\Unity Hub.exe"
     },
@@ -147,7 +147,7 @@
     { "name": "unity_search_missing_references", "description": "Find missing references in scene" },
     { "name": "unity_screenshot_game", "description": "Capture Game View screenshot" },
     { "name": "unity_screenshot_scene", "description": "Capture Scene View screenshot" },
-    { "name": "unity_screenshot_editor_window", "description": "Capture any Editor window (Inspector, Project, custom) to PNG — Windows only" },
+    { "name": "unity_screenshot_editor_window", "description": "Capture any Editor window (Inspector, Project, custom) to PNG - Windows only" },
     { "name": "unity_graphics_scene_capture", "description": "Capture Scene View as inline image" },
     { "name": "unity_graphics_game_capture", "description": "Capture Game View as inline image" },
     { "name": "unity_prefab_info", "description": "Get prefab information and overrides" },
@@ -160,8 +160,8 @@
     { "name": "unity_queue_info", "description": "Get multi-agent queue state" },
     { "name": "unity_agents_list", "description": "List active agent sessions" },
     { "name": "unity_agent_log", "description": "Get action log for an agent" },
-    { "name": "unity_list_advanced_tools", "description": "Browse 193 advanced tools by category (animation, physics, lighting, shaders, profiling, etc.)" },
-    { "name": "unity_advanced_tool", "description": "Execute any advanced tool by name + params" },
+    { "name": "unity_list_advanced_tools", "description": "Browse fallback Unity tools by category" },
+    { "name": "unity_advanced_tool", "description": "Fallback generic Unity entrypoint when no concrete tool exists or metadata is stale" },
     { "name": "unity_get_project_context", "description": "Get project-specific documentation context" }
   ],
   "prompts": [
