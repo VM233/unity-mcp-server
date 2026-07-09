@@ -184,10 +184,7 @@ async function pollQueueStatus(ticketId) {
           data: statusData.result !== undefined ? statusData.result : statusData,
         };
       } else if (statusData.status === "Failed") {
-        return {
-          success: false,
-          error: statusData.error || "Queue processing failed",
-        };
+        return normalizeFailedQueueStatus(statusData);
       }
 
       // Still processing â€" wait before polling again
@@ -218,6 +215,36 @@ async function pollQueueStatus(ticketId) {
       };
     }
   }
+}
+
+function normalizeFailedQueueStatus(statusData) {
+  const result = statusData?.result;
+  if (result && typeof result === "object" && !Array.isArray(result)) {
+    const message = result.error || result.message || statusData.errorMessage || "Queue processing failed";
+    return {
+      ...result,
+      success: false,
+      error: message,
+      message,
+      errorCode: result.errorCode || statusData.errorCode || "queue_processing_failed",
+      retryable: Boolean(result.retryable || statusData.retryable),
+      ticketId: statusData.ticketId,
+      status: statusData.status,
+      actionName: statusData.actionName,
+    };
+  }
+
+  const message = statusData?.error || statusData?.errorMessage || "Queue processing failed";
+  return {
+    success: false,
+    error: message,
+    message,
+    errorCode: statusData?.errorCode || "queue_processing_failed",
+    retryable: Boolean(statusData?.retryable),
+    ticketId: statusData?.ticketId,
+    status: statusData?.status,
+    actionName: statusData?.actionName,
+  };
 }
 
 /**

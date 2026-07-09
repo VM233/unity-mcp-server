@@ -360,6 +360,28 @@ function routeToDescription(route) {
 
 const detailedStaticFirstClassPluginTools = [
   {
+    toolName: "unity_project_tools_execute",
+    route: "project-tools/execute",
+    category: "project-tools",
+    description:
+      "Execute a project-defined Unity MCP tool by toolName with args. Prefer direct unity_project_tool_* tools when they are available.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        toolName: {
+          type: "string",
+          description: "Project tool name from unity_project_tools_list, e.g. battleidle/get-runtime-ready-state.",
+        },
+        args: {
+          type: "object",
+          description: "Arguments passed to the project tool.",
+          additionalProperties: true,
+        },
+      },
+      required: ["toolName"],
+    },
+  },
+  {
     toolName: "unity_scene_instantiate_prefab",
     route: "scene/instantiate-prefab",
     category: "scene",

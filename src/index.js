@@ -306,7 +306,7 @@ const TOOLS_SKIP_PORT_INJECT = new Set([
   "unity_list_instances",
 ]);
 
-function toolWithPortSchema({ name, description, inputSchema }) {
+function toolWithPortSchema({ name, description, inputSchema, annotations }) {
   // Inject port into unity_* tools that target an Editor instance
   if (
     name.startsWith("unity_") &&
@@ -331,6 +331,7 @@ function toolWithPortSchema({ name, description, inputSchema }) {
       name,
       description: sanitizeToolMetadata(description),
       inputSchema: sanitizeToolMetadata(augmented),
+      annotations: sanitizeToolMetadata(annotations || {}),
     };
   }
 
@@ -338,6 +339,7 @@ function toolWithPortSchema({ name, description, inputSchema }) {
     name,
     description: sanitizeToolMetadata(description),
     inputSchema: sanitizeToolMetadata(inputSchema),
+    annotations: sanitizeToolMetadata(annotations || {}),
   };
 }
 

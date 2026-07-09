@@ -19,6 +19,11 @@ import { loadState, persistState } from "./state-persistence.js";
 import { staticFirstClassPluginTools } from "./tools/plugin-first-class-tools.js";
 
 const PLUGIN_TOOLS_CACHE_KEY = "pluginToolsMetadata";
+const PLUGIN_TOOLS_LIVE_REFRESH_INTERVAL_MS = 10_000;
+
+let livePluginToolsCache = null;
+let livePluginToolsFetchedAt = 0;
+let livePluginToolsFetchPromise = null;
 
 /**
  * Explicit route overrides for tools whose API endpoints
@@ -144,12 +149,38 @@ async function fetchPluginToolsLive() {
   return [];
 }
 
-function fetchPluginToolsForToolList() {
-  return loadPluginToolsCache();
+async function fetchPluginToolsForToolList() {
+  const now = Date.now();
+  if (
+    livePluginToolsCache &&
+    now - livePluginToolsFetchedAt < PLUGIN_TOOLS_LIVE_REFRESH_INTERVAL_MS
+  ) {
+    return livePluginToolsCache;
+  }
+
+  if (!livePluginToolsFetchPromise) {
+    livePluginToolsFetchPromise = fetchPluginToolsLive()
+      .then((tools) => {
+        if (tools.length > 0) {
+          livePluginToolsCache = tools;
+          livePluginToolsFetchedAt = Date.now();
+          return tools;
+        }
+
+        const cached = loadPluginToolsCache();
+        return cached.length > 0 ? cached : [];
+      })
+      .catch(() => loadPluginToolsCache())
+      .finally(() => {
+        livePluginToolsFetchPromise = null;
+      });
+  }
+
+  return livePluginToolsFetchPromise;
 }
 
 async function fetchPluginToolsForCatalog() {
-  const liveTools = await fetchPluginToolsLive();
+  const liveTools = await fetchPluginToolsForToolList();
   return liveTools.length > 0 ? liveTools : loadPluginToolsCache();
 }
 
@@ -225,7 +256,7 @@ export function sanitizeToolMetadata(value) {
 }
 
 export async function fetchFirstClassPluginTools() {
-  const pluginTools = fetchPluginToolsForToolList();
+  const pluginTools = await fetchPluginToolsForToolList();
   const candidatesByName = new Map();
 
   for (const tool of staticFirstClassPluginTools) {
@@ -245,6 +276,7 @@ export async function fetchFirstClassPluginTools() {
       description: sanitizeToolMetadata(
         tool.description || `Unity MCP route: ${tool.route}`),
       inputSchema: normalizeInputSchema(tool.inputSchema),
+      annotations: sanitizeToolMetadata(tool.annotations || {}),
       handler: async (params = {}) =>
         JSON.stringify(await sendCommand(tool.route, params || {}), null, 2),
     });

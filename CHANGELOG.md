@@ -8,6 +8,11 @@ All notable changes to this package will be documented in this file.
 - **First-class project tools** — Unity plugin tools with `projectToolName` metadata are now exposed directly in MCP `tools/list` with their declared schemas, while still remaining callable through `unity_advanced_tool` as a stale-metadata fallback.
 - **`unity_asset_refresh` core tool** — Expose AssetDatabase refresh/import-specific-path refresh as a first-class MCP tool instead of requiring `unity_advanced_tool`.
 - **First-class Unity plugin routes** — `_meta/tools` entries with `firstClass=true` are now exposed directly in MCP `tools/list` with their route-owned schemas and descriptions, instead of requiring `unity_advanced_tool`.
+- **`unity_project_tools_execute` tool** — Adds a concrete project-tool execution fallback so agents do not need `unity_advanced_tool` while waiting for direct project tools to refresh.
+
+### Fixed
+- **Live project-tool discovery** — `tools/list` now refreshes Unity plugin metadata before falling back to the persisted cache, so project-specific `unity_project_tool_*` tools can appear after Unity loads them.
+- **Queue failure details** — Failed queue tickets now preserve Unity's structured `error`, `message`, `errorCode`, and `retryable` fields instead of collapsing to `Queue processing failed`.
 
 ## [2.30.0] - 2026-06-02
 
