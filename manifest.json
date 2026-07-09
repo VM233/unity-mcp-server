@@ -215,6 +215,7 @@
     { "name": "unity_texture_check_ui_import_settings", "description": "Check texture import settings for UI use" },
     { "name": "unity_build_run_test", "description": "Run a build test through the Unity plugin route" },
     { "name": "unity_project_tools_list", "description": "List project-defined Unity MCP tools" },
+    { "name": "unity_project_tools_execute", "description": "Execute a project-defined Unity MCP tool by toolName with args" },
     { "name": "unity_set_object_reference", "description": "Set an object reference via prefab system" },
     { "name": "unity_packages_list", "description": "List installed Unity packages" },
     { "name": "unity_packages_add", "description": "Install a Unity package" },

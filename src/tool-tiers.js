@@ -14,11 +14,15 @@
 // (unity_terrain_list -> terrain/list). This means new C# plugin routes
 // and project-defined tools can run before MCP client metadata refreshes.
 
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
+import { dirname, join } from "path";
+import { CONFIG } from "./config.js";
 import { sendCommand } from "./unity-editor-bridge.js";
 import { loadState, persistState } from "./state-persistence.js";
 import { staticFirstClassPluginTools } from "./tools/plugin-first-class-tools.js";
 
 const PLUGIN_TOOLS_CACHE_KEY = "pluginToolsMetadata";
+const PLUGIN_TOOLS_CACHE_FILE = join(dirname(CONFIG.instanceRegistryPath), "plugin-tools-metadata-cache.json");
 const PLUGIN_TOOLS_LIVE_REFRESH_INTERVAL_MS = 10_000;
 
 let livePluginToolsCache = null;
@@ -102,12 +106,31 @@ function getProjectToolName(value) {
 }
 
 function loadPluginToolsCache() {
+  try {
+    if (existsSync(PLUGIN_TOOLS_CACHE_FILE)) {
+      const data = JSON.parse(readFileSync(PLUGIN_TOOLS_CACHE_FILE, "utf-8"));
+      if (Array.isArray(data?.tools)) return data.tools;
+      if (Array.isArray(data)) return data;
+    }
+  } catch {
+    // Fall through to legacy session cache.
+  }
+
   const cached = loadState(PLUGIN_TOOLS_CACHE_KEY);
   return Array.isArray(cached) ? cached : [];
 }
 
 function savePluginToolsCache(tools) {
   if (Array.isArray(tools) && tools.length > 0) {
+    try {
+      mkdirSync(dirname(PLUGIN_TOOLS_CACHE_FILE), { recursive: true });
+      writeFileSync(
+        PLUGIN_TOOLS_CACHE_FILE,
+        JSON.stringify({ updatedAt: Date.now(), tools }, null, 2)
+      );
+    } catch {
+      // Keep the legacy cache as a fallback if the long-lived cache cannot be written.
+    }
     persistState(PLUGIN_TOOLS_CACHE_KEY, tools);
   }
 }
@@ -158,6 +181,18 @@ async function fetchPluginToolsForToolList() {
     return livePluginToolsCache;
   }
 
+  return loadPluginToolsCache();
+}
+
+async function fetchPluginToolsForCatalog() {
+  const now = Date.now();
+  if (
+    livePluginToolsCache &&
+    now - livePluginToolsFetchedAt < PLUGIN_TOOLS_LIVE_REFRESH_INTERVAL_MS
+  ) {
+    return livePluginToolsCache;
+  }
+
   if (!livePluginToolsFetchPromise) {
     livePluginToolsFetchPromise = fetchPluginToolsLive()
       .then((tools) => {
@@ -177,11 +212,6 @@ async function fetchPluginToolsForToolList() {
   }
 
   return livePluginToolsFetchPromise;
-}
-
-async function fetchPluginToolsForCatalog() {
-  const liveTools = await fetchPluginToolsForToolList();
-  return liveTools.length > 0 ? liveTools : loadPluginToolsCache();
 }
 
 function isFirstClassProjectTool(tool) {

@@ -11,7 +11,7 @@ All notable changes to this package will be documented in this file.
 - **`unity_project_tools_execute` tool** — Adds a concrete project-tool execution fallback so agents do not need `unity_advanced_tool` while waiting for direct project tools to refresh.
 
 ### Fixed
-- **Live project-tool discovery** — `tools/list` now refreshes Unity plugin metadata before falling back to the persisted cache, so project-specific `unity_project_tool_*` tools can appear after Unity loads them.
+- **Fast project-tool discovery** — `tools/list` now returns static tools and cached Unity plugin metadata without waiting on the Editor, preventing MCP clients from dropping the Unity server during startup. Live metadata refresh still happens through catalog/execution paths and updates a long-lived cache for future sessions.
 - **Queue failure details** — Failed queue tickets now preserve Unity's structured `error`, `message`, `errorCode`, and `retryable` fields instead of collapsing to `Queue processing failed`.
 
 ## [2.30.0] - 2026-06-02
