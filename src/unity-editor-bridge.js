@@ -97,16 +97,190 @@ async function submitToQueue(apiPath, bodyString) {
   return data; // { ticketId, queuePosition, ... }
 }
 
+async function fetchQueueStatusRaw(ticketId, timeoutMs = 10000) {
+  const url = `${getBridgeUrl()}/api/queue/status?ticketId=${ticketId}`;
+  const response = await fetch(url, {
+    method: "GET",
+    headers: {
+      "X-Agent-Id": _currentAgentId,
+    },
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    return {
+      success: false,
+      statusCode: response.status,
+      retryable: isTransientError(null, response),
+      error: `HTTP ${response.status}: ${text}`,
+    };
+  }
+
+  return {
+    success: true,
+    data: await response.json(),
+  };
+}
+
+async function fetchQueueInfoRaw(timeoutMs = 5000) {
+  const url = `${getBridgeUrl()}/api/queue/info`;
+  const response = await fetch(url, {
+    method: "GET",
+    headers: {
+      "X-Agent-Id": _currentAgentId,
+    },
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    return {
+      success: false,
+      statusCode: response.status,
+      error: `HTTP ${response.status}: ${text}`,
+    };
+  }
+
+  return {
+    success: true,
+    data: await response.json(),
+  };
+}
+
+async function fetchEditorStateRaw(timeoutMs = 5000) {
+  const url = `${getBridgeUrl()}/api/editor/state`;
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Agent-Id": _currentAgentId,
+    },
+    body: "{}",
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    return {
+      success: false,
+      statusCode: response.status,
+      error: `HTTP ${response.status}: ${text}`,
+    };
+  }
+
+  return {
+    success: true,
+    data: await response.json(),
+  };
+}
+
+function extractEditorState(rawState) {
+  if (!rawState || !rawState.success) return null;
+  const data = rawState.data;
+  if (data && typeof data === "object" && data.success === true && data.data) {
+    return data.data;
+  }
+  return data;
+}
+
+function editorStateLooksIdle(editorState) {
+  if (!editorState || typeof editorState !== "object") return false;
+  return (
+    editorState.isCompiling === false &&
+    editorState.isUpdating !== true &&
+    editorState.isChangingPlayMode !== true
+  );
+}
+
+function getQueuePollTimeoutMs(command, params = {}) {
+  const configuredTimeout = CONFIG.queuePollTimeoutMs || CONFIG.editorBridgeTimeout;
+
+  if (command === "wait/editor-idle" || command === "uitoolkit/wait-refresh") {
+    const commandTimeout = Number(params.timeoutMs);
+    const stableMs = Number(params.stableMs);
+    const requestedWaitMs = Number.isFinite(commandTimeout) && commandTimeout > 0
+      ? commandTimeout
+      : 0;
+    const requestedStableMs = Number.isFinite(stableMs) && stableMs > 0
+      ? stableMs
+      : 0;
+    return Math.max(configuredTimeout, requestedWaitMs + requestedStableMs + 30000);
+  }
+
+  return configuredTimeout;
+}
+
+async function buildQueuePollTimeoutResult(ticketId, command, timeoutMs, elapsedMs) {
+  const finalStatus = await fetchQueueStatusRaw(ticketId).catch((error) => ({
+    success: false,
+    error: error.message,
+  }));
+
+  if (finalStatus.success) {
+    const statusData = finalStatus.data;
+    if (statusData.status === "Completed") {
+      return {
+        success: true,
+        data: statusData.result !== undefined ? statusData.result : statusData,
+      };
+    }
+
+    if (statusData.status === "Failed") {
+      return normalizeFailedQueueStatus(statusData);
+    }
+  }
+
+  const [queueInfo, editorStateRaw] = await Promise.all([
+    fetchQueueInfoRaw().catch((error) => ({ success: false, error: error.message })),
+    fetchEditorStateRaw().catch((error) => ({ success: false, error: error.message })),
+  ]);
+
+  const editorState = extractEditorState(editorStateRaw);
+  if (command === "wait/editor-idle" && editorStateLooksIdle(editorState)) {
+    return {
+      success: true,
+      data: {
+        success: true,
+        recoveredAfterPollTimeout: true,
+        ticketId,
+        command,
+        pollTimedOut: true,
+        pollTimeoutMs: timeoutMs,
+        elapsedMs,
+        finalTicketStatus: finalStatus,
+        finalQueueInfo: queueInfo,
+        finalEditorState: editorState,
+      },
+    };
+  }
+
+  return {
+    success: false,
+    retryable: true,
+    errorCode: "queue_poll_timeout",
+    error: `Queue polling timed out after ${timeoutMs}ms for ticket ${ticketId}`,
+    ticketId,
+    command,
+    pollTimedOut: true,
+    pollTimeoutMs: timeoutMs,
+    elapsedMs,
+    finalTicketStatus: finalStatus,
+    finalQueueInfo: queueInfo,
+    finalEditorState: editorState,
+  };
+}
+
 /**
  * Poll the queue status for a ticket until completion.
  * GET /api/queue/status?ticketId=X
  */
-async function pollQueueStatus(ticketId) {
+async function pollQueueStatus(ticketId, command, params = {}) {
   let pollIntervalMs = CONFIG.queuePollIntervalMs;
   const maxIntervalMs = Math.min(1000, CONFIG.queuePollMaxMs);
   const startTime = Date.now();
   // Use dedicated poll timeout (longer than bridge timeout to handle slow operations like execute_code)
-  const timeoutMs = CONFIG.queuePollTimeoutMs || CONFIG.editorBridgeTimeout;
+  const timeoutMs = getQueuePollTimeoutMs(command, params);
   let consecutive404s = 0;
   let sawTransientPollError = false;
   let transientRetryCount = 0;
@@ -115,39 +289,29 @@ async function pollQueueStatus(ticketId) {
   while (true) {
     // Check timeout
     if (Date.now() - startTime > timeoutMs) {
-      return {
-        success: false,
-        error: `Queue polling timed out after ${timeoutMs}ms for ticket ${ticketId}`,
-      };
+      return buildQueuePollTimeoutResult(ticketId, command, timeoutMs, Date.now() - startTime);
     }
 
     // Poll status
     try {
-      const url = `${getBridgeUrl()}/api/queue/status?ticketId=${ticketId}`;
-      const response = await fetch(url, {
-        method: "GET",
-        headers: {
-          "X-Agent-Id": _currentAgentId,
-        },
-        signal: AbortSignal.timeout(10000), // 10s per individual poll request
-      });
+      const statusResult = await fetchQueueStatusRaw(ticketId);
 
-      if (!response.ok) {
-        if (isTransientError(null, response)) {
+      if (!statusResult.success) {
+        if (statusResult.retryable) {
           sawTransientPollError = true;
           const delay = Math.min(
             POLL_TRANSIENT_RETRY_BASE_MS * Math.pow(1.5, transientRetryCount++),
             maxIntervalMs
           );
           console.error(
-            `[MCP Bridge] Queue poll HTTP ${response.status} for ticket ${ticketId}; retrying in ${delay}ms...`
+            `[MCP Bridge] Queue poll ${statusResult.error} for ticket ${ticketId}; retrying in ${delay}ms...`
           );
           await sleep(delay);
           continue;
         }
 
         // Grace period for 404 â€" ticket may be between dequeue and execution tracking
-        if (response.status === 404) {
+        if (statusResult.statusCode === 404) {
           consecutive404s++;
           if (consecutive404s < max404Grace) {
             await sleep(pollIntervalMs);
@@ -155,18 +319,17 @@ async function pollQueueStatus(ticketId) {
             continue;
           }
         }
-        const text = await response.text();
-        if (response.status === 404 && sawTransientPollError) {
+        if (statusResult.statusCode === 404 && sawTransientPollError) {
           return {
             success: false,
             retryable: true,
-            error: `Queue ticket ${ticketId} was lost after a Unity reload: ${text}`,
+            error: `Queue ticket ${ticketId} was lost after a Unity reload: ${statusResult.error}`,
           };
         }
 
         return {
           success: false,
-          error: `Failed to poll queue status: HTTP ${response.status}: ${text}`,
+          error: `Failed to poll queue status: ${statusResult.error}`,
         };
       }
 
@@ -174,7 +337,7 @@ async function pollQueueStatus(ticketId) {
       consecutive404s = 0;
       transientRetryCount = 0;
 
-      const statusData = await response.json();
+      const statusData = statusResult.data;
 
       // Check completion status
       if (statusData.status === "Completed") {
@@ -355,7 +518,7 @@ export async function sendCommand(command, params = {}) {
           console.error(`[MCP Bridge] Submitted ${command} to queue, ticket: ${ticketId}`);
 
           // Poll for completion
-          const result = await pollQueueStatus(ticketId);
+          const result = await pollQueueStatus(ticketId, command, params);
 
           // Queue submission succeeded (we got a ticket), so queue mode is confirmed
           _queueModeDetermined = true;

@@ -13,6 +13,7 @@ All notable changes to this package will be documented in this file.
 ### Fixed
 - **Fast project-tool discovery** — `tools/list` now returns static tools and cached Unity plugin metadata without waiting on the Editor, preventing MCP clients from dropping the Unity server during startup. Live metadata refresh still happens through catalog/execution paths and updates a long-lived cache for future sessions.
 - **Queue failure details** — Failed queue tickets now preserve Unity's structured `error`, `message`, `errorCode`, and `retryable` fields instead of collapsing to `Queue processing failed`.
+- **Queue polling timeout diagnostics** - queue polling now performs a final ticket/status probe before returning timeout, includes final queue and Editor state diagnostics, and can recover `wait/editor-idle` as successful when the Editor is already idle even if the queue ticket did not complete before the poll timeout.
 
 ## [2.30.0] - 2026-06-02
 
