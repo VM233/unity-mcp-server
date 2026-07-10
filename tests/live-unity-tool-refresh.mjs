@@ -65,14 +65,27 @@ try {
   await client.connect(transport);
   assert.equal(client.getServerCapabilities()?.tools?.listChanged, true);
 
+  const liveProjectTool = "unity_project_tool_battleidle_get_battle_state";
   const initial = await client.listTools();
-  assert.equal(initial.tools.some((tool) => tool.name === "unity_testing_run_package_tests"), false);
+  const initialChars = JSON.stringify(initial).length;
+  assert.equal(initial.tools.some((tool) => tool.name === liveProjectTool), false);
+  assert.ok(initial.tools.length <= 105);
+  assert.ok(initialChars < 100_000);
+  assert.equal(initial.tools.some((tool) => tool.description?.startsWith("IMPORTANT:")), false);
 
   await withTimeout(listChanged, 60000, "tool list change notification timed out");
 
   const refreshed = await client.listTools();
+  const refreshedChars = JSON.stringify(refreshed).length;
+  assert.equal(refreshed.tools.some((tool) => tool.name === liveProjectTool), true);
   assert.equal(refreshed.tools.some((tool) => tool.name === "unity_testing_run_package_tests"), true);
   assert.equal(refreshed.tools.some((tool) => tool.name === "unity_prefab_asset_move_component"), true);
+  assert.equal(refreshed.tools.some((tool) => tool.name === "unity_prefab_asset_batch_edit"), false);
+  assert.ok(refreshed.tools.length <= 125);
+  assert.ok(refreshedChars < 100_000);
+  assert.equal(refreshed.tools.some((tool) => tool.description?.startsWith("IMPORTANT:")), false);
+  console.log(`tools/list: ${initial.tools.length} tools / ${initialChars} chars initially; ` +
+    `${refreshed.tools.length} tools / ${refreshedChars} chars after refresh.`);
   console.log("Live Unity tool metadata refreshed without reconnecting.");
 } finally {
   await transport.close().catch(() => {});
