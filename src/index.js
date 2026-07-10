@@ -33,7 +33,12 @@ import { editorTools } from "./tools/editor-tools.js";
 import { umaTools } from "./tools/uma-tools.js";
 import { contextTools } from "./tools/context-tools.js";
 import { instanceTools } from "./tools/instance-tools.js";
-import { fetchFirstClassPluginTools, sanitizeToolMetadata, splitToolTiers } from "./tool-tiers.js";
+import {
+  fetchFirstClassPluginTools,
+  refreshPluginToolsMetadata,
+  sanitizeToolMetadata,
+  splitToolTiers,
+} from "./tool-tiers.js";
 import { setAgentId, getProjectContext } from "./unity-editor-bridge.js";
 import {
   autoSelectInstance,
@@ -277,7 +282,7 @@ const server = new Server(
   },
   {
     capabilities: {
-      tools: {},
+      tools: { listChanged: true },
       resources: {},
     },
     instructions: [
@@ -555,9 +560,30 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
 });
 
 // ─── Start Server ───
+function startPluginToolMetadataRefresh() {
+  const refresh = async () => {
+    try {
+      const result = await refreshPluginToolsMetadata();
+      if (result.changed) {
+        console.error("[MCP] Unity plugin tool metadata changed; notifying MCP clients");
+        await server.sendToolListChanged();
+      }
+    } catch (error) {
+      console.error(`[MCP] Plugin tool metadata refresh failed: ${error.message}`);
+    } finally {
+      const timer = setTimeout(refresh, 5000);
+      timer.unref();
+    }
+  };
+
+  const timer = setTimeout(refresh, 1000);
+  timer.unref();
+}
+
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
+  startPluginToolMetadataRefresh();
   debugLog(`=== SERVER START === v2.26.0, agent=${PROCESS_AGENT_ID}, discoveryDone=${_discoveryDonePerAgent.get(PROCESS_AGENT_ID) || false}, selectedPort=${getSelectedInstance()?.port || 'null'}`);
   console.error(
     `Unity MCP Server running on stdio (agent: ${PROCESS_AGENT_ID})`

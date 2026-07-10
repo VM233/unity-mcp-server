@@ -5,12 +5,15 @@ All notable changes to this package will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- **Live tool-list notifications** - The server advertises `tools.listChanged`, polls live Unity plugin metadata, and sends `notifications/tools/list_changed` when first-class routes or schemas change.
 - **First-class project tools** — Unity plugin tools with `projectToolName` metadata are now exposed directly in MCP `tools/list` with their declared schemas, while still remaining callable through `unity_advanced_tool` as a stale-metadata fallback.
 - **`unity_asset_refresh` core tool** — Expose AssetDatabase refresh/import-specific-path refresh as a first-class MCP tool instead of requiring `unity_advanced_tool`.
 - **First-class Unity plugin routes** — `_meta/tools` entries with `firstClass=true` are now exposed directly in MCP `tools/list` with their route-owned schemas and descriptions, instead of requiring `unity_advanced_tool`.
 - **`unity_project_tools_execute` tool** — Adds a concrete project-tool execution fallback so agents do not need `unity_advanced_tool` while waiting for direct project tools to refresh.
 
 ### Fixed
+- **Reload-lost queue replay** - `LostAfterReload` is handled as a failed terminal ticket immediately; reload-safe wait and test-query routes are resubmitted with a new ticket, while mutating routes remain non-replayable by default.
+- **Queue success consistency** - A failed or reload-lost final ticket can no longer be wrapped in an outer `success: true` timeout recovery response.
 - **Fast project-tool discovery** — `tools/list` now returns static tools and cached Unity plugin metadata without waiting on the Editor, preventing MCP clients from dropping the Unity server during startup. Live metadata refresh still happens through catalog/execution paths and updates a long-lived cache for future sessions.
 - **Queue failure details** — Failed queue tickets now preserve Unity's structured `error`, `message`, `errorCode`, and `retryable` fields instead of collapsing to `Queue processing failed`.
 - **Queue polling timeout diagnostics** - queue polling now performs a final ticket/status probe before returning timeout, includes final queue and Editor state diagnostics, and can recover `wait/editor-idle` as successful when the Editor is already idle even if the queue ticket did not complete before the poll timeout.

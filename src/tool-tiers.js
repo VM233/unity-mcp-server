@@ -141,6 +141,8 @@ async function fetchPluginToolsLive() {
     metaTools = metaTools?.data ?? metaTools;
     if (Array.isArray(metaTools?.tools)) {
       savePluginToolsCache(metaTools.tools);
+      livePluginToolsCache = metaTools.tools;
+      livePluginToolsFetchedAt = Date.now();
       return metaTools.tools;
     }
   } catch (_) {
@@ -163,6 +165,8 @@ async function fetchPluginToolsLive() {
         },
       }));
       savePluginToolsCache(tools);
+      livePluginToolsCache = tools;
+      livePluginToolsFetchedAt = Date.now();
       return tools;
     }
   } catch (_) {
@@ -170,6 +174,40 @@ async function fetchPluginToolsLive() {
   }
 
   return [];
+}
+
+export function pluginToolsFingerprint(tools) {
+  if (!Array.isArray(tools)) return "[]";
+
+  return JSON.stringify(
+    tools
+      .map((tool) => ({
+        toolName: tool?.toolName || "",
+        route: tool?.route || "",
+        exposure: tool?.exposure || "",
+        description: tool?.description || "",
+        inputSchema: tool?.inputSchema || null,
+        annotations: tool?.annotations || null,
+      }))
+      .sort((left, right) =>
+        `${left.toolName}\n${left.route}`.localeCompare(`${right.toolName}\n${right.route}`))
+  );
+}
+
+export async function refreshPluginToolsMetadata() {
+  const previousTools = livePluginToolsCache || loadPluginToolsCache();
+  const previousFingerprint = pluginToolsFingerprint(previousTools);
+  const tools = await fetchPluginToolsLive();
+  if (tools.length === 0) {
+    return { changed: false, tools: previousTools, fingerprint: previousFingerprint };
+  }
+
+  const fingerprint = pluginToolsFingerprint(tools);
+  return {
+    changed: fingerprint !== previousFingerprint,
+    tools,
+    fingerprint,
+  };
 }
 
 async function fetchPluginToolsForToolList() {
@@ -197,8 +235,6 @@ async function fetchPluginToolsForCatalog() {
     livePluginToolsFetchPromise = fetchPluginToolsLive()
       .then((tools) => {
         if (tools.length > 0) {
-          livePluginToolsCache = tools;
-          livePluginToolsFetchedAt = Date.now();
           return tools;
         }
 

@@ -62,8 +62,16 @@ function isTransientError(error, response) {
   return false;
 }
 
-function canReplayAfterLostTicket(command) {
-  return command.startsWith("_meta/") || command.startsWith("packages/");
+export function canReplayAfterLostTicket(command) {
+  return (
+    command.startsWith("_meta/") ||
+    command.startsWith("packages/") ||
+    command === "wait/editor-idle" ||
+    command === "uitoolkit/wait-refresh" ||
+    command === "testing/list-tests" ||
+    command === "testing/get-job" ||
+    command === "testing/get-package-job"
+  );
 }
 
 /**
@@ -193,6 +201,23 @@ function editorStateLooksIdle(editorState) {
   );
 }
 
+export function normalizeTerminalQueueStatus(statusData) {
+  if (!statusData || typeof statusData !== "object") return null;
+
+  if (statusData.status === "Completed") {
+    return {
+      success: true,
+      data: statusData.result !== undefined ? statusData.result : statusData,
+    };
+  }
+
+  if (["Failed", "TimedOut", "LostAfterReload"].includes(statusData.status)) {
+    return normalizeFailedQueueStatus(statusData);
+  }
+
+  return null;
+}
+
 function getQueuePollTimeoutMs(command, params = {}) {
   const configuredTimeout = CONFIG.queuePollTimeoutMs || CONFIG.editorBridgeTimeout;
 
@@ -219,16 +244,8 @@ async function buildQueuePollTimeoutResult(ticketId, command, timeoutMs, elapsed
 
   if (finalStatus.success) {
     const statusData = finalStatus.data;
-    if (statusData.status === "Completed") {
-      return {
-        success: true,
-        data: statusData.result !== undefined ? statusData.result : statusData,
-      };
-    }
-
-    if (statusData.status === "Failed") {
-      return normalizeFailedQueueStatus(statusData);
-    }
+    const terminalResult = normalizeTerminalQueueStatus(statusData);
+    if (terminalResult) return terminalResult;
   }
 
   const [queueInfo, editorStateRaw] = await Promise.all([
@@ -339,16 +356,8 @@ async function pollQueueStatus(ticketId, command, params = {}) {
 
       const statusData = statusResult.data;
 
-      // Check completion status
-      if (statusData.status === "Completed") {
-        // Extract result â€" use explicit undefined check so falsy values (null, 0, false, "") pass through
-        return {
-          success: true,
-          data: statusData.result !== undefined ? statusData.result : statusData,
-        };
-      } else if (statusData.status === "Failed") {
-        return normalizeFailedQueueStatus(statusData);
-      }
+      const terminalResult = normalizeTerminalQueueStatus(statusData);
+      if (terminalResult) return terminalResult;
 
       // Still processing â€" wait before polling again
       await sleep(pollIntervalMs);

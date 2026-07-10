@@ -117,6 +117,8 @@ This keeps the tool count manageable for clients like Claude Desktop and Cowork 
 
 Use `params` for the route or project tool arguments. This lets new Unity plugin routes and project-defined tools run before the MCP client's tool list has refreshed.
 
+The server advertises MCP tool-list change notifications and refreshes live plugin metadata in the background. When a package update adds or changes a first-class Unity route, compatible MCP clients automatically request the updated tool list without reconnecting.
+
 ### Multi-Instance Support
 
 The server automatically discovers all running Unity Editor instances on startup. If only one instance is found, it auto-connects. If multiple instances are running (e.g., main editor + ParrelSync clones), it prompts you to select which one to work with.
