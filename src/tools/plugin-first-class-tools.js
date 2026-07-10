@@ -15,7 +15,7 @@ const diffProperties = {
   },
   prefabFileDiffMode: {
     type: "string",
-    description: "Diff return mode: full, minimal, or summary.",
+    description: "Diff return mode: summary, minimal, or full. Defaults to summary.",
   },
   prefabFileDiffContextLines: {
     type: "number",
@@ -55,7 +55,8 @@ const transformProps = {
   scale: vector3Schema("Optional local scale."),
 };
 
-const batchOperationSchema = {
+// Kept out of tools/list; optional catalog consumers can import the detailed form on demand.
+export const detailedPrefabBatchOperationSchema = {
   oneOf: [
     {
       type: "object",
@@ -240,7 +241,29 @@ const batchOperationSchema = {
   ],
 };
 
-const prefabBatchSchema = (transactionDefaults = false) => ({
+const compactBatchOperationSchema = {
+  type: "object",
+  description: "Prefab edit operation. Use type plus fields accepted by the matching prefab-asset route.",
+  properties: {
+    type: {
+      type: "string",
+      enum: [
+        "addComponent",
+        "setProperty",
+        "setReference",
+        "addGameObject",
+        "instantiatePrefab",
+        "removeComponent",
+        "removeGameObject",
+        "moveGameObject",
+      ],
+    },
+  },
+  required: ["type"],
+  additionalProperties: true,
+};
+
+const prefabBatchSchema = () => ({
   type: "object",
   properties: {
     assetPath: {
@@ -269,14 +292,12 @@ const prefabBatchSchema = (transactionDefaults = false) => ({
     },
     prefabFileDiffMode: {
       type: "string",
-      description: transactionDefaults
-        ? "Diff return mode. Defaults to summary for transaction-edit."
-        : "Diff return mode: full, minimal, or summary. Defaults to full.",
+      description: "Diff return mode: summary, minimal, or full. Defaults to summary.",
     },
     operations: {
       type: "array",
       description: "Ordered prefab asset edit operations.",
-      items: batchOperationSchema,
+      items: compactBatchOperationSchema,
     },
   },
   required: ["assetPath", "operations"],
@@ -284,23 +305,15 @@ const prefabBatchSchema = (transactionDefaults = false) => ({
 
 const firstClassPluginRoutes = [
   "packages/update-git",
-  "mcp/health",
-  "mcp/set-autostart",
   "wait/editor-idle",
-  "instance/current",
-  "instance/list",
-  "instance/resolve",
-  "instance/assert-project",
-  "scene/instantiate-prefab",
   "serialized-object/get",
   "serialized-object/set",
   "prefab-asset/add-component",
   "prefab-asset/add-gameobject",
-  "prefab-asset/batch-edit",
   "prefab-asset/get-properties",
   "prefab-asset/hierarchy",
-  "prefab-asset/instantiate-child-prefab",
   "prefab-asset/instantiate-prefab",
+  "prefab-asset/move-component",
   "prefab-asset/move-gameobject",
   "prefab-asset/find",
   "prefab-asset/remove-component",
@@ -311,13 +324,9 @@ const firstClassPluginRoutes = [
   "asset/refresh",
   "asset/rename",
   "asset/move",
+  "asset/move-batch",
   "asset/export-unitypackage",
-  "compilation/errors",
   "console/query",
-  "animation/transition-info",
-  "animation/update-state",
-  "animation/update-transition",
-  "animation/connect-states",
   "uitoolkit/asset-inspect",
   "uitoolkit/runtime-documents",
   "uitoolkit/runtime-tree",
@@ -330,24 +339,14 @@ const firstClassPluginRoutes = [
   "uitoolkit/locate-element",
   "uitoolkit/capture-element",
   "uitoolkit/compare-element",
-  "uitoolkit/generated-children",
-  "uitoolkit/resource-audit",
   "uitoolkit/builder-preview",
-  "screenshot/crop",
-  "graphics/image-alpha-bounds",
-  "graphics/rect-gap",
-  "graphics/annotate-rects",
-  "graphics/compare-images",
-  "sprite/sheet-info",
-  "sprite/replace-and-slice",
-  "sprite/slice-sheet",
-  "sprite/update-animation-clip",
-  "sprite/replace-slice-update-clip",
-  "texture/apply-sprite-preset",
-  "texture/import-image",
-  "texture/check-ui-import-settings",
-  "build/run-test",
+  "testing/list-tests",
+  "testing/run-tests",
+  "testing/get-job",
+  "testing/run-package-tests",
+  "testing/get-package-job",
   "project-tools/list",
+  "project-tools/execute",
 ];
 
 function routeToToolName(route) {
@@ -418,7 +417,12 @@ const detailedStaticFirstClassPluginTools = [
         instanceId: { type: "string", description: "Unity object instance ID." },
         assetPath: { type: "string", description: "Project asset path." },
         componentType: { type: "string", description: "Component type to inspect." },
-        propertyName: { type: "string", description: "Optional serialized property name/path filter." },
+        propertyPath: { type: "string", description: "Optional serialized property path filter." },
+        offset: { type: "number", description: "Visible property offset. Defaults to 0." },
+        maxProperties: { type: "number", description: "Property limit. Defaults to 50; capped at 500." },
+        includeChildren: { type: "boolean", description: "Walk child properties. Defaults to false." },
+        maxDepth: { type: "number", description: "Nested value depth. Defaults to 3; capped at 8." },
+        maxArrayElements: { type: "number", description: "Elements per serialized array. Defaults to 50; capped at 500." },
       },
     },
   },
@@ -449,7 +453,9 @@ const detailedStaticFirstClassPluginTools = [
       type: "object",
       properties: {
         assetPath: { type: "string", description: "Prefab asset path to inspect." },
+        prefabPath: { type: "string", description: "Optional GameObject path used as the hierarchy root." },
         maxDepth: { type: "number", description: "Maximum hierarchy depth to traverse." },
+        maxNodes: { type: "number", description: "Maximum returned nodes. Defaults to 250; capped at 2000." },
       },
       required: ["assetPath"],
     },
@@ -657,14 +663,14 @@ const detailedStaticFirstClassPluginTools = [
     route: "prefab-asset/batch-edit",
     category: "prefab-asset",
     description: "Apply multiple prefab asset edits in one transaction, save once, and return operation summaries plus prefab YAML diff.",
-    inputSchema: prefabBatchSchema(false),
+    inputSchema: prefabBatchSchema(),
   },
   {
     toolName: "unity_prefab_asset_transaction_edit",
     route: "prefab-asset/transaction-edit",
     category: "prefab-asset",
     description: "High-level prefab asset transaction edit with default summary diff for minimal-change review.",
-    inputSchema: prefabBatchSchema(true),
+    inputSchema: prefabBatchSchema(),
   },
   {
     toolName: "unity_asset_export_unitypackage",
@@ -693,7 +699,10 @@ const detailedStaticFirstClassPluginTools = [
   },
 ];
 
-const detailedRoutes = new Set(detailedStaticFirstClassPluginTools.map((tool) => tool.route));
+const firstClassRouteSet = new Set(firstClassPluginRoutes);
+const enabledDetailedStaticTools = detailedStaticFirstClassPluginTools
+  .filter((tool) => firstClassRouteSet.has(tool.route));
+const detailedRoutes = new Set(enabledDetailedStaticTools.map((tool) => tool.route));
 const genericStaticFirstClassPluginTools = firstClassPluginRoutes
   .filter((route) => !detailedRoutes.has(route))
   .map((route) => ({
@@ -709,6 +718,6 @@ const genericStaticFirstClassPluginTools = firstClassPluginRoutes
   }));
 
 export const staticFirstClassPluginTools = [
-  ...detailedStaticFirstClassPluginTools,
+  ...enabledDetailedStaticTools,
   ...genericStaticFirstClassPluginTools,
 ];

@@ -49,13 +49,18 @@ export const editorTools = [
   },
   {
     name: "unity_scene_hierarchy",
-    description: "Get the full hierarchy tree of all GameObjects in the active scene, including their components and children.",
+    description: "Read a bounded scene hierarchy or compact component-filtered matches.",
     inputSchema: {
       type: "object",
       properties: {
         maxDepth: { type: "number", description: "Maximum depth to traverse (default: 10)" },
-        maxNodes: { type: "number", description: "Maximum total nodes to return (default: 5000). Use lower values for very large scenes to avoid timeouts." },
+        maxNodes: { type: "number", description: "Maximum total nodes to return (default: 250, capped at 2000)." },
         parentPath: { type: "string", description: "Only return hierarchy under this GameObject path (e.g. 'Canvas/Panel'). Useful for exploring specific subtrees in large scenes." },
+        componentType: { type: "string", description: "Return compact flat matches containing this component type." },
+        nameContains: { type: "string", description: "Optional name filter used with componentType." },
+        pathContains: { type: "string", description: "Optional hierarchy path filter used with componentType." },
+        offset: { type: "number", description: "Filtered result offset (default: 0)." },
+        maxResults: { type: "number", description: "Filtered result limit (default: 50, capped at 200)." },
       },
     },
     handler: async (params) => JSON.stringify(await bridge.getHierarchy(params), null, 2),
@@ -417,10 +422,13 @@ export const editorTools = [
       type: "object",
       properties: {
         code: { type: "string", description: "C# code to execute. Must be a valid method body. Access UnityEngine and UnityEditor namespaces. Use 'return' to send data back." },
+        maxResultItems: { type: "number", description: "Maximum serialized collection/object entries (default: 200, capped at 2000)." },
+        maxResultDepth: { type: "number", description: "Maximum serialized result depth (default: 8, capped at 16)." },
+        maxResultStringLength: { type: "number", description: "Maximum characters per returned string (default: 20000, capped at 200000)." },
       },
       required: ["code"],
     },
-    handler: async ({ code }) => JSON.stringify(await bridge.executeCode(code), null, 2),
+    handler: async (params) => JSON.stringify(await bridge.executeCode(params), null, 2),
   },
 
   // â”€â”€â”€ Material / Rendering â”€â”€â”€

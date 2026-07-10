@@ -5,7 +5,13 @@ import {
   canReplayAfterLostTicket,
   normalizeTerminalQueueStatus,
 } from "../src/unity-editor-bridge.js";
-import { pluginToolsFingerprint } from "../src/tool-tiers.js";
+import { editorTools } from "../src/tools/editor-tools.js";
+import { hubTools } from "../src/tools/hub-tools.js";
+import { instanceTools } from "../src/tools/instance-tools.js";
+import { contextTools } from "../src/tools/context-tools.js";
+import { staticFirstClassPluginTools } from "../src/tools/plugin-first-class-tools.js";
+import { umaTools } from "../src/tools/uma-tools.js";
+import { pluginToolsFingerprint, splitToolTiers } from "../src/tool-tiers.js";
 
 test("LostAfterReload is a failed terminal status", () => {
   const result = normalizeTerminalQueueStatus({
@@ -48,4 +54,31 @@ test("plugin tool metadata fingerprint is order independent and schema sensitive
 
   assert.equal(pluginToolsFingerprint(first), pluginToolsFingerprint(reordered));
   assert.notEqual(pluginToolsFingerprint(first), pluginToolsFingerprint(changed));
+});
+
+test("default tool surface stays bounded and omits duplicate prefab aliases", () => {
+  const { coreTools, metaTools } = splitToolTiers([...editorTools, ...umaTools]);
+  const exposedByName = new Map(
+    [...instanceTools, ...hubTools, ...coreTools, ...metaTools, ...contextTools]
+      .map((tool) => [tool.name, tool])
+  );
+  for (const tool of staticFirstClassPluginTools) {
+    if (!exposedByName.has(tool.toolName)) {
+      exposedByName.set(tool.toolName, {
+        name: tool.toolName,
+        description: tool.description,
+        inputSchema: tool.inputSchema,
+      });
+    }
+  }
+
+  const exposed = [...exposedByName.values()];
+  assert.ok(exposed.length <= 105, `expected <=105 tools, got ${exposed.length}`);
+  assert.ok(JSON.stringify({ tools: exposed }).length <= 60_000);
+  assert.equal(exposedByName.has("unity_prefab_asset_batch_edit"), false);
+  assert.equal(exposedByName.has("unity_prefab_asset_instantiate_child_prefab"), false);
+
+  const transaction = exposedByName.get("unity_prefab_asset_transaction_edit");
+  assert.ok(transaction);
+  assert.ok(JSON.stringify(transaction.inputSchema).length < 2_500);
 });

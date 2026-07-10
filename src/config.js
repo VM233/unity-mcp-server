@@ -43,9 +43,9 @@ export const CONFIG = {
 
   // Response size limits (bytes) — protects against Write EOF errors on large projects
   // Soft limit: log a warning but still return the response
-  responseSoftLimitBytes: parseInt(process.env.UNITY_RESPONSE_SOFT_LIMIT || String(2 * 1024 * 1024)),   // 2 MB
+  responseSoftLimitBytes: parseInt(process.env.UNITY_RESPONSE_SOFT_LIMIT || String(512 * 1024)),
   // Hard limit: truncate the response and return pagination guidance instead
-  responseHardLimitBytes: parseInt(process.env.UNITY_RESPONSE_HARD_LIMIT || String(4 * 1024 * 1024)),   // 4 MB
+  responseHardLimitBytes: parseInt(process.env.UNITY_RESPONSE_HARD_LIMIT || String(2 * 1024 * 1024)),
 
   // Logging
   logLevel: process.env.LOG_LEVEL || "info",

@@ -27,7 +27,6 @@ const PLUGIN_TOOLS_LIVE_REFRESH_INTERVAL_MS = 10_000;
 
 let livePluginToolsCache = null;
 let livePluginToolsFetchedAt = 0;
-let livePluginToolsFetchPromise = null;
 
 /**
  * Explicit route overrides for tools whose API endpoints
@@ -135,15 +134,41 @@ function savePluginToolsCache(tools) {
   }
 }
 
-async function fetchPluginToolsLive(firstClassOnly = true) {
+async function fetchPluginToolsLive(firstClassOnly = true, {
+  includeSchema = firstClassOnly,
+  category,
+  cache = firstClassOnly,
+} = {}) {
   try {
-    let metaTools = await sendCommand("_meta/tools", { firstClassOnly, compact: firstClassOnly });
-    metaTools = metaTools?.data ?? metaTools;
-    if (Array.isArray(metaTools?.tools)) {
-      savePluginToolsCache(metaTools.tools);
-      livePluginToolsCache = metaTools.tools;
-      livePluginToolsFetchedAt = Date.now();
-      return metaTools.tools;
+    const tools = [];
+    let receivedToolPage = false;
+    let offset = 0;
+    for (let page = 0; page < 100; page++) {
+      let metaTools = await sendCommand("_meta/tools", {
+        firstClassOnly,
+        compact: true,
+        includeSchema,
+        category,
+        offset,
+        limit: 200,
+      });
+      metaTools = metaTools?.data ?? metaTools;
+      if (!Array.isArray(metaTools?.tools)) break;
+      receivedToolPage = true;
+      tools.push(...metaTools.tools);
+      if (!metaTools.hasMore || metaTools.tools.length === 0) break;
+      offset = Number.isInteger(metaTools.nextOffset)
+        ? metaTools.nextOffset
+        : offset + metaTools.tools.length;
+    }
+
+    if (receivedToolPage) {
+      if (cache && tools.length > 0) {
+        savePluginToolsCache(tools);
+        livePluginToolsCache = tools;
+        livePluginToolsFetchedAt = Date.now();
+      }
+      return tools;
     }
   } catch (_) {
     // Older plugin builds only support _meta/routes.
@@ -164,9 +189,11 @@ async function fetchPluginToolsLive(firstClassOnly = true) {
           additionalProperties: true,
         },
       }));
-      savePluginToolsCache(tools);
-      livePluginToolsCache = tools;
-      livePluginToolsFetchedAt = Date.now();
+      if (cache) {
+        savePluginToolsCache(tools);
+        livePluginToolsCache = tools;
+        livePluginToolsFetchedAt = Date.now();
+      }
       return tools;
     }
   } catch (_) {
@@ -226,32 +253,9 @@ async function fetchPluginToolsForToolList() {
   return loadPluginToolsCache();
 }
 
-async function fetchPluginToolsForCatalog() {
-  const now = Date.now();
-  if (
-    livePluginToolsCache &&
-    now - livePluginToolsFetchedAt < PLUGIN_TOOLS_LIVE_REFRESH_INTERVAL_MS
-  ) {
-    return livePluginToolsCache;
-  }
-
-  if (!livePluginToolsFetchPromise) {
-    livePluginToolsFetchPromise = fetchPluginToolsLive(false)
-      .then((tools) => {
-        if (tools.length > 0) {
-          return tools;
-        }
-
-        const cached = loadPluginToolsCache();
-        return cached.length > 0 ? cached : [];
-      })
-      .catch(() => loadPluginToolsCache())
-      .finally(() => {
-        livePluginToolsFetchPromise = null;
-      });
-  }
-
-  return livePluginToolsFetchPromise;
+async function fetchPluginToolsForCatalog({ category, includeSchema = false } = {}) {
+  return fetchPluginToolsLive(false, { category, includeSchema, cache: false })
+    .catch(() => []);
 }
 
 function isFirstClassProjectTool(tool) {
@@ -402,12 +406,7 @@ const CORE_TOOLS = new Set([
   "unity_script_update",
   "unity_execute_code",
 
-  // Material
-  "unity_material_create",
-  "unity_renderer_set_material",
-
   // Build & play
-  "unity_build",
   "unity_play_mode",
 
   // Console & Compilation
@@ -417,28 +416,16 @@ const CORE_TOOLS = new Set([
 
   // Editor actions
   "unity_execute_menu_item",
-  "unity_undo",
-  "unity_redo",
-  "unity_undo_history",
-
   // Selection & search
   "unity_selection_get",
   "unity_selection_set",
-  "unity_selection_focus_scene_view",
-  "unity_selection_find_by_type",
   "unity_search_by_component",
-  "unity_search_by_tag",
-  "unity_search_by_layer",
   "unity_search_by_name",
   "unity_search_assets",
-  "unity_search_missing_references",
 
   // Screenshots & capture
   "unity_screenshot_game",
   "unity_screenshot_scene",
-  "unity_screenshot_editor_window",
-  "unity_graphics_scene_capture",
-  "unity_graphics_game_capture",
 
   // Prefab basics
   "unity_prefab_info",
@@ -446,17 +433,8 @@ const CORE_TOOLS = new Set([
 
   // Packages
   "unity_packages_list",
-  "unity_packages_add",
-  "unity_packages_remove",
-  "unity_packages_search",
-  "unity_packages_info",
   "unity_packages_update_git",
   "unity_packages_lint_metas",
-
-  // Queue & agents
-  "unity_queue_info",
-  "unity_agents_list",
-  "unity_agent_log",
 ]);
 
 /**
@@ -520,10 +498,20 @@ export function splitToolTiers(allEditorTools) {
           type: "boolean",
           description: "Include inputSchema for dynamically discovered tools. Defaults to false.",
         },
+        offset: {
+          type: "number",
+          description: "Tool offset within a selected category. Defaults to 0.",
+        },
+        limit: {
+          type: "number",
+          description: "Maximum tools returned for a selected category. Defaults to 100; capped at 200.",
+        },
       },
     },
-    handler: async ({ category, includeSchema } = {}) => {
-      const pluginTools = await fetchPluginToolsForCatalog();
+    handler: async ({ category, includeSchema, offset = 0, limit = 100 } = {}) => {
+      offset = Math.max(0, Number(offset) || 0);
+      limit = Math.max(1, Math.min(Number(limit) || 100, 200));
+      const pluginTools = await fetchPluginToolsForCatalog({ category, includeSchema });
       const pluginToolsByName = new Map();
       for (const tool of pluginTools) {
         if (tool.toolName) pluginToolsByName.set(tool.toolName, tool);
@@ -531,7 +519,9 @@ export function splitToolTiers(allEditorTools) {
 
       // Merge dynamic routes into the advanced tool list
       // Dynamic routes that aren't in our cached map get listed as lazy-loadable tools
-      let mergedCategories = { ...categories };
+      const mergedCategories = Object.fromEntries(
+        Object.entries(categories).map(([name, tools]) => [name, [...tools]])
+      );
       let dynamicCount = 0;
 
       for (const tool of pluginTools) {
@@ -580,42 +570,37 @@ export function splitToolTiers(allEditorTools) {
             return result;
           });
 
-        const all = [
+        const allTools = [
           ...matching.map((t) => ({ name: t.name, description: sanitizeToolMetadata(t.description) })),
           ...dynamicTools,
         ];
 
-        if (all.length === 0) {
+        if (allTools.length === 0) {
           return `No advanced tools found for category "${category}". Available categories: ${Object.keys(mergedCategories).join(", ")}`;
         }
-        return JSON.stringify(all, null, 2);
+        const page = allTools.slice(offset, offset + limit);
+        const nextOffset = offset + page.length;
+        return JSON.stringify({
+          category: cat,
+          totalTools: allTools.length,
+          offset,
+          limit,
+          returnedTools: page.length,
+          hasMore: nextOffset < allTools.length,
+          nextOffset: nextOffset < allTools.length ? nextOffset : null,
+          tools: page,
+        }, null, 2);
       }
 
-      // Full catalog grouped by category
-      const result = {};
-      for (const [cat, names] of Object.entries(mergedCategories)) {
-        result[cat] = names;
-      }
+      const categorySummaries = Object.entries(mergedCategories)
+        .map(([name, names]) => ({ name, toolCount: names.length }))
+        .sort((left, right) => left.name.localeCompare(right.name));
       return JSON.stringify(
         {
           totalAdvancedTools: advanced.length + dynamicCount,
           dynamicTools: dynamicCount,
-          categories: result,
-          dynamicToolDetails: includeSchema
-            ? pluginTools
-                .filter((tool) =>
-                  tool.toolName &&
-                  !advancedMap.has(tool.toolName) &&
-                  !CORE_TOOLS.has(tool.toolName) &&
-                  !isFirstClassProjectTool(tool) &&
-                  !isFirstClassRouteTool(tool))
-                .map((tool) => ({
-                  name: tool.toolName,
-                  route: tool.route,
-                  description: sanitizeToolMetadata(tool.description),
-                  inputSchema: sanitizeToolMetadata(tool.inputSchema),
-                }))
-            : undefined,
+          categories: categorySummaries,
+          hint: "Call again with category to list paginated tools and optional schemas.",
         },
         null,
         2

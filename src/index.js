@@ -80,7 +80,7 @@ function truncateResponseIfNeeded(contentBlocks) {
           `⚠️ Response too large (${sizeMB} MB, limit: ${limitMB} MB) — truncated to prevent Write EOF error.\n\n` +
           `The requested data was too large to return in a single response. ` +
           `Use pagination parameters to request smaller chunks:\n` +
-          `• unity_scene_hierarchy: use maxNodes (default 5000) and/or lower maxDepth\n` +
+          `• unity_scene_hierarchy: use maxNodes, parentPath, or component filters\n` +
           `• unity_search_by_name/component/tag/layer: use limit parameter\n` +
           `• unity_asset_list: use maxResults parameter\n` +
           `• unity_console_log: use count parameter\n\n` +
@@ -278,25 +278,15 @@ async function ensureInstanceDiscovery() {
 const server = new Server(
   {
     name: "unity-mcp",
-    version: "2.26.0",
+    version: "2.31.0",
   },
   {
     capabilities: {
       tools: { listChanged: true },
       resources: {},
     },
-    instructions: [
-      "IMPORTANT: Always use the MCP tools provided by this server (unity_*) to interact with Unity.",
-      "NEVER call the Unity HTTP bridge directly (e.g. http://127.0.0.1:7890/api/...).",
-      "The bridge is an internal communication layer between this MCP server and the Unity Editor plugin.",
-      "Direct HTTP calls bypass the multi-agent queue, agent tracking, and safety mechanisms.",
-      "Use the unity_* MCP tools for all Unity operations — they handle queuing, retries, and agent identity automatically.",
-      "",
-      "MULTI-INSTANCE: This MCP server supports multiple Unity Editor instances running simultaneously.",
-      "On your first tool call, instances are auto-discovered. If multiple instances are found,",
-      "you MUST ask the user which instance to work with and call unity_select_instance before proceeding.",
-      "Use unity_list_instances to see all available instances at any time.",
-    ].join(" "),
+    instructions:
+      "Use unity_* tools, never the internal HTTP bridge. If multiple Editors are running, select one with unity_select_instance.",
   }
 );
 
@@ -312,40 +302,36 @@ const TOOLS_SKIP_PORT_INJECT = new Set([
 ]);
 
 function toolWithPortSchema({ name, description, inputSchema, annotations }) {
+  let schema = inputSchema;
   // Inject port into unity_* tools that target an Editor instance
   if (
     name.startsWith("unity_") &&
     !name.startsWith("unity_hub_") &&
     !TOOLS_SKIP_PORT_INJECT.has(name)
   ) {
-    const schema = inputSchema || { type: "object", properties: {} };
-    const augmented = {
-      ...schema,
+    const baseSchema = inputSchema || { type: "object", properties: {} };
+    schema = {
+      ...baseSchema,
       properties: {
-        ...(schema.properties || {}),
+        ...(baseSchema.properties || {}),
         port: {
           type: "number",
-          description:
-            "Target Unity instance port for parallel-safe routing. " +
-            "Get this from unity_select_instance. When working with " +
-            "multiple Unity instances, ALWAYS include this parameter.",
+          description: "Target Editor port.",
         },
       },
     };
-    return {
-      name,
-      description: sanitizeToolMetadata(description),
-      inputSchema: sanitizeToolMetadata(augmented),
-      annotations: sanitizeToolMetadata(annotations || {}),
-    };
   }
 
-  return {
+  const tool = {
     name,
     description: sanitizeToolMetadata(description),
-    inputSchema: sanitizeToolMetadata(inputSchema),
-    annotations: sanitizeToolMetadata(annotations || {}),
+    inputSchema: sanitizeToolMetadata(schema),
   };
+  const cleanAnnotations = sanitizeToolMetadata(annotations || {});
+  if (Object.keys(cleanAnnotations).length > 0) {
+    tool.annotations = cleanAnnotations;
+  }
+  return tool;
 }
 
 async function getExposedTools() {
@@ -584,7 +570,7 @@ async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   startPluginToolMetadataRefresh();
-  debugLog(`=== SERVER START === v2.26.0, agent=${PROCESS_AGENT_ID}, discoveryDone=${_discoveryDonePerAgent.get(PROCESS_AGENT_ID) || false}, selectedPort=${getSelectedInstance()?.port || 'null'}`);
+  debugLog(`=== SERVER START === v2.31.0, agent=${PROCESS_AGENT_ID}, discoveryDone=${_discoveryDonePerAgent.get(PROCESS_AGENT_ID) || false}, selectedPort=${getSelectedInstance()?.port || 'null'}`);
   console.error(
     `Unity MCP Server running on stdio (agent: ${PROCESS_AGENT_ID})`
   );

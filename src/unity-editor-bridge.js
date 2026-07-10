@@ -802,8 +802,8 @@ export async function getEditorState() {
   return sendCommand("editor/state");
 }
 
-export async function executeCode(code) {
-  return sendCommand("editor/execute-code", { code });
+export async function executeCode(params) {
+  return sendCommand("editor/execute-code", typeof params === "string" ? { code: params } : params);
 }
 
 export async function createPrefab(params) {

@@ -11,6 +11,12 @@ All notable changes to this package will be documented in this file.
 - **First-class Unity plugin routes** — `_meta/tools` entries with `firstClass=true` are now exposed directly in MCP `tools/list` with their route-owned schemas and descriptions, instead of requiring `unity_advanced_tool`.
 - **`unity_project_tools_execute` tool** — Adds a concrete project-tool execution fallback so agents do not need `unity_advanced_tool` while waiting for direct project tools to refresh.
 
+### Changed
+- **Bounded tool surface** - the default concrete surface stays near 100 tools, while duplicate aliases and low-frequency large-schema tools remain callable through the paginated advanced catalog.
+- **Compact server instructions** - Unity routing and multi-instance guidance now lives in one short server instruction instead of adding repeated long text to every tool context.
+- **Response budgets** - text responses warn at 512 KB and stop at 2 MB; high-volume Unity routes expose smaller defaults, pagination, and stack/detail opt-ins before reaching that transport guard.
+- **Paginated plugin metadata** - hot refresh explicitly requests schema-bearing first-class pages, while catalog reads request only the selected category and schema detail level.
+
 ### Fixed
 - **Compact hot-refresh metadata** - background tool refresh requests only compact first-class descriptors, avoiding repeated transfer of the full Unity route catalog.
 - **Reload-lost queue replay** - `LostAfterReload` is handled as a failed terminal ticket immediately; reload-safe wait and test-query routes are resubmitted with a new ticket, while mutating routes remain non-replayable by default.

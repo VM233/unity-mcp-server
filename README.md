@@ -105,10 +105,10 @@ This server communicates with:
 ### Two-Tier Tool System
 
 To avoid overwhelming MCP clients with 288 tools, the server uses a two-tier architecture:
-- **Core tools** (~70) are always exposed directly
-- **Advanced tools** (~130+) are accessed via a single `unity_advanced_tool` proxy with lazy loading
+- **Core and high-frequency plugin tools** stay near 100 concrete tools
+- **Advanced tools** are accessed through `unity_advanced_tool` with lazy metadata loading
 
-This keeps the tool count manageable for clients like Claude Desktop and Cowork while still providing access to every Unity feature. Use `unity_list_advanced_tools` to discover all advanced tools by category.
+This keeps the tool count manageable while preserving access to every Unity feature. `unity_list_advanced_tools` returns compact category counts by default; pass `category`, `offset`, `limit`, and optional `includeSchema` to inspect one paginated category.
 
 `unity_advanced_tool` is also the stable generic fallback when tool metadata is stale. Its `tool` field accepts:
 - A registered MCP tool name, such as `unity_animation_create_controller`
@@ -118,6 +118,7 @@ This keeps the tool count manageable for clients like Claude Desktop and Cowork 
 Use `params` for the route or project tool arguments. This lets new Unity plugin routes and project-defined tools run before the MCP client's tool list has refreshed.
 
 The server advertises MCP tool-list change notifications and refreshes live plugin metadata in the background. When a package update adds or changes a first-class Unity route, compatible MCP clients automatically request the updated tool list without reconnecting.
+Metadata refresh requests compact schema-bearing first-class pages only; they do not transfer the full plugin route catalog.
 
 ### Multi-Instance Support
 
