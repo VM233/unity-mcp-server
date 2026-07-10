@@ -61,6 +61,13 @@ async function withTimeout(promise, timeoutMs, message) {
   }
 }
 
+function getJsonText(response) {
+  return [...response.content]
+    .reverse()
+    .find((block) => block.type === "text" && block.text.trimStart().startsWith("{"))
+    ?.text || "";
+}
+
 try {
   await client.connect(transport);
   assert.equal(client.getServerCapabilities()?.tools?.listChanged, true);
@@ -84,8 +91,29 @@ try {
   assert.ok(refreshed.tools.length <= 125);
   assert.ok(refreshedChars < 100_000);
   assert.equal(refreshed.tools.some((tool) => tool.description?.startsWith("IMPORTANT:")), false);
+
+  const catalogResponse = await client.callTool({
+    name: "unity_list_advanced_tools",
+    arguments: {},
+  });
+  const catalogText = getJsonText(catalogResponse);
+  const catalog = JSON.parse(catalogText);
+  assert.ok(catalogText.length < 10_000);
+  assert.ok(Array.isArray(catalog.categories));
+  assert.ok(catalog.categories.every((category) => !Array.isArray(category.tools)));
+
+  const prefabCatalogResponse = await client.callTool({
+    name: "unity_list_advanced_tools",
+    arguments: { category: "prefab-asset", includeSchema: true, limit: 25 },
+  });
+  const prefabCatalogText = getJsonText(prefabCatalogResponse);
+  const prefabCatalog = JSON.parse(prefabCatalogText);
+  assert.ok(prefabCatalogText.length < 50_000);
+  assert.ok(prefabCatalog.tools.length <= 25);
   console.log(`tools/list: ${initial.tools.length} tools / ${initialChars} chars initially; ` +
     `${refreshed.tools.length} tools / ${refreshedChars} chars after refresh.`);
+  console.log(`advanced catalog: ${catalogText.length} chars summary; ` +
+    `${prefabCatalogText.length} chars for prefab-asset schemas.`);
   console.log("Live Unity tool metadata refreshed without reconnecting.");
 } finally {
   await transport.close().catch(() => {});
