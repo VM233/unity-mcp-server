@@ -37,8 +37,8 @@ test("only explicitly replayable reload-safe routes are retried", () => {
 
 test("plugin tool metadata fingerprint is order independent and schema sensitive", () => {
   const first = [
-    { toolName: "unity_b", route: "b/run", inputSchema: { type: "object" } },
-    { toolName: "unity_a", route: "a/run", inputSchema: { type: "object" } },
+    { toolName: "unity_b", route: "b/run", firstClass: true, inputSchema: { type: "object" } },
+    { toolName: "unity_a", route: "a/run", firstClass: true, inputSchema: { type: "object" } },
   ];
   const reordered = [first[1], first[0]];
   const changed = [

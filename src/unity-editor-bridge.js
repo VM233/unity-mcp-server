@@ -506,6 +506,7 @@ async function sendCommandLegacyMode(command, params = {}) {
  */
 export async function sendCommand(command, params = {}) {
   const bodyString = JSON.stringify(params);
+  let lostTicketReplayCount = 0;
 
   // If we've determined the plugin doesn't support queue mode, use legacy
   if (_queueModeDetermined && !_useQueueMode) {
@@ -533,6 +534,7 @@ export async function sendCommand(command, params = {}) {
           _queueModeDetermined = true;
           _useQueueMode = true;
           if (!result.success && result.retryable && canReplayAfterLostTicket(command) && attempt < MAX_RETRIES) {
+            lostTicketReplayCount++;
             const delay = RETRY_BASE_DELAY_MS * Math.pow(2, attempt);
             console.error(
               `[MCP Bridge] Replaying "${command}" after lost queue ticket ${ticketId} in ${delay}ms (${attempt + 1}/${MAX_RETRIES})...`
@@ -541,7 +543,9 @@ export async function sendCommand(command, params = {}) {
             continue;
           }
 
-          return result;
+          return lostTicketReplayCount > 0
+            ? { ...result, replayedAfterLostTicket: true, replayCount: lostTicketReplayCount }
+            : result;
         } catch (submitError) {
           submitLastError = submitError;
 

@@ -12,6 +12,7 @@ All notable changes to this package will be documented in this file.
 - **`unity_project_tools_execute` tool** — Adds a concrete project-tool execution fallback so agents do not need `unity_advanced_tool` while waiting for direct project tools to refresh.
 
 ### Fixed
+- **Compact hot-refresh metadata** - background tool refresh requests only compact first-class descriptors, avoiding repeated transfer of the full Unity route catalog.
 - **Reload-lost queue replay** - `LostAfterReload` is handled as a failed terminal ticket immediately; reload-safe wait and test-query routes are resubmitted with a new ticket, while mutating routes remain non-replayable by default.
 - **Queue success consistency** - A failed or reload-lost final ticket can no longer be wrapped in an outer `success: true` timeout recovery response.
 - **Fast project-tool discovery** — `tools/list` now returns static tools and cached Unity plugin metadata without waiting on the Editor, preventing MCP clients from dropping the Unity server during startup. Live metadata refresh still happens through catalog/execution paths and updates a long-lived cache for future sessions.

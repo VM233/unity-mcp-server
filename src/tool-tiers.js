@@ -135,9 +135,9 @@ function savePluginToolsCache(tools) {
   }
 }
 
-async function fetchPluginToolsLive() {
+async function fetchPluginToolsLive(firstClassOnly = true) {
   try {
-    let metaTools = await sendCommand("_meta/tools", {});
+    let metaTools = await sendCommand("_meta/tools", { firstClassOnly, compact: firstClassOnly });
     metaTools = metaTools?.data ?? metaTools;
     if (Array.isArray(metaTools?.tools)) {
       savePluginToolsCache(metaTools.tools);
@@ -181,6 +181,10 @@ export function pluginToolsFingerprint(tools) {
 
   return JSON.stringify(
     tools
+      .filter((tool) =>
+        tool?.firstClass === true ||
+        tool?.preferred === true ||
+        tool?.exposure === "first-class")
       .map((tool) => ({
         toolName: tool?.toolName || "",
         route: tool?.route || "",
@@ -232,7 +236,7 @@ async function fetchPluginToolsForCatalog() {
   }
 
   if (!livePluginToolsFetchPromise) {
-    livePluginToolsFetchPromise = fetchPluginToolsLive()
+    livePluginToolsFetchPromise = fetchPluginToolsLive(false)
       .then((tools) => {
         if (tools.length > 0) {
           return tools;
@@ -675,7 +679,7 @@ export function splitToolTiers(allEditorTools) {
         return await targetTool.handler(params || {});
       }
 
-      const pluginTools = await fetchPluginToolsLive();
+      const pluginTools = await fetchPluginToolsLive(false);
       const dynamicTool = pluginTools.find((item) => item.toolName === tool);
       if (dynamicTool?.route) {
         try {

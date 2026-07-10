@@ -571,7 +571,7 @@ function startPluginToolMetadataRefresh() {
     } catch (error) {
       console.error(`[MCP] Plugin tool metadata refresh failed: ${error.message}`);
     } finally {
-      const timer = setTimeout(refresh, 5000);
+      const timer = setTimeout(refresh, 15000);
       timer.unref();
     }
   };
