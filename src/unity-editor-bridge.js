@@ -3,6 +3,7 @@
 // Supports both queue mode (async ticket-based) and legacy sync mode
 import { CONFIG } from "./config.js";
 import { getActiveBridgeUrl } from "./instance-discovery.js";
+import { getRequestAgentId } from "./request-context.js";
 
 // Dynamic bridge URL â€" resolved per-call based on selected instance
 function getBridgeUrl() {
@@ -12,19 +13,9 @@ function getBridgeUrl() {
 // Legacy constant kept for backward compat in places that don't need dynamic routing
 const BRIDGE_URL = `http://${CONFIG.editorBridgeHost}:${CONFIG.editorBridgePort}`;
 
-// Agent identity â€" tracks which AI agent is making requests
-let _currentAgentId = "default";
-
 // Mode detection â€" cached to avoid repeated 404 checks
 let _useQueueMode = true;
 let _queueModeDetermined = false;
-
-/**
- * Set the current agent ID. All subsequent sendCommand calls include this as X-Agent-Id header.
- */
-export function setAgentId(agentId) {
-  _currentAgentId = agentId || "default";
-}
 
 // Retry settings â€" handles Unity domain reloads (1-3 sec server downtime)
 const MAX_RETRIES = 4;
@@ -85,13 +76,13 @@ async function submitToQueue(apiPath, bodyString) {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "X-Agent-Id": _currentAgentId,
+      "X-Agent-Id": getRequestAgentId(),
     },
     body: JSON.stringify({
       apiPath,
       method: "POST",
       body: bodyString,
-      agentId: _currentAgentId,
+      agentId: getRequestAgentId(),
     }),
     signal: AbortSignal.timeout(CONFIG.editorBridgeTimeout),
   });
@@ -110,7 +101,7 @@ async function fetchQueueStatusRaw(ticketId, timeoutMs = 10000) {
   const response = await fetch(url, {
     method: "GET",
     headers: {
-      "X-Agent-Id": _currentAgentId,
+      "X-Agent-Id": getRequestAgentId(),
     },
     signal: AbortSignal.timeout(timeoutMs),
   });
@@ -136,7 +127,7 @@ async function fetchQueueInfoRaw(timeoutMs = 5000) {
   const response = await fetch(url, {
     method: "GET",
     headers: {
-      "X-Agent-Id": _currentAgentId,
+      "X-Agent-Id": getRequestAgentId(),
     },
     signal: AbortSignal.timeout(timeoutMs),
   });
@@ -162,7 +153,7 @@ async function fetchEditorStateRaw(timeoutMs = 5000) {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "X-Agent-Id": _currentAgentId,
+      "X-Agent-Id": getRequestAgentId(),
     },
     body: "{}",
     signal: AbortSignal.timeout(timeoutMs),
@@ -436,7 +427,7 @@ async function sendCommandLegacyMode(command, params = {}) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "X-Agent-Id": _currentAgentId,
+          "X-Agent-Id": getRequestAgentId(),
         },
         body: JSON.stringify(params),
         signal: controller.signal,
@@ -607,7 +598,7 @@ export async function getQueueInfo() {
     const response = await fetch(url, {
       method: "GET",
       headers: {
-        "X-Agent-Id": _currentAgentId,
+        "X-Agent-Id": getRequestAgentId(),
       },
       signal: AbortSignal.timeout(CONFIG.editorBridgeTimeout),
     });
@@ -637,7 +628,7 @@ export async function getTicketStatus(ticketId) {
     const response = await fetch(url, {
       method: "GET",
       headers: {
-        "X-Agent-Id": _currentAgentId,
+        "X-Agent-Id": getRequestAgentId(),
       },
       signal: AbortSignal.timeout(CONFIG.editorBridgeTimeout),
     });
@@ -1948,7 +1939,7 @@ export async function getProjectContext(category = null) {
 
   const response = await fetch(url, {
     method: "GET",
-    headers: { "X-Agent-Id": _currentAgentId },
+    headers: { "X-Agent-Id": getRequestAgentId() },
     signal: AbortSignal.timeout(5000),
   });
 

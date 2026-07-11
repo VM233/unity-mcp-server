@@ -4,6 +4,12 @@ All notable changes to this package will be documented in this file.
 
 ## [Unreleased]
 
+## [3.1.1] - 2026-07-11
+
+### Fixed
+- **Concurrent tool routing** - Request agent IDs and port overrides now use `AsyncLocalStorage`, so parallel tool calls cannot overwrite each other's Unity target.
+- **Concurrent first-call discovery** - Instance auto-discovery is single-flight per agent, preventing one parallel first call from routing to the default port before another call finishes selecting the live Editor.
+
 ## [3.1.0] - 2026-07-11
 
 ### Changed
