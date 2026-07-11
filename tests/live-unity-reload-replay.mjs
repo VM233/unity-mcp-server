@@ -5,6 +5,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 
 const serverRoot = resolve(new URL("..", import.meta.url).pathname.replace(/^\/(.:)/, "$1"));
+const bridgePort = Number(process.env.UNITY_BRIDGE_PORT || "7890");
 const client = new Client({ name: "unity-mcp-reload-replay-test", version: "1.0.0" },
   { capabilities: {} });
 const transport = new StdioClientTransport({
@@ -13,7 +14,7 @@ const transport = new StdioClientTransport({
   cwd: serverRoot,
   env: Object.fromEntries(Object.entries({
     ...process.env,
-    UNITY_BRIDGE_PORT: "7890",
+    UNITY_BRIDGE_PORT: String(bridgePort),
   }).filter(([, value]) => value !== undefined)),
   stderr: "inherit",
 });
@@ -43,7 +44,7 @@ try {
   const scheduleResult = parseToolResult(await client.callTool({
     name: "unity_execute_code",
     arguments: {
-      port: 7890,
+      port: bridgePort,
       code: `
 double reloadAt = EditorApplication.timeSinceStartup + 1.5;
 EditorApplication.CallbackFunction callback = null;
@@ -63,7 +64,7 @@ return new { scheduled = true, reloadAt };
   const waitPromise = client.callTool({
     name: "unity_wait_editor_idle",
     arguments: {
-      port: 7890,
+      port: bridgePort,
       timeoutMs: 90000,
       stableFrames: 200,
       stableMs: 20000,
