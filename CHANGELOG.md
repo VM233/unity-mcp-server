@@ -4,6 +4,13 @@ All notable changes to this package will be documented in this file.
 
 ## [Unreleased]
 
+## [3.1.0] - 2026-07-11
+
+### Changed
+- **Compact tool responses** - Tool handlers now return compact JSON instead of pretty-printed JSON.
+- **Lean tool metadata** - Remove repeated server instructions, compatibility aliases, duplicate annotation titles, and false annotation defaults from the exposed tool surface.
+- **Canonical request fields** - Static fallback schemas now match the plugin's canonical fields without compatibility aliases.
+
 ## [3.0.0] - 2026-07-11
 
 ### Breaking changes

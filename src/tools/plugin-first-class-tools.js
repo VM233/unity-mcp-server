@@ -43,10 +43,6 @@ const componentIndexProps = {
     type: "number",
     description: "Component index when multiple components of this type exist. Defaults to 0.",
   },
-  index: {
-    type: "number",
-    description: "Alias for componentIndex.",
-  },
 };
 
 const transformProps = {
@@ -393,11 +389,8 @@ const assetMoveSchema = () => ({
         type: "object",
         properties: {
           path: { type: "string", description: "Current asset path." },
-          assetPath: { type: "string", description: "Alias for path." },
           destinationPath: { type: "string", description: "Destination asset path, or an existing folder path to keep the same file name." },
-          targetPath: { type: "string", description: "Alias for destinationPath." },
           destinationFolder: { type: "string", description: "Existing folder path to keep the same file name." },
-          targetFolder: { type: "string", description: "Alias for destinationFolder." },
         },
       },
     },
@@ -735,25 +728,6 @@ const detailedStaticFirstClassPluginTools = [
     route: "prefab-asset/instantiate-prefab",
     category: "prefab-asset",
     description: "Instantiate a prefab asset as a child inside another prefab asset.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        assetPath: { type: "string", description: "Target prefab asset path to edit." },
-        sourcePrefabPath: { type: "string", description: "Prefab asset path to instantiate into the target prefab." },
-        parentPrefabPath: { type: "string", description: "Parent path inside the target prefab. Empty means root." },
-        name: { type: "string", description: "Optional name override for the created GameObject." },
-        siblingIndex: { type: "number", description: "Optional sibling index under the parent." },
-        ...transformProps,
-        ...diffProperties,
-      },
-      required: ["assetPath", "sourcePrefabPath"],
-    },
-  },
-  {
-    toolName: "unity_prefab_asset_instantiate_child_prefab",
-    route: "prefab-asset/instantiate-child-prefab",
-    category: "prefab-asset",
-    description: "Alias for instantiating a prefab asset as a child inside another prefab asset.",
     inputSchema: {
       type: "object",
       properties: {

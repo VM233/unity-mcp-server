@@ -27,7 +27,7 @@ export const contextTools = [
     },
     handler: async ({ category } = {}) => {
       const data = await bridge.getProjectContext(category || null);
-      return JSON.stringify(data, null, 2);
+      return JSON.stringify(data);
     },
   },
 ];

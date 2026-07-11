@@ -56,7 +56,7 @@ export const instanceTools = [
         result.message = `Found ${instances.length} Unity instance(s). Currently targeting: ${selected.projectName} (port ${selected.port})`;
       }
 
-      return JSON.stringify(result, null, 2);
+      return JSON.stringify(result);
     },
   },
 
@@ -108,7 +108,7 @@ export const instanceTools = [
         };
       }
 
-      return JSON.stringify(result, null, 2);
+      return JSON.stringify(result);
     },
   },
 ];

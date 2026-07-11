@@ -97,10 +97,21 @@ try {
   assert.deepEqual(assetMove.inputSchema.required, ["moves"]);
   assert.deepEqual(setReference.inputSchema.required, ["references"]);
   assert.deepEqual(localizationUpsert.inputSchema.required, ["collection", "entries"]);
+  assert.equal(refreshed.tools.some((tool) => tool.annotations?.title), false);
+  assert.equal(refreshed.tools.some((tool) =>
+    Object.values(tool.annotations || {}).some((value) => value === false)), false);
+  assert.equal(JSON.stringify(refreshed.tools).includes("Alias for"), false);
   assert.ok(refreshed.tools.length <= 140);
   assert.ok(refreshedChars < 150_000,
     `expected refreshed tools/list below 150000 chars, got ${refreshedChars}`);
   assert.equal(refreshed.tools.some((tool) => tool.description?.startsWith("IMPORTANT:")), false);
+
+  const pingResponse = await client.callTool({
+    name: "unity_editor_ping",
+    arguments: { port: Number(environment.UNITY_BRIDGE_PORT) },
+  });
+  const pingText = getJsonText(pingResponse);
+  assert.equal(pingText.includes("\n"), false);
 
   const catalogResponse = await client.callTool({
     name: "unity_list_advanced_tools",

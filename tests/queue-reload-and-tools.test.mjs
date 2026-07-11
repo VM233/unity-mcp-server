@@ -75,6 +75,7 @@ test("default tool surface stays bounded and omits duplicate prefab aliases", ()
   const exposed = [...exposedByName.values()];
   assert.ok(exposed.length <= 105, `expected <=105 tools, got ${exposed.length}`);
   assert.ok(JSON.stringify({ tools: exposed }).length <= 60_000);
+  assert.equal(JSON.stringify(exposed).includes("Alias for"), false);
   assert.equal(exposedByName.has("unity_prefab_asset_batch_edit"), false);
   assert.equal(exposedByName.has("unity_asset_move_batch"), false);
   assert.equal(exposedByName.has("unity_component_batch_wire"), false);

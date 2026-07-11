@@ -37,7 +37,7 @@ export function persistState(key, value) {
     state[key] = value;
     state._updatedAt = Date.now();
     mkdirSync(STATE_DIR, { recursive: true });
-    writeFileSync(STATE_FILE, JSON.stringify(state, null, 2));
+    writeFileSync(STATE_FILE, JSON.stringify(state));
   } catch (err) {
     debugLog(`persistState(${key}) FAILED: ${err.message}`);
   }

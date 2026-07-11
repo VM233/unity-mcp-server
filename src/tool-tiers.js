@@ -125,7 +125,7 @@ function savePluginToolsCache(tools) {
       mkdirSync(dirname(PLUGIN_TOOLS_CACHE_FILE), { recursive: true });
       writeFileSync(
         PLUGIN_TOOLS_CACHE_FILE,
-        JSON.stringify({ updatedAt: Date.now(), tools }, null, 2)
+        JSON.stringify({ updatedAt: Date.now(), tools })
       );
     } catch {
       // Keep the legacy cache as a fallback if the long-lived cache cannot be written.
@@ -352,7 +352,7 @@ export async function fetchFirstClassPluginTools() {
       inputSchema: normalizeInputSchema(tool.inputSchema),
       annotations: sanitizeToolMetadata(tool.annotations || {}),
       handler: async (params = {}) =>
-        JSON.stringify(await sendCommand(tool.route, params || {}), null, 2),
+        JSON.stringify(await sendCommand(tool.route, params || {})),
     });
   }
 
@@ -587,7 +587,7 @@ export function splitToolTiers(allEditorTools) {
           hasMore: nextOffset < allTools.length,
           nextOffset: nextOffset < allTools.length ? nextOffset : null,
           tools: page,
-        }, null, 2);
+        });
       }
 
       const categorySummaries = Object.entries(mergedCategories)
@@ -641,7 +641,7 @@ export function splitToolTiers(allEditorTools) {
             toolName: projectToolName,
             args: params || {},
           });
-          return JSON.stringify(result, null, 2);
+          return JSON.stringify(result);
         } catch (err) {
           return `Error executing project tool "${projectToolName}": ${err.message}`;
         }
@@ -651,7 +651,7 @@ export function splitToolTiers(allEditorTools) {
         try {
           console.error(`[MCP] Calling raw Unity route "${tool}" via fallback generic entry`);
           const result = await sendCommand(tool, params || {});
-          return JSON.stringify(result, null, 2);
+          return JSON.stringify(result);
         } catch (err) {
           return `Error executing route "${tool}": ${err.message}`;
         }
@@ -668,7 +668,7 @@ export function splitToolTiers(allEditorTools) {
         try {
           console.error(`[MCP] Lazy-loading tool "${tool}" via plugin route "${dynamicTool.route}"`);
           const result = await sendCommand(dynamicTool.route, params || {});
-          return JSON.stringify(result, null, 2);
+          return JSON.stringify(result);
         } catch (err) {
           return `Error executing "${tool}" (lazy route: ${dynamicTool.route}): ${err.message}`;
         }
@@ -683,7 +683,7 @@ export function splitToolTiers(allEditorTools) {
           // Log to stderr, not stdout - stdout carries the MCP JSON-RPC transport.
           console.error(`[MCP] Lazy-loading tool "${tool}" via route "${route}"`);
           const result = await sendCommand(route, params || {});
-          return JSON.stringify(result, null, 2);
+          return JSON.stringify(result);
         } catch (err) {
           return `Error executing "${tool}" (lazy route: ${route}): ${err.message}`;
         }

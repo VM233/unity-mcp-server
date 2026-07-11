@@ -20,7 +20,7 @@ export const umaTools = [
       required: ["fbxPath"],
     },
     handler: async (params) =>
-      JSON.stringify(await bridge.umaInspectFbx(params), null, 2),
+      JSON.stringify(await bridge.umaInspectFbx(params)),
   },
   {
     name: "unity_uma_create_slot",
@@ -59,7 +59,7 @@ export const umaTools = [
       required: ["fbxPath", "smrName", "slotName", "outputFolder", "umaMaterialPath"],
     },
     handler: async (params) =>
-      JSON.stringify(await bridge.umaCreateSlot(params), null, 2),
+      JSON.stringify(await bridge.umaCreateSlot(params)),
   },
   {
     name: "unity_uma_create_overlay",
@@ -90,7 +90,7 @@ export const umaTools = [
       required: ["overlayName", "outputFolder", "umaMaterialPath", "textures"],
     },
     handler: async (params) =>
-      JSON.stringify(await bridge.umaCreateOverlay(params), null, 2),
+      JSON.stringify(await bridge.umaCreateOverlay(params)),
   },
   {
     name: "unity_uma_create_wardrobe_recipe",
@@ -174,7 +174,7 @@ export const umaTools = [
       required: ["recipeName", "outputFolder", "wardrobeSlot", "compatibleRaces", "slots"],
     },
     handler: async (params) =>
-      JSON.stringify(await bridge.umaCreateWardrobeRecipe(params), null, 2),
+      JSON.stringify(await bridge.umaCreateWardrobeRecipe(params)),
   },
   {
     name: "unity_uma_register_assets",
@@ -196,7 +196,7 @@ export const umaTools = [
       },
     },
     handler: async (params) =>
-      JSON.stringify(await bridge.umaRegisterAssets(params), null, 2),
+      JSON.stringify(await bridge.umaRegisterAssets(params)),
   },
   {
     name: "unity_uma_list_global_library",
@@ -216,7 +216,7 @@ export const umaTools = [
       },
     },
     handler: async (params) =>
-      JSON.stringify(await bridge.umaListGlobalLibrary(params), null, 2),
+      JSON.stringify(await bridge.umaListGlobalLibrary(params)),
   },
   {
     name: "unity_uma_list_wardrobe_slots",
@@ -233,7 +233,7 @@ export const umaTools = [
       required: ["raceName"],
     },
     handler: async (params) =>
-      JSON.stringify(await bridge.umaListWardrobeSlots(params), null, 2),
+      JSON.stringify(await bridge.umaListWardrobeSlots(params)),
   },
   {
     name: "unity_uma_list_uma_materials",
@@ -244,7 +244,7 @@ export const umaTools = [
       properties: {},
     },
     handler: async (params) =>
-      JSON.stringify(await bridge.umaListUMAMaterials(params), null, 2),
+      JSON.stringify(await bridge.umaListUMAMaterials(params)),
   },
   {
     name: "unity_uma_get_project_config",
@@ -255,7 +255,7 @@ export const umaTools = [
       properties: {},
     },
     handler: async (params) =>
-      JSON.stringify(await bridge.umaGetProjectConfig(params), null, 2),
+      JSON.stringify(await bridge.umaGetProjectConfig(params)),
   },
   {
     name: "unity_uma_verify_recipe",
@@ -274,7 +274,7 @@ export const umaTools = [
       required: ["recipePath"],
     },
     handler: async (params) =>
-      JSON.stringify(await bridge.umaVerifyRecipe(params), null, 2),
+      JSON.stringify(await bridge.umaVerifyRecipe(params)),
   },
   {
     name: "unity_uma_rebuild_global_library",
@@ -299,7 +299,7 @@ export const umaTools = [
       },
     },
     handler: async (params) =>
-      JSON.stringify(await bridge.umaRebuildGlobalLibrary(params), null, 2),
+      JSON.stringify(await bridge.umaRebuildGlobalLibrary(params)),
   },
   {
     name: "unity_uma_create_wardrobe_from_fbx",
@@ -377,7 +377,7 @@ export const umaTools = [
       required: ["fbxPath", "outputFolder", "wardrobeSlot", "umaMaterialPath", "variants"],
     },
     handler: async (params) =>
-      JSON.stringify(await bridge.umaCreateWardrobeFromFbx(params), null, 2),
+      JSON.stringify(await bridge.umaCreateWardrobeFromFbx(params)),
   },
   {
     name: "unity_uma_wardrobe_equip",
@@ -414,7 +414,7 @@ export const umaTools = [
       required: ["gameObjectPath", "wardrobeSlot"],
     },
     handler: async (params) =>
-      JSON.stringify(await bridge.umaWardrobeEquip(params), null, 2),
+      JSON.stringify(await bridge.umaWardrobeEquip(params)),
   },
   {
     name: "unity_uma_edit_race",
@@ -519,7 +519,7 @@ export const umaTools = [
       },
     },
     handler: async (params) =>
-      JSON.stringify(await bridge.umaEditRace(params), null, 2),
+      JSON.stringify(await bridge.umaEditRace(params)),
   },
   {
     name: "unity_uma_create_race",
@@ -622,6 +622,6 @@ export const umaTools = [
       required: ["raceName"],
     },
     handler: async (params) =>
-      JSON.stringify(await bridge.umaCreateRace(params), null, 2),
+      JSON.stringify(await bridge.umaCreateRace(params)),
   },
 ];
