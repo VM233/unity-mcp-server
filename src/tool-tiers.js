@@ -388,8 +388,6 @@ const CORE_TOOLS = new Set([
   "unity_component_remove",
   "unity_component_get_properties",
   "unity_component_set_property",
-  "unity_component_set_reference",
-  "unity_component_batch_wire",
   "unity_component_get_referenceable",
 
   // Asset management

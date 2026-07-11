@@ -4,6 +4,15 @@ All notable changes to this package will be documented in this file.
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-07-11
+
+### Breaking changes
+- **Unified multi-operation execution** - `unity_prefab_asset_transaction_edit`, `unity_asset_move`, `unity_component_set_reference`, and `unity_localization_upsert_entry` now use a shared nested `execution` object with `mode`, `operationsPerFrame`, `frameBudgetMs`, `timeoutMs`, and supported `continueOnError` behavior.
+- **Removed duplicate batch tools** - Removed the old `unity_prefab_asset_batch_edit`, `unity_asset_move_batch`, `unity_component_batch_wire`, and `unity_localization_upsert_entries` aliases. Their canonical tools now accept operation arrays directly.
+
+### Fixed
+- **Live plugin schema precedence** - Live first-class metadata reported by the Unity plugin now replaces same-named server fallbacks in both `tools/list` and execution, so package schema upgrades take effect without reconnecting.
+
 ### Added
 - **Live tool-list notifications** - The server advertises `tools.listChanged`, polls live Unity plugin metadata, and sends `notifications/tools/list_changed` when first-class routes or schemas change.
 - **First-class project tools** — Unity plugin tools with `projectToolName` metadata are now exposed directly in MCP `tools/list` with their declared schemas, while still remaining callable through `unity_advanced_tool` as a stale-metadata fallback.

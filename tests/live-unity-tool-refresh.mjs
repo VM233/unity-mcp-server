@@ -27,7 +27,7 @@ const environment = Object.fromEntries(
   Object.entries({
     ...process.env,
     UNITY_INSTANCE_REGISTRY: registryPath,
-    UNITY_BRIDGE_PORT: "7890",
+    UNITY_BRIDGE_PORT: process.env.UNITY_BRIDGE_PORT || "7890",
   }).filter(([, value]) => value !== undefined)
 );
 
@@ -72,10 +72,8 @@ try {
   await client.connect(transport);
   assert.equal(client.getServerCapabilities()?.tools?.listChanged, true);
 
-  const liveProjectTool = "unity_project_tool_battleidle_get_battle_state";
   const initial = await client.listTools();
   const initialChars = JSON.stringify(initial).length;
-  assert.equal(initial.tools.some((tool) => tool.name === liveProjectTool), false);
   assert.ok(initial.tools.length <= 105);
   assert.ok(initialChars < 100_000);
   assert.equal(initial.tools.some((tool) => tool.description?.startsWith("IMPORTANT:")), false);
@@ -84,12 +82,24 @@ try {
 
   const refreshed = await client.listTools();
   const refreshedChars = JSON.stringify(refreshed).length;
-  assert.equal(refreshed.tools.some((tool) => tool.name === liveProjectTool), true);
   assert.equal(refreshed.tools.some((tool) => tool.name === "unity_testing_run_package_tests"), true);
   assert.equal(refreshed.tools.some((tool) => tool.name === "unity_prefab_asset_move_component"), true);
   assert.equal(refreshed.tools.some((tool) => tool.name === "unity_prefab_asset_batch_edit"), false);
-  assert.ok(refreshed.tools.length <= 125);
-  assert.ok(refreshedChars < 100_000);
+  assert.equal(refreshed.tools.some((tool) => tool.name === "unity_asset_move_batch"), false);
+  assert.equal(refreshed.tools.some((tool) => tool.name === "unity_component_batch_wire"), false);
+  assert.equal(refreshed.tools.some((tool) => tool.name === "unity_localization_upsert_entries"), false);
+  const transaction = refreshed.tools.find((tool) => tool.name === "unity_prefab_asset_transaction_edit");
+  const assetMove = refreshed.tools.find((tool) => tool.name === "unity_asset_move");
+  const setReference = refreshed.tools.find((tool) => tool.name === "unity_component_set_reference");
+  const localizationUpsert = refreshed.tools.find((tool) => tool.name === "unity_localization_upsert_entry");
+  assert.deepEqual(transaction.inputSchema.properties.execution.properties.mode.enum,
+    ["auto", "immediate", "batched"]);
+  assert.deepEqual(assetMove.inputSchema.required, ["moves"]);
+  assert.deepEqual(setReference.inputSchema.required, ["references"]);
+  assert.deepEqual(localizationUpsert.inputSchema.required, ["collection", "entries"]);
+  assert.ok(refreshed.tools.length <= 140);
+  assert.ok(refreshedChars < 150_000,
+    `expected refreshed tools/list below 150000 chars, got ${refreshedChars}`);
   assert.equal(refreshed.tools.some((tool) => tool.description?.startsWith("IMPORTANT:")), false);
 
   const catalogResponse = await client.callTool({

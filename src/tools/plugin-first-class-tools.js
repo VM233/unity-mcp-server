@@ -263,6 +263,35 @@ const compactBatchOperationSchema = {
   additionalProperties: true,
 };
 
+const executionSchema = ({ includeContinueOnError = true } = {}) => {
+  const properties = {
+    mode: {
+      type: "string",
+      enum: ["auto", "immediate", "batched"],
+      description: "Execution mode. auto batches multi-operation requests, immediate runs in one frame, and batched yields across frames.",
+    },
+    operationsPerFrame: {
+      type: "number",
+      description: "Maximum operations processed in one editor frame. Defaults to 25.",
+    },
+    frameBudgetMs: {
+      type: "number",
+      description: "Soft per-frame execution budget in milliseconds. Defaults to 8.",
+    },
+    timeoutMs: {
+      type: "number",
+      description: "Maximum total execution time in milliseconds. Defaults to 90000.",
+    },
+  };
+  if (includeContinueOnError) {
+    properties.continueOnError = {
+      type: "boolean",
+      description: "Continue processing later operations after one fails. Defaults to false.",
+    };
+  }
+  return { type: "object", properties };
+};
+
 const prefabBatchSchema = () => ({
   type: "object",
   properties: {
@@ -294,6 +323,25 @@ const prefabBatchSchema = () => ({
       type: "string",
       description: "Diff return mode: summary, minimal, or full. Defaults to summary.",
     },
+    prefabFileDiffContextLines: {
+      type: "number",
+      description: "Context lines around prefab YAML changes. Defaults to 2.",
+    },
+    prefabFileDiffMaxLines: {
+      type: "number",
+      description: "Maximum diff lines returned. Defaults to 200.",
+    },
+    prefabFileDiffIgnoreContains: {
+      type: "array",
+      description: "Optional substrings used to hide noisy diff lines.",
+      items: { type: "string" },
+    },
+    prefabFileDiffIgnoreYamlProperties: {
+      type: "array",
+      description: "Optional YAML property names used to hide noisy diff lines.",
+      items: { type: "string" },
+    },
+    execution: executionSchema({ includeContinueOnError: false }),
     operations: {
       type: "array",
       description: "Ordered prefab asset edit operations.",
@@ -301,6 +349,87 @@ const prefabBatchSchema = () => ({
     },
   },
   required: ["assetPath", "operations"],
+});
+
+const componentSetReferenceSchema = () => ({
+  type: "object",
+  properties: {
+    path: { type: "string", description: "Default target GameObject inherited by reference items." },
+    instanceId: { type: "string", description: "Default target instance ID inherited by reference items." },
+    componentType: { type: "string", description: "Default component type inherited by reference items." },
+    execution: executionSchema(),
+    references: {
+      type: "array",
+      description: "Reference assignments. Every item requires propertyName and one reference source or clear=true.",
+      items: {
+        type: "object",
+        properties: {
+          path: { type: "string", description: "Target scene GameObject path or name." },
+          instanceId: { type: "string", description: "Target scene GameObject instance ID." },
+          componentType: { type: "string", description: "Component containing the property." },
+          propertyName: { type: "string", description: "ObjectReference property to assign." },
+          assetPath: { type: "string", description: "Asset path to assign." },
+          referenceGameObject: { type: "string", description: "Scene GameObject path or name to assign." },
+          referenceComponentType: { type: "string", description: "Component type on the referenced GameObject." },
+          referenceInstanceId: { type: "number", description: "Unity object instance ID to assign." },
+          clear: { type: "boolean", description: "Clear the reference." },
+        },
+        required: ["propertyName"],
+      },
+    },
+  },
+  required: ["references"],
+});
+
+const assetMoveSchema = () => ({
+  type: "object",
+  properties: {
+    dryRun: { type: "boolean", description: "Validate every move and return expected paths without moving." },
+    execution: executionSchema(),
+    moves: {
+      type: "array",
+      description: "Move requests. Every item needs a source path and one destination path or folder field.",
+      items: {
+        type: "object",
+        properties: {
+          path: { type: "string", description: "Current asset path." },
+          assetPath: { type: "string", description: "Alias for path." },
+          destinationPath: { type: "string", description: "Destination asset path, or an existing folder path to keep the same file name." },
+          targetPath: { type: "string", description: "Alias for destinationPath." },
+          destinationFolder: { type: "string", description: "Existing folder path to keep the same file name." },
+          targetFolder: { type: "string", description: "Alias for destinationFolder." },
+        },
+      },
+    },
+  },
+  required: ["moves"],
+});
+
+const localizationUpsertEntrySchema = () => ({
+  type: "object",
+  properties: {
+    collection: { type: "string", description: "Table Collection name or GUID." },
+    type: { type: "string", enum: ["string", "asset"], description: "Collection type. Defaults to string." },
+    createTables: { type: "boolean", description: "Create missing Locale tables. Defaults to true." },
+    execution: executionSchema(),
+    entries: {
+      type: "array",
+      description: "Up to 500 Locale entry writes. The entire request is validated before changes are made.",
+      items: {
+        type: "object",
+        properties: {
+          key: { type: "string", description: "Shared localization key." },
+          locale: { type: "string", description: "Target Locale code." },
+          value: { type: "string", description: "String or Smart String value when type is string." },
+          smart: { type: "boolean", description: "Optional Smart String flag when type is string." },
+          assetPath: { type: "string", description: "Asset path when type is asset." },
+          subAssetName: { type: "string", description: "Optional exact sub-asset name at assetPath." },
+        },
+        required: ["key", "locale"],
+      },
+    },
+  },
+  required: ["collection", "entries"],
 });
 
 const firstClassPluginRoutes = [
@@ -321,11 +450,12 @@ const firstClassPluginRoutes = [
   "prefab-asset/set-property",
   "prefab-asset/set-reference",
   "prefab-asset/transaction-edit",
+  "component/set-reference",
   "asset/refresh",
   "asset/rename",
   "asset/move",
-  "asset/move-batch",
   "asset/export-unitypackage",
+  "localization/upsert-entry",
   "console/query",
   "uitoolkit/asset-inspect",
   "uitoolkit/runtime-documents",
@@ -659,18 +789,32 @@ const detailedStaticFirstClassPluginTools = [
     },
   },
   {
-    toolName: "unity_prefab_asset_batch_edit",
-    route: "prefab-asset/batch-edit",
-    category: "prefab-asset",
-    description: "Apply multiple prefab asset edits in one transaction, save once, and return operation summaries plus prefab YAML diff.",
-    inputSchema: prefabBatchSchema(),
-  },
-  {
     toolName: "unity_prefab_asset_transaction_edit",
     route: "prefab-asset/transaction-edit",
     category: "prefab-asset",
     description: "High-level prefab asset transaction edit with default summary diff for minimal-change review.",
     inputSchema: prefabBatchSchema(),
+  },
+  {
+    toolName: "unity_component_set_reference",
+    route: "component/set-reference",
+    category: "component",
+    description: "Assign one or more component ObjectReference properties with configurable immediate or frame-batched execution.",
+    inputSchema: componentSetReferenceSchema(),
+  },
+  {
+    toolName: "unity_asset_move",
+    route: "asset/move",
+    category: "asset",
+    description: "Preflight and move one or more Unity assets with configurable execution, GUID preservation, and rollback.",
+    inputSchema: assetMoveSchema(),
+  },
+  {
+    toolName: "unity_localization_upsert_entry",
+    route: "localization/upsert-entry",
+    category: "localization",
+    description: "Create or update one or more localized entries with configurable immediate or frame-batched execution.",
+    inputSchema: localizationUpsertEntrySchema(),
   },
   {
     toolName: "unity_asset_export_unitypackage",

@@ -76,9 +76,27 @@ test("default tool surface stays bounded and omits duplicate prefab aliases", ()
   assert.ok(exposed.length <= 105, `expected <=105 tools, got ${exposed.length}`);
   assert.ok(JSON.stringify({ tools: exposed }).length <= 60_000);
   assert.equal(exposedByName.has("unity_prefab_asset_batch_edit"), false);
+  assert.equal(exposedByName.has("unity_asset_move_batch"), false);
+  assert.equal(exposedByName.has("unity_component_batch_wire"), false);
+  assert.equal(exposedByName.has("unity_localization_upsert_entries"), false);
   assert.equal(exposedByName.has("unity_prefab_asset_instantiate_child_prefab"), false);
 
   const transaction = exposedByName.get("unity_prefab_asset_transaction_edit");
   assert.ok(transaction);
   assert.ok(JSON.stringify(transaction.inputSchema).length < 2_500);
+  assert.deepEqual(transaction.inputSchema.properties.execution.properties.mode.enum,
+    ["auto", "immediate", "batched"]);
+  assert.equal(transaction.inputSchema.properties.execution.properties.continueOnError, undefined);
+
+  const assetMove = exposedByName.get("unity_asset_move");
+  assert.deepEqual(assetMove.inputSchema.required, ["moves"]);
+  assert.ok(assetMove.inputSchema.properties.execution);
+
+  const setReference = exposedByName.get("unity_component_set_reference");
+  assert.deepEqual(setReference.inputSchema.required, ["references"]);
+  assert.ok(setReference.inputSchema.properties.execution.properties.continueOnError);
+
+  const localizationUpsert = exposedByName.get("unity_localization_upsert_entry");
+  assert.deepEqual(localizationUpsert.inputSchema.required, ["collection", "entries"]);
+  assert.ok(localizationUpsert.inputSchema.properties.execution);
 });

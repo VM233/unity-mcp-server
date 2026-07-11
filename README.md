@@ -45,8 +45,8 @@
 | **Unity Hub** | List/install editors, manage modules, set install paths |
 | **Scenes** | Open, save, create scenes, get full hierarchy tree with pagination |
 | **GameObjects** | Create (primitives/empty), delete, duplicate, reparent, activate/deactivate, transform (world/local) |
-| **Components** | Add, remove, get/set any serialized property, wire object references, batch wire |
-| **Assets** | List, import, delete, search, create prefabs, create & assign materials |
+| **Components** | Add, remove, get/set serialized properties, and wire one or many object references |
+| **Assets** | List, import, delete, search, move one or many assets, create prefabs, create & assign materials |
 | **Scripts** | Create, read, update C# scripts |
 | **Builds** | Multi-platform builds (Windows, macOS, Linux, Android, iOS, WebGL) |
 | **Console & Compilation** | Read/clear Unity console logs (errors, warnings, info); get C# compilation errors via CompilationPipeline (independent of console buffer) |

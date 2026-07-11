@@ -730,14 +730,6 @@ export async function getComponentProperties(params) {
   return sendCommand("component/get-properties", params);
 }
 
-export async function setComponentReference(params) {
-  return sendCommand("component/set-reference", params);
-}
-
-export async function batchWireReferences(params) {
-  return sendCommand("component/batch-wire", params);
-}
-
 export async function getReferenceableObjects(params) {
   return sendCommand("component/get-referenceable", params);
 }

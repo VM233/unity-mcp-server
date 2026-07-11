@@ -213,56 +213,6 @@ export const editorTools = [
     },
   },
   {
-    name: "unity_component_set_reference",
-    description: "Set an object reference on a component property. Dedicated tool for wiring references between GameObjects, components, and assets. More powerful than set_property for ObjectReference fields; supports resolution by asset path, scene GameObject name, component type, or instance ID.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        path: { type: "string", description: "Hierarchy path or name of the target GameObject" },
-        instanceId: { type: "string", description: "Instance ID of the target GameObject (alternative to path)" },
-        componentType: { type: "string", description: "Component type containing the property (optional; will auto-search all components)" },
-        propertyName: { type: "string", description: "Name of the ObjectReference property to set" },
-        assetPath: { type: "string", description: "Asset path to assign (e.g. 'Assets/Materials/MyMat.mat', 'Assets/Prefabs/Enemy.prefab')" },
-        referenceGameObject: { type: "string", description: "Name or hierarchy path of a scene GameObject to assign" },
-        referenceComponentType: { type: "string", description: "When referencing a scene object, get a specific component instead of the GameObject itself (e.g. 'Camera', 'AudioSource')" },
-        referenceInstanceId: { type: "number", description: "Instance ID of the object to assign" },
-        clear: { type: "boolean", description: "Set to true to clear/null the reference" },
-      },
-      required: ["propertyName"],
-    },
-    handler: async (params) => JSON.stringify(await bridge.setComponentReference(params), null, 2),
-  },
-  {
-    name: "unity_component_batch_wire",
-    description: "Wire multiple object references in a single call. Efficient for setting up many references at once (e.g. wiring a UI manager to all its panels, connecting enemy AI to patrol waypoints). Each entry specifies a target GameObject, property, and reference to assign.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        references: {
-          type: "array",
-          description: "Array of reference assignments to perform",
-          items: {
-            type: "object",
-            properties: {
-              path: { type: "string", description: "Target GameObject path or name" },
-              instanceId: { type: "string", description: "Target GameObject instance ID" },
-              componentType: { type: "string", description: "Component type (optional)" },
-              propertyName: { type: "string", description: "Property name to set" },
-              assetPath: { type: "string", description: "Asset path to assign" },
-              referenceGameObject: { type: "string", description: "Scene GameObject to assign" },
-              referenceComponentType: { type: "string", description: "Component type on the referenced GameObject" },
-              referenceInstanceId: { type: "number", description: "Instance ID to assign" },
-              clear: { type: "boolean", description: "Clear the reference" },
-            },
-            required: ["propertyName"],
-          },
-        },
-      },
-      required: ["references"],
-    },
-    handler: async (params) => JSON.stringify(await bridge.batchWireReferences(params), null, 2),
-  },
-  {
     name: "unity_component_get_referenceable",
     description: "Discover what objects can be assigned to an ObjectReference property. Returns matching scene objects and project assets filtered by the expected type. Useful before wiring references to know what's available.",
     inputSchema: {

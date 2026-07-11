@@ -278,7 +278,7 @@ async function ensureInstanceDiscovery() {
 const server = new Server(
   {
     name: "unity-mcp",
-    version: "2.31.0",
+    version: "3.0.0",
   },
   {
     capabilities: {
@@ -335,25 +335,23 @@ function toolWithPortSchema({ name, description, inputSchema, annotations }) {
 }
 
 async function getExposedTools() {
-  const tools = [...ALL_TOOLS];
-  const names = new Set(tools.map((tool) => tool.name));
+  const toolsByName = new Map(ALL_TOOLS.map((tool) => [tool.name, tool]));
   const projectTools = await fetchFirstClassPluginTools();
 
   for (const tool of projectTools) {
-    if (names.has(tool.name)) continue;
-    names.add(tool.name);
-    tools.push(tool);
+    // Unity owns route schemas. Live plugin metadata must replace a same-named
+    // server fallback so package upgrades take effect without reconnecting.
+    toolsByName.set(tool.name, tool);
   }
 
-  return tools;
+  return [...toolsByName.values()];
 }
 
 async function findExposedTool(name) {
-  const staticTool = ALL_TOOLS.find((tool) => tool.name === name);
-  if (staticTool) return staticTool;
-
   const projectTools = await fetchFirstClassPluginTools();
-  return projectTools.find((tool) => tool.name === name) || null;
+  return projectTools.find((tool) => tool.name === name) ||
+    ALL_TOOLS.find((tool) => tool.name === name) ||
+    null;
 }
 
 server.setRequestHandler(ListToolsRequestSchema, async () => {
@@ -366,7 +364,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
 // ─── Call Tool Handler ───
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
-  let tool = ALL_TOOLS.find((t) => t.name === name);
+  let tool = null;
 
   try {
     // Allow per-request agent ID override from MCP metadata, but default to
@@ -429,9 +427,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       };
     }
 
-    if (!tool) {
-      tool = await findExposedTool(name);
-    }
+    tool = await findExposedTool(name);
 
     if (!tool) {
       return {
@@ -570,7 +566,7 @@ async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   startPluginToolMetadataRefresh();
-  debugLog(`=== SERVER START === v2.31.0, agent=${PROCESS_AGENT_ID}, discoveryDone=${_discoveryDonePerAgent.get(PROCESS_AGENT_ID) || false}, selectedPort=${getSelectedInstance()?.port || 'null'}`);
+  debugLog(`=== SERVER START === v3.0.0, agent=${PROCESS_AGENT_ID}, discoveryDone=${_discoveryDonePerAgent.get(PROCESS_AGENT_ID) || false}, selectedPort=${getSelectedInstance()?.port || 'null'}`);
   console.error(
     `Unity MCP Server running on stdio (agent: ${PROCESS_AGENT_ID})`
   );
