@@ -21,6 +21,7 @@ let _queueModeDetermined = false;
 const MAX_RETRIES = 4;
 const RETRY_BASE_DELAY_MS = 800; // 800ms, 1600ms, 3200ms, 6400ms
 const POLL_TRANSIENT_RETRY_BASE_MS = 500;
+const RELOAD_RETRY_MAX_DELAY_MS = 2000;
 
 /**
  * Sleep helper for retry backoff
@@ -227,6 +228,47 @@ function getQueuePollTimeoutMs(command, params = {}) {
   return configuredTimeout;
 }
 
+export function getReloadReconnectBudgetMs(command, params = {}) {
+  return canReplayAfterLostTicket(command)
+    ? getQueuePollTimeoutMs(command, params)
+    : 0;
+}
+
+function shouldRetryTransientConnection(command, params, startedAt, retryCount) {
+  const reconnectBudgetMs = getReloadReconnectBudgetMs(command, params);
+  if (reconnectBudgetMs > 0) {
+    return Date.now() - startedAt < reconnectBudgetMs;
+  }
+
+  return retryCount < MAX_RETRIES;
+}
+
+function getTransientRetryDelayMs(command, params, startedAt, retryCount) {
+  const reconnectBudgetMs = getReloadReconnectBudgetMs(command, params);
+  const exponentialDelay = RETRY_BASE_DELAY_MS * Math.pow(2, Math.min(retryCount, MAX_RETRIES));
+  if (reconnectBudgetMs <= 0) return exponentialDelay;
+
+  const remainingMs = Math.max(0, reconnectBudgetMs - (Date.now() - startedAt));
+  return Math.min(exponentialDelay, RELOAD_RETRY_MAX_DELAY_MS, remainingMs);
+}
+
+function buildConnectionFailure(command, params, startedAt, retryCount, lastError) {
+  const elapsedMs = Date.now() - startedAt;
+  const reconnectBudgetMs = getReloadReconnectBudgetMs(command, params);
+  return {
+    success: false,
+    retryable: reconnectBudgetMs > 0,
+    errorCode: reconnectBudgetMs > 0 ? "reload_reconnect_timeout" : "editor_connection_failed",
+    error: reconnectBudgetMs > 0
+      ? `Unity Editor did not reconnect within the ${reconnectBudgetMs}ms reload recovery budget for ${command}: ${lastError?.message}`
+      : `Connection failed after ${MAX_RETRIES} retries: ${lastError?.message}. Unity Editor may be reloading or not running.`,
+    command,
+    retryCount,
+    elapsedMs,
+    reconnectBudgetMs,
+  };
+}
+
 async function buildQueuePollTimeoutResult(ticketId, command, timeoutMs, elapsedMs) {
   const finalStatus = await fetchQueueStatusRaw(ticketId).catch((error) => ({
     success: false,
@@ -417,8 +459,10 @@ function normalizeFailedQueueStatus(statusData) {
 async function sendCommandLegacyMode(command, params = {}) {
   const url = `${getBridgeUrl()}/api/${command}`;
   let lastError = null;
+  const startedAt = Date.now();
+  let retryCount = 0;
 
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+  while (true) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), CONFIG.editorBridgeTimeout);
 
@@ -435,12 +479,14 @@ async function sendCommandLegacyMode(command, params = {}) {
       clearTimeout(timeout);
 
       // Transient server error â€" retry
-      if (isTransientError(null, response) && attempt < MAX_RETRIES) {
-        const delay = RETRY_BASE_DELAY_MS * Math.pow(2, attempt);
+      if (isTransientError(null, response) &&
+          shouldRetryTransientConnection(command, params, startedAt, retryCount)) {
+        const delay = getTransientRetryDelayMs(command, params, startedAt, retryCount);
         console.error(
-          `[MCP Bridge] HTTP ${response.status} on ${command}, retrying in ${delay}ms (${attempt + 1}/${MAX_RETRIES})...`
+          `[MCP Bridge] HTTP ${response.status} on ${command}, retrying in ${delay}ms (retry ${retryCount + 1})...`
         );
         await sleep(delay);
+        retryCount++;
         continue;
       }
 
@@ -452,9 +498,9 @@ async function sendCommandLegacyMode(command, params = {}) {
       const data = await response.json();
 
       // If we retried, log that we recovered
-      if (attempt > 0) {
+      if (retryCount > 0) {
         console.error(
-          `[MCP Bridge] Recovered after ${attempt} retries for ${command}`
+          `[MCP Bridge] Recovered after ${retryCount} retries for ${command}`
         );
       }
 
@@ -464,14 +510,18 @@ async function sendCommandLegacyMode(command, params = {}) {
       lastError = error;
 
       // Transient connection error â€" retry with backoff
-      if (isTransientError(error, null) && attempt < MAX_RETRIES) {
-        const delay = RETRY_BASE_DELAY_MS * Math.pow(2, attempt);
+      if (isTransientError(error, null) &&
+          shouldRetryTransientConnection(command, params, startedAt, retryCount)) {
+        const delay = getTransientRetryDelayMs(command, params, startedAt, retryCount);
         console.error(
-          `[MCP Bridge] ${error.code || error.name || "Error"} on ${command}, retrying in ${delay}ms (${attempt + 1}/${MAX_RETRIES})...`
+          `[MCP Bridge] ${error.code || error.name || "Error"} on ${command}, retrying in ${delay}ms (retry ${retryCount + 1})...`
         );
         await sleep(delay);
+        retryCount++;
         continue;
       }
+
+      break;
     }
   }
 
@@ -483,10 +533,7 @@ async function sendCommandLegacyMode(command, params = {}) {
         "Request timed out after retries. Unity Editor may be in a long domain reload or not running.",
     };
   }
-  return {
-    success: false,
-    error: `Connection failed after ${MAX_RETRIES} retries: ${lastError?.message}. Unity Editor may be reloading or not running.`,
-  };
+  return buildConnectionFailure(command, params, startedAt, retryCount, lastError);
 }
 
 /**
@@ -498,6 +545,8 @@ async function sendCommandLegacyMode(command, params = {}) {
 export async function sendCommand(command, params = {}) {
   const bodyString = JSON.stringify(params);
   let lostTicketReplayCount = 0;
+  let submitRetryCount = 0;
+  const startedAt = Date.now();
 
   // If we've determined the plugin doesn't support queue mode, use legacy
   if (_queueModeDetermined && !_useQueueMode) {
@@ -509,7 +558,7 @@ export async function sendCommand(command, params = {}) {
     try {
       // Submit to queue with retry logic
       let submitLastError = null;
-      for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      while (true) {
         try {
           const ticketData = await submitToQueue(command, bodyString);
           const ticketId = ticketData.ticketId;
@@ -524,13 +573,15 @@ export async function sendCommand(command, params = {}) {
           // Queue submission succeeded (we got a ticket), so queue mode is confirmed
           _queueModeDetermined = true;
           _useQueueMode = true;
-          if (!result.success && result.retryable && canReplayAfterLostTicket(command) && attempt < MAX_RETRIES) {
+          if (!result.success && result.retryable && canReplayAfterLostTicket(command) &&
+              shouldRetryTransientConnection(command, params, startedAt, submitRetryCount)) {
             lostTicketReplayCount++;
-            const delay = RETRY_BASE_DELAY_MS * Math.pow(2, attempt);
+            const delay = getTransientRetryDelayMs(command, params, startedAt, submitRetryCount);
             console.error(
-              `[MCP Bridge] Replaying "${command}" after lost queue ticket ${ticketId} in ${delay}ms (${attempt + 1}/${MAX_RETRIES})...`
+              `[MCP Bridge] Replaying "${command}" after lost queue ticket ${ticketId} in ${delay}ms (retry ${submitRetryCount + 1})...`
             );
             await sleep(delay);
+            submitRetryCount++;
             continue;
           }
 
@@ -541,12 +592,14 @@ export async function sendCommand(command, params = {}) {
           submitLastError = submitError;
 
           // Check if it's a transient error worth retrying
-          if (isTransientError(submitError, null) && attempt < MAX_RETRIES) {
-            const delay = RETRY_BASE_DELAY_MS * Math.pow(2, attempt);
+          if (isTransientError(submitError, null) &&
+              shouldRetryTransientConnection(command, params, startedAt, submitRetryCount)) {
+            const delay = getTransientRetryDelayMs(command, params, startedAt, submitRetryCount);
             console.error(
-              `[MCP Bridge] Error submitting to queue: ${submitError.message}, retrying in ${delay}ms (${attempt + 1}/${MAX_RETRIES})...`
+              `[MCP Bridge] Error submitting to queue: ${submitError.message}, retrying in ${delay}ms (retry ${submitRetryCount + 1})...`
             );
             await sleep(delay);
+            submitRetryCount++;
             continue;
           }
 
@@ -567,6 +620,10 @@ export async function sendCommand(command, params = {}) {
 
       // If we get here, queue submit failed after retries
       if (submitLastError) {
+        if (getReloadReconnectBudgetMs(command, params) > 0) {
+          return buildConnectionFailure(command, params, startedAt, submitRetryCount, submitLastError);
+        }
+
         console.warn(
           `[MCP Bridge] Queue mode failed after retries, falling back to legacy sync mode: ${submitLastError.message}`
         );

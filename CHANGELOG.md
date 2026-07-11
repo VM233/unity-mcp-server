@@ -2,7 +2,10 @@
 
 All notable changes to this package will be documented in this file.
 
-## [Unreleased]
+## [3.1.2] - 2026-07-11
+
+### Fixed
+- **Domain-reload wait reconnects** - Reload-safe commands such as `unity_wait_editor_idle` now keep reconnecting for the command's full polling budget instead of exhausting four fixed submission retries and incorrectly disabling queue mode during a longer Unity domain reload.
 
 ## [3.1.1] - 2026-07-11
 

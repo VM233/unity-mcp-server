@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   canReplayAfterLostTicket,
+  getReloadReconnectBudgetMs,
   normalizeTerminalQueueStatus,
 } from "../src/unity-editor-bridge.js";
 import { editorTools } from "../src/tools/editor-tools.js";
@@ -39,6 +40,18 @@ test("only explicitly replayable reload-safe routes are retried", () => {
   assert.equal(canReplayAfterLostTicket("testing/list-tests"), true);
   assert.equal(canReplayAfterLostTicket("testing/get-package-job"), true);
   assert.equal(canReplayAfterLostTicket("prefab-asset/remove-gameobject"), false);
+});
+
+test("reload-safe waits use their full command timeout instead of a fixed retry count", () => {
+  const defaultBudget = getReloadReconnectBudgetMs("wait/editor-idle", {});
+  const longWaitBudget = getReloadReconnectBudgetMs("wait/editor-idle", {
+    timeoutMs: 180_000,
+    stableMs: 2_000,
+  });
+
+  assert.ok(defaultBudget >= 120_000);
+  assert.ok(longWaitBudget >= 212_000);
+  assert.equal(getReloadReconnectBudgetMs("prefab-asset/remove-gameobject", {}), 0);
 });
 
 test("plugin tool metadata fingerprint is order independent and schema sensitive", () => {
