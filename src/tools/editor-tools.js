@@ -486,7 +486,7 @@ export const editorTools = [
       },
       required: ["action"],
     },
-    handler: async ({ action }) => JSON.stringify(await bridge.playMode(action)),
+    handler: async (params) => JSON.stringify(await bridge.playMode(params)),
   },
 
   // â”€â”€â”€ Editor Menu â”€â”€â”€

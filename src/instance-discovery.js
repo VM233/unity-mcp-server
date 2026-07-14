@@ -63,7 +63,8 @@ export async function validateSelectedInstance() {
   const alive = await pingInstance(savedPort);
   if (alive) {
     const info = await getInstanceInfo(savedPort);
-    if (info && info.projectPath && info.projectPath === savedPath) {
+    if (info && info.projectPath &&
+        normalizeProjectPath(info.projectPath) === normalizeProjectPath(savedPath)) {
       return currentInstance;
     }
 
@@ -83,7 +84,7 @@ export async function validateSelectedInstance() {
       (entry) =>
         entry.port === savedPort &&
         entry.projectPath &&
-        entry.projectPath === savedPath
+        normalizeProjectPath(entry.projectPath) === normalizeProjectPath(savedPath)
     );
 
     if (registryMatch) {
@@ -106,7 +107,8 @@ export async function validateSelectedInstance() {
   // Re-discover all instances and find the one matching our saved projectPath
   const instances = await discoverInstances();
   const match = instances.find(
-    (inst) => inst.projectPath && inst.projectPath === savedPath
+    (inst) => inst.projectPath &&
+      normalizeProjectPath(inst.projectPath) === normalizeProjectPath(savedPath)
   );
 
   if (match) {
@@ -118,7 +120,8 @@ export async function validateSelectedInstance() {
 
   // Last resort: check if the registry has our project on ANY port (could be compiling on a new port)
   const registryFallback = readRegistryFile().find(
-    (entry) => entry.projectPath && entry.projectPath === savedPath
+    (entry) => entry.projectPath &&
+      normalizeProjectPath(entry.projectPath) === normalizeProjectPath(savedPath)
   );
   if (registryFallback && registryFallback.port) {
     if (isRegistryEntryStale(registryFallback)) {
@@ -246,13 +249,50 @@ export function getActiveInstanceContext() {
 
 /** Resolve the project identity for an explicit per-request port override. */
 export async function resolveInstanceContextForPort(port) {
-  const registryEntry = readRegistryFile().find((entry) => entry.port === port);
-  if (registryEntry?.projectPath || registryEntry?.projectName) {
-    return registryEntry;
+  const info = await getInstanceInfo(port);
+  if (info?.projectPath || info?.projectName) {
+    return { port, ...info, source: "live-port" };
   }
 
-  const info = await getInstanceInfo(port);
-  return info ? { port, ...info } : null;
+  return newestRegistryEntry(readRegistryFile().filter((entry) => entry.port === port));
+}
+
+export async function resolveInstanceContextForProjectPath(projectPath) {
+  const normalizedPath = normalizeProjectPath(projectPath);
+  if (!normalizedPath) return null;
+
+  const registryMatch = newestRegistryEntry(readRegistryFile().filter(
+    (entry) => normalizeProjectPath(entry.projectPath) === normalizedPath
+  ));
+  if (registryMatch) {
+    const resolvedRegistryMatch = await resolveInstanceContextForPort(registryMatch.port);
+    if (normalizeProjectPath(resolvedRegistryMatch?.projectPath) === normalizedPath) {
+      return resolvedRegistryMatch;
+    }
+  }
+
+  const instances = await discoverInstances();
+  return instances.find(
+    (entry) => normalizeProjectPath(entry.projectPath) === normalizedPath
+  ) || null;
+}
+
+export function normalizeProjectPath(projectPath) {
+  return String(projectPath || "")
+    .replace(/\\/g, "/")
+    .replace(/\/+$/, "")
+    .toLowerCase();
+}
+
+function newestRegistryEntry(entries) {
+  if (!entries.length) return null;
+  return [...entries].sort((left, right) =>
+    registryTimestamp(right) - registryTimestamp(left))[0];
+}
+
+function registryTimestamp(entry) {
+  const value = Date.parse(entry?.lastSeen || entry?.registeredAt || "");
+  return Number.isFinite(value) ? value : 0;
 }
 
 /**
@@ -269,14 +309,17 @@ export async function discoverInstances() {
   try {
     const registryData = readRegistryFile();
     if (registryData.length > 0) {
-      // Validate each entry by pinging it
+      // Validate each entry and replace potentially stale registry identity with
+      // the live project identity currently listening on that port.
       const validated = await Promise.all(
         registryData.map(async (entry) => {
           const port = entry.port;
           if (!port) return null;
 
-          const alive = await pingInstance(port);
-          return alive ? { ...entry, alive: true, source: "registry" } : null;
+          const info = await getInstanceInfo(port);
+          return info
+            ? { ...entry, ...info, port, alive: true, source: "registry+live" }
+            : null;
         })
       );
 

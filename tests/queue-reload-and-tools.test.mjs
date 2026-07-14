@@ -6,8 +6,13 @@ import {
   buildTargetHeaders,
   createRequestId,
   getReloadReconnectBudgetMs,
+  normalizeRecoveredAssetRefreshJob,
   normalizeTerminalQueueStatus,
+  sendCommand,
 } from "../src/unity-editor-bridge.js";
+import { runWithRequestContext } from "../src/request-context.js";
+import { injectEditorBindingSchema } from "../src/tool-schema.js";
+import { normalizeProjectPath } from "../src/instance-discovery.js";
 import { editorTools } from "../src/tools/editor-tools.js";
 import { hubTools } from "../src/tools/hub-tools.js";
 import { instanceTools } from "../src/tools/instance-tools.js";
@@ -66,6 +71,71 @@ test("mutating transport headers bind agent and selected Unity project", () => {
   assert.equal(headers["X-UnityMCP-Expected-Project-Path"],
     "D:/UnityProjects/BattleIdle/apps/game-client-unity");
   assert.equal(headers["X-UnityMCP-Expected-Project-Name"], "BattleIdle");
+});
+
+test("explicit project binding overrides stale discovered instance identity", () => {
+  const headers = buildTargetHeaders({
+    projectPath: "D:/UnityProjects/StaleProject",
+    projectName: "StaleProject",
+  }, "agent-42", {}, {
+    expectedProjectPath: "D:\\UnityProjects\\BattleIdle\\apps\\game-client-unity",
+    expectedProjectName: "BattleIdle",
+  });
+  assert.equal(headers["X-UnityMCP-Expected-Project-Path"],
+    "D:\\UnityProjects\\BattleIdle\\apps\\game-client-unity");
+  assert.equal(headers["X-UnityMCP-Expected-Project-Name"], "BattleIdle");
+});
+
+test("project identity comparison accepts Windows slash and casing differences", () => {
+  assert.equal(
+    normalizeProjectPath("D:\\UnityProjects\\BattleIdle\\apps\\game-client-unity\\"),
+    normalizeProjectPath("d:/unityprojects/battleidle/apps/game-client-unity")
+  );
+});
+
+test("first-class Editor schemas expose explicit project binding", () => {
+  for (const name of ["unity_asset_refresh", "unity_execute_code", "unity_play_mode"]) {
+    const schema = injectEditorBindingSchema(name, {
+      type: "object",
+      properties: { value: { type: "string" } },
+      required: ["value"],
+    });
+    assert.ok(schema.properties.port, name);
+    assert.ok(schema.properties.expectedProjectPath, name);
+    assert.deepEqual(schema.required, ["value"]);
+  }
+
+  assert.equal(injectEditorBindingSchema("unity_list_instances", {
+    type: "object", properties: {},
+  }).properties.expectedProjectPath, undefined);
+  assert.equal(injectEditorBindingSchema("unity_hub_list_projects", {
+    type: "object", properties: {},
+  }).properties.expectedProjectPath, undefined);
+});
+
+test("asset refresh recovery returns persistent job truth instead of transport failure", () => {
+  const succeeded = normalizeRecoveredAssetRefreshJob({
+    jobId: "refresh-1",
+    status: "succeeded",
+    success: true,
+  }, {
+    errorCode: "queue_poll_timeout",
+    error: "outer poll timed out",
+    ticketId: 91,
+  }, "request-1");
+  assert.equal(succeeded.success, true);
+  assert.equal(succeeded.data.jobId, "refresh-1");
+  assert.equal(succeeded.data.recoveredAfterTransportFailure, true);
+  assert.equal(succeeded.data.transportFailure.errorCode, "queue_poll_timeout");
+
+  const failed = normalizeRecoveredAssetRefreshJob({
+    jobId: "refresh-2",
+    status: "failed",
+    error: "import failed",
+  }, { error: "connection lost" }, "request-2");
+  assert.equal(failed.success, false);
+  assert.equal(failed.error, "import failed");
+  assert.equal(normalizeRecoveredAssetRefreshJob({ status: "succeeded" }, {}, "request-3"), null);
 });
 
 test("generated idempotency keys are unique command-scoped values", () => {
@@ -137,5 +207,63 @@ test("default tool surface stays bounded and omits duplicate prefab aliases", ()
 
   const refreshJob = exposedByName.get("unity_asset_get_refresh_job");
   assert.ok(refreshJob);
-  assert.deepEqual(Object.keys(refreshJob.inputSchema.properties), ["jobId", "clear"]);
+  assert.deepEqual(Object.keys(refreshJob.inputSchema.properties),
+    ["jobId", "refreshRequestId", "clear"]);
+});
+
+test("asset refresh queue failure is reconciled by exact persistent request ID", async () => {
+  const originalFetch = globalThis.fetch;
+  let submittedRequestId = "";
+  let recoveryRequestId = "";
+
+  globalThis.fetch = async (url, options = {}) => {
+    const target = String(url);
+    if (target.endsWith("/api/queue/submit")) {
+      const body = JSON.parse(options.body);
+      submittedRequestId = body.requestId;
+      assert.equal(options.headers["X-UnityMCP-Expected-Project-Path"],
+        "D:/UnityProjects/BattleIdle/apps/game-client-unity");
+      return Response.json({ ticketId: 17 });
+    }
+    if (target.includes("/api/queue/status?ticketId=17")) {
+      return Response.json({
+        ticketId: 17,
+        actionName: "asset/refresh",
+        status: "TimedOut",
+        errorCode: "request_timed_out",
+        retryable: false,
+        result: { success: false, error: "outer request timed out" },
+      });
+    }
+    if (target.endsWith("/api/asset/get-refresh-job")) {
+      recoveryRequestId = JSON.parse(options.body).refreshRequestId;
+      return Response.json({
+        success: true,
+        jobId: "refresh-17",
+        status: "succeeded",
+      });
+    }
+    throw new Error(`unexpected fetch ${target}`);
+  };
+
+  try {
+    const result = await runWithRequestContext({
+      agentId: "agent-refresh",
+      portOverride: 7891,
+      targetInstance: {
+        port: 7891,
+        projectPath: "D:/UnityProjects/BattleIdle/apps/game-client-unity",
+        projectName: "BattleIdle",
+      },
+      expectedProjectPath: "D:/UnityProjects/BattleIdle/apps/game-client-unity",
+    }, () => sendCommand("asset/refresh", { assetPaths: ["Assets/test.uss"] }));
+
+    assert.equal(result.success, true);
+    assert.equal(result.data.jobId, "refresh-17");
+    assert.equal(result.data.recoveredAfterTransportFailure, true);
+    assert.ok(submittedRequestId);
+    assert.equal(recoveryRequestId, submittedRequestId);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });

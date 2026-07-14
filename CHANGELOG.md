@@ -2,6 +2,16 @@
 
 All notable changes to this package will be documented in this file.
 
+## [3.2.1] - 2026-07-15
+
+### Added
+- Exposed `expectedProjectPath` alongside `port` on every Editor-targeting first-class tool schema, including `unity_asset_refresh`, `unity_execute_code`, and `unity_play_mode`.
+- Added exact request-ID recovery for persistent asset refresh jobs after queue polling or transport failures during a Unity domain reload.
+
+### Fixed
+- Resolve an explicit port against its live `/api/ping` identity before registry fallback, preventing stale registry data from producing false project-binding HTTP 409 responses.
+- Preserve explicit project binding in request-local headers even when a core tool handler narrows its command body.
+
 ## [3.2.0] - 2026-07-14
 
 ### Breaking changes

@@ -328,7 +328,7 @@ If Unity MCP helps your workflow, consider supporting its development! Your supp
 
 - **Parallel-safe instance routing** — When multiple AI agents (e.g. Claude Cowork tasks) share the same MCP process, each agent can now include a `port` parameter in every `unity_*` tool call to guarantee routing to the correct Unity Editor instance. This prevents cross-agent contamination where one task's `unity_select_instance` could redirect another task's commands to the wrong project.
 - **Per-request port override** — A new stateless routing mechanism bypasses the shared per-agent state entirely. The `port` parameter is extracted by middleware before the tool handler runs, used for routing, then stripped from the args. This is safe because MCP stdio transport processes requests sequentially.
-- **Schema injection** — The optional `port` parameter is automatically injected into every `unity_*` tool schema (except `unity_list_instances`, `unity_select_instance`, and `unity_hub_*`), so AI assistants see it as a legitimate parameter and pass it consistently.
+- **Schema injection** — Optional `port` and `expectedProjectPath` parameters are automatically injected into every Editor-targeting `unity_*` tool schema (except `unity_list_instances`, `unity_select_instance`, and `unity_hub_*`). Supplying `expectedProjectPath` can resolve the target port by project path, and mutating requests are rejected before execution if the bound project does not match.
 - **Enhanced select_instance response** — `unity_select_instance` now returns explicit routing instructions telling the AI to include `port` in all subsequent calls.
 
 ## Frequently Asked Questions

@@ -68,6 +68,14 @@ function getJsonText(response) {
     ?.text || "";
 }
 
+function assertEditorBindingSchema(tools, toolName) {
+  const tool = tools.find((candidate) => candidate.name === toolName);
+  assert.ok(tool, `${toolName} was not exposed`);
+  assert.ok(tool.inputSchema.properties.port, `${toolName} did not expose port`);
+  assert.ok(tool.inputSchema.properties.expectedProjectPath,
+    `${toolName} did not expose expectedProjectPath`);
+}
+
 try {
   await client.connect(transport);
   assert.equal(client.getServerCapabilities()?.tools?.listChanged, true);
@@ -84,7 +92,13 @@ try {
   assert.equal(initial.tools.some((tool) => tool.description?.startsWith("IMPORTANT:")), false);
   const initialRefreshJob = initial.tools.find((tool) => tool.name === "unity_asset_get_refresh_job");
   assert.ok(initialRefreshJob);
-  assert.deepEqual(Object.keys(initialRefreshJob.inputSchema.properties), ["jobId", "clear", "port"]);
+  assert.ok(initialRefreshJob.inputSchema.properties.jobId);
+  assert.ok(initialRefreshJob.inputSchema.properties.clear);
+  assert.ok(initialRefreshJob.inputSchema.properties.port);
+  assert.ok(initialRefreshJob.inputSchema.properties.expectedProjectPath);
+  for (const toolName of ["unity_asset_refresh", "unity_execute_code", "unity_play_mode"]) {
+    assertEditorBindingSchema(initial.tools, toolName);
+  }
 
   const refreshedMetadataTools = [
     "unity_testing_run_package_tests",
@@ -115,7 +129,12 @@ try {
   assert.deepEqual(assetMove.inputSchema.required, ["moves"]);
   assert.deepEqual(setReference.inputSchema.required, ["references"]);
   assert.deepEqual(localizationUpsert.inputSchema.required, ["collection", "entries"]);
-  assert.deepEqual(Object.keys(refreshJob.inputSchema.properties), ["jobId", "clear", "port"]);
+  assert.ok(refreshJob.inputSchema.properties.jobId);
+  assert.ok(refreshJob.inputSchema.properties.refreshRequestId);
+  assert.ok(refreshJob.inputSchema.properties.clear);
+  for (const toolName of ["unity_asset_refresh", "unity_execute_code", "unity_play_mode"]) {
+    assertEditorBindingSchema(refreshed.tools, toolName);
+  }
   assert.equal(refreshed.tools.some((tool) => tool.annotations?.title), false);
   assert.equal(refreshed.tools.some((tool) =>
     Object.values(tool.annotations || {}).some((value) => value === false)), false);

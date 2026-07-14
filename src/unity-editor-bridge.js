@@ -3,7 +3,11 @@
 // Supports both queue mode (async ticket-based) and legacy sync mode
 import { CONFIG } from "./config.js";
 import { getActiveBridgeUrl, getActiveInstanceContext } from "./instance-discovery.js";
-import { getRequestAgentId } from "./request-context.js";
+import {
+  getRequestAgentId,
+  getRequestExpectedProjectName,
+  getRequestExpectedProjectPath,
+} from "./request-context.js";
 
 // Dynamic bridge URL â€" resolved per-call based on selected instance
 function getBridgeUrl() {
@@ -11,16 +15,21 @@ function getBridgeUrl() {
 }
 
 function buildBridgeHeaders(additional = {}) {
-  return buildTargetHeaders(getActiveInstanceContext(), getRequestAgentId(), additional);
+  return buildTargetHeaders(getActiveInstanceContext(), getRequestAgentId(), additional, {
+    expectedProjectPath: getRequestExpectedProjectPath(),
+    expectedProjectName: getRequestExpectedProjectName(),
+  });
 }
 
-export function buildTargetHeaders(instance, agentId, additional = {}) {
+export function buildTargetHeaders(instance, agentId, additional = {}, explicitBinding = {}) {
   const headers = { ...additional, "X-Agent-Id": agentId };
-  if (instance?.projectPath) {
-    headers["X-UnityMCP-Expected-Project-Path"] = instance.projectPath;
+  const expectedProjectPath = explicitBinding.expectedProjectPath || instance?.projectPath;
+  const expectedProjectName = explicitBinding.expectedProjectName || instance?.projectName;
+  if (expectedProjectPath) {
+    headers["X-UnityMCP-Expected-Project-Path"] = expectedProjectPath;
   }
-  if (instance?.projectName) {
-    headers["X-UnityMCP-Expected-Project-Name"] = instance.projectName;
+  if (expectedProjectName) {
+    headers["X-UnityMCP-Expected-Project-Name"] = expectedProjectName;
   }
   return headers;
 }
@@ -43,6 +52,7 @@ const MAX_RETRIES = 4;
 const RETRY_BASE_DELAY_MS = 800; // 800ms, 1600ms, 3200ms, 6400ms
 const POLL_TRANSIENT_RETRY_BASE_MS = 500;
 const RELOAD_RETRY_MAX_DELAY_MS = 2000;
+const ASSET_REFRESH_RECOVERY_BUDGET_MS = 15000;
 
 /**
  * Sleep helper for retry backoff
@@ -190,6 +200,114 @@ async function fetchEditorStateRaw(timeoutMs = 5000) {
     success: true,
     data: await response.json(),
   };
+}
+
+async function fetchAssetRefreshJobRaw(refreshRequestId, timeoutMs = 5000) {
+  const response = await fetch(`${getBridgeUrl()}/api/asset/get-refresh-job`, {
+    method: "POST",
+    headers: buildBridgeHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ refreshRequestId }),
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    return {
+      success: false,
+      statusCode: response.status,
+      retryable: isTransientError(null, response),
+      error: `HTTP ${response.status}: ${text}`,
+    };
+  }
+
+  return {
+    success: true,
+    data: await response.json(),
+  };
+}
+
+function summarizeTransportFailure(failure) {
+  return {
+    errorCode: failure?.errorCode || "asset_refresh_transport_failure",
+    error: failure?.error || failure?.message || "Asset refresh transport failed.",
+    ticketId: failure?.ticketId ?? null,
+    status: failure?.status || "",
+  };
+}
+
+export function normalizeRecoveredAssetRefreshJob(job, originalFailure, refreshRequestId) {
+  if (!job || typeof job !== "object" || Array.isArray(job) || !job.jobId || !job.status) {
+    return null;
+  }
+
+  const status = String(job.status).toLowerCase();
+  const knownStatuses = new Set([
+    "queued",
+    "running",
+    "waiting-for-editor",
+    "succeeded",
+    "failed",
+    "canceled",
+    "cancelled",
+  ]);
+  if (!knownStatuses.has(status)) return null;
+
+  const recoveredJob = {
+    ...job,
+    recoveredAfterTransportFailure: true,
+    refreshRequestId,
+    transportFailure: summarizeTransportFailure(originalFailure),
+  };
+
+  if (["failed", "canceled", "cancelled"].includes(status)) {
+    const error = job.error || job.message || `Asset refresh job ${job.jobId} ${status}.`;
+    return {
+      success: false,
+      data: recoveredJob,
+      error,
+      message: error,
+      errorCode: job.errorCode || "asset_refresh_job_failed",
+      recoveredAfterTransportFailure: true,
+    };
+  }
+
+  return {
+    success: true,
+    data: recoveredJob,
+    recoveredAfterTransportFailure: true,
+  };
+}
+
+async function recoverAssetRefreshJob(refreshRequestId, originalFailure) {
+  const startedAt = Date.now();
+  let attempt = 0;
+  do {
+    try {
+      const response = await fetchAssetRefreshJobRaw(refreshRequestId);
+      if (response.success) {
+        const recovered = normalizeRecoveredAssetRefreshJob(
+          response.data,
+          originalFailure,
+          refreshRequestId
+        );
+        if (recovered) return recovered;
+      } else if (response.statusCode === 409) {
+        return null;
+      }
+    } catch (error) {
+      if (!isTransientError(error, null)) return null;
+    }
+
+    const delay = Math.min(500 * Math.pow(1.5, attempt++), 2000);
+    await sleep(delay);
+  } while (Date.now() - startedAt < ASSET_REFRESH_RECOVERY_BUDGET_MS);
+
+  return null;
+}
+
+async function recoverReloadSafeCommand(command, requestId, originalFailure) {
+  if (command !== "asset/refresh") return null;
+  return recoverAssetRefreshJob(requestId, originalFailure);
 }
 
 function extractEditorState(rawState) {
@@ -543,14 +661,16 @@ async function sendCommandLegacyMode(command, params = {}, requestId = createReq
   }
 
   // All retries exhausted
-  if (lastError?.name === "AbortError") {
-    return {
+  const failure = lastError?.name === "AbortError"
+    ? {
       success: false,
+      retryable: true,
+      errorCode: "legacy_request_timeout",
       error:
         "Request timed out after retries. Unity Editor may be in a long domain reload or not running.",
-    };
-  }
-  return buildConnectionFailure(command, params, startedAt, retryCount, lastError);
+    }
+    : buildConnectionFailure(command, params, startedAt, retryCount, lastError);
+  return (await recoverReloadSafeCommand(command, requestId, failure)) || failure;
 }
 
 /**
@@ -591,6 +711,10 @@ export async function sendCommand(command, params = {}) {
           // Queue submission succeeded (we got a ticket), so queue mode is confirmed
           _queueModeDetermined = true;
           _useQueueMode = true;
+          if (!result.success) {
+            const recovered = await recoverReloadSafeCommand(command, requestId, result);
+            if (recovered) return recovered;
+          }
           if (!result.success && result.retryable && canReplayAfterLostTicket(command) &&
               shouldRetryTransientConnection(command, params, startedAt, submitRetryCount)) {
             lostTicketReplayCount++;
@@ -638,8 +762,17 @@ export async function sendCommand(command, params = {}) {
 
       // If we get here, queue submit failed after retries
       if (submitLastError) {
+        const failure = buildConnectionFailure(
+          command,
+          params,
+          startedAt,
+          submitRetryCount,
+          submitLastError
+        );
+        const recovered = await recoverReloadSafeCommand(command, requestId, failure);
+        if (recovered) return recovered;
         if (getReloadReconnectBudgetMs(command, params) > 0) {
-          return buildConnectionFailure(command, params, startedAt, submitRetryCount, submitLastError);
+          return failure;
         }
 
         console.warn(
@@ -864,8 +997,8 @@ export async function getCompilationErrors(params) {
   return sendCommand("compilation/errors", params);
 }
 
-export async function playMode(action) {
-  return sendCommand("editor/play-mode", { action }); // "play", "pause", "stop"
+export async function playMode(params) {
+  return sendCommand("editor/play-mode", params); // action: "play", "pause", "stop"
 }
 
 export async function getEditorState() {

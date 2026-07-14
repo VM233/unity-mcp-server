@@ -789,6 +789,10 @@ const detailedStaticFirstClassPluginTools = [
           type: "string",
           description: "Optional refresh job ID. Defaults to the current or latest job.",
         },
+        refreshRequestId: {
+          type: "string",
+          description: "Optional original asset/refresh request ID used to recover the matching persistent job.",
+        },
         clear: {
           type: "boolean",
           description: "Clear the persisted job after a terminal result is read. Defaults to false.",

@@ -45,9 +45,11 @@ import {
   getSelectedInstance,
   isInstanceSelectionRequired,
   resolveInstanceContextForPort,
+  resolveInstanceContextForProjectPath,
   validateSelectedInstance,
 } from "./instance-discovery.js";
 import { debugLog } from "./state-persistence.js";
+import { injectEditorBindingSchema } from "./tool-schema.js";
 import { CONFIG } from "./config.js";
 import {
   getRequestAgentId,
@@ -290,7 +292,7 @@ async function performInstanceDiscovery(agentId) {
 const server = new Server(
   {
     name: "unity-mcp",
-    version: "3.2.0",
+    version: "3.2.1",
   },
   {
     capabilities: {
@@ -301,37 +303,8 @@ const server = new Server(
 );
 
 // ─── List Tools Handler ───
-// Inject an optional `port` parameter into every unity_* tool schema (except
-// unity_select_instance which already owns it, unity_list_instances which lists
-// all instances, and unity_hub_* which talk to Unity Hub not an Editor instance).
-// This lets agents pass `port` on every call for parallel-safe routing without
-// having to modify each tool definition file individually.
-const TOOLS_SKIP_PORT_INJECT = new Set([
-  "unity_select_instance",
-  "unity_list_instances",
-]);
-
-function toolWithPortSchema({ name, description, inputSchema, annotations }) {
-  let schema = inputSchema;
-  // Inject port into unity_* tools that target an Editor instance
-  if (
-    name.startsWith("unity_") &&
-    !name.startsWith("unity_hub_") &&
-    !TOOLS_SKIP_PORT_INJECT.has(name)
-  ) {
-    const baseSchema = inputSchema || { type: "object", properties: {} };
-    schema = {
-      ...baseSchema,
-      properties: {
-        ...(baseSchema.properties || {}),
-        port: {
-          type: "number",
-          description: "Target Editor port.",
-        },
-      },
-    };
-  }
-
+function toolWithEditorBindingSchema({ name, description, inputSchema, annotations }) {
+  const schema = injectEditorBindingSchema(name, inputSchema);
   const tool = {
     name,
     description: sanitizeToolMetadata(description),
@@ -373,7 +346,7 @@ async function findExposedTool(name) {
 server.setRequestHandler(ListToolsRequestSchema, async () => {
   const tools = await getExposedTools();
   return {
-    tools: tools.map(toolWithPortSchema),
+    tools: tools.map(toolWithEditorBindingSchema),
   };
 });
 
@@ -382,15 +355,39 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
   const meta = request.params._meta || {};
   const agentId = meta.agentId || meta.agent_id || PROCESS_AGENT_ID;
-  const portOverride = (args && typeof args.port === "number" && args.port)
+  let portOverride = (args && typeof args.port === "number" && args.port)
     || (typeof meta.port === "number" && meta.port)
     || null;
+  const expectedProjectPath = typeof args?.expectedProjectPath === "string"
+    ? args.expectedProjectPath.trim()
+    : "";
+  const expectedProjectName = typeof args?.expectedProjectName === "string"
+    ? args.expectedProjectName.trim()
+    : "";
 
-  const targetInstance = portOverride
+  let targetInstance = portOverride
     ? await resolveInstanceContextForPort(portOverride)
     : null;
+  if (!portOverride && expectedProjectPath) {
+    targetInstance = await resolveInstanceContextForProjectPath(expectedProjectPath);
+    portOverride = targetInstance?.port || null;
+  }
+  if (portOverride && expectedProjectPath && !targetInstance) {
+    targetInstance = {
+      port: portOverride,
+      projectPath: expectedProjectPath,
+      projectName: expectedProjectName,
+      source: "explicit-binding-fallback",
+    };
+  }
 
-  return runWithRequestContext({ agentId, portOverride, targetInstance }, async () => {
+  return runWithRequestContext({
+    agentId,
+    portOverride,
+    targetInstance,
+    expectedProjectPath,
+    expectedProjectName,
+  }, async () => {
     let tool = null;
     try {
       if (portOverride) {
