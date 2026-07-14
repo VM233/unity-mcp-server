@@ -445,6 +445,7 @@ const firstClassPluginRoutes = [
   "prefab-asset/transaction-edit",
   "component/set-reference",
   "asset/refresh",
+  "asset/get-refresh-job",
   "asset/rename",
   "asset/move",
   "asset/export-unitypackage",
@@ -775,6 +776,25 @@ const detailedStaticFirstClassPluginTools = [
     category: "component",
     description: "Assign one or more component ObjectReference properties with configurable immediate or frame-batched execution.",
     inputSchema: componentSetReferenceSchema(),
+  },
+  {
+    toolName: "unity_asset_get_refresh_job",
+    route: "asset/get-refresh-job",
+    category: "asset",
+    description: "Poll the current or latest reload-safe AssetDatabase refresh job.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        jobId: {
+          type: "string",
+          description: "Optional refresh job ID. Defaults to the current or latest job.",
+        },
+        clear: {
+          type: "boolean",
+          description: "Clear the persisted job after a terminal result is read. Defaults to false.",
+        },
+      },
+    },
   },
   {
     toolName: "unity_asset_move",

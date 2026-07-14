@@ -2,6 +2,11 @@
 
 All notable changes to this package will be documented in this file.
 
+## [3.1.3] - 2026-07-14
+
+### Fixed
+- **Asset refresh job polling exposure** - `unity_asset_get_refresh_job` is now available with its concrete schema during initial MCP startup, before live Unity plugin metadata finishes refreshing.
+
 ## [3.1.2] - 2026-07-11
 
 ### Fixed

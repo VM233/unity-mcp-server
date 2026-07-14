@@ -77,6 +77,9 @@ try {
   assert.ok(initial.tools.length <= 105);
   assert.ok(initialChars < 100_000);
   assert.equal(initial.tools.some((tool) => tool.description?.startsWith("IMPORTANT:")), false);
+  const initialRefreshJob = initial.tools.find((tool) => tool.name === "unity_asset_get_refresh_job");
+  assert.ok(initialRefreshJob);
+  assert.deepEqual(Object.keys(initialRefreshJob.inputSchema.properties), ["jobId", "clear", "port"]);
 
   await withTimeout(listChanged, 60000, "tool list change notification timed out");
 
@@ -92,16 +95,19 @@ try {
   const assetMove = refreshed.tools.find((tool) => tool.name === "unity_asset_move");
   const setReference = refreshed.tools.find((tool) => tool.name === "unity_component_set_reference");
   const localizationUpsert = refreshed.tools.find((tool) => tool.name === "unity_localization_upsert_entry");
+  const refreshJob = refreshed.tools.find((tool) => tool.name === "unity_asset_get_refresh_job");
   assert.deepEqual(transaction.inputSchema.properties.execution.properties.mode.enum,
     ["auto", "immediate", "batched"]);
   assert.deepEqual(assetMove.inputSchema.required, ["moves"]);
   assert.deepEqual(setReference.inputSchema.required, ["references"]);
   assert.deepEqual(localizationUpsert.inputSchema.required, ["collection", "entries"]);
+  assert.deepEqual(Object.keys(refreshJob.inputSchema.properties), ["jobId", "clear", "port"]);
   assert.equal(refreshed.tools.some((tool) => tool.annotations?.title), false);
   assert.equal(refreshed.tools.some((tool) =>
     Object.values(tool.annotations || {}).some((value) => value === false)), false);
   assert.equal(JSON.stringify(refreshed.tools).includes("Alias for"), false);
-  assert.ok(refreshed.tools.length <= 140);
+  assert.ok(refreshed.tools.length <= 155,
+    `expected refreshed tools/list at or below 155 tools, got ${refreshed.tools.length}`);
   assert.ok(refreshedChars < 150_000,
     `expected refreshed tools/list below 150000 chars, got ${refreshedChars}`);
   assert.equal(refreshed.tools.some((tool) => tool.description?.startsWith("IMPORTANT:")), false);
@@ -113,11 +119,20 @@ try {
   const pingText = getJsonText(pingResponse);
   assert.equal(pingText.includes("\n"), false);
 
+  const refreshJobResponse = await client.callTool({
+    name: "unity_asset_get_refresh_job",
+    arguments: { port: Number(environment.UNITY_BRIDGE_PORT) },
+  });
+  const refreshJobText = getJsonText(refreshJobResponse);
+  assert.doesNotThrow(() => JSON.parse(refreshJobText));
+  assert.equal(refreshJobText.includes("Unknown route"), false);
+
   const catalogResponse = await client.callTool({
     name: "unity_list_advanced_tools",
-    arguments: {},
+    arguments: { port: Number(environment.UNITY_BRIDGE_PORT) },
   });
   const catalogText = getJsonText(catalogResponse);
+  assert.ok(catalogText, `advanced catalog response did not contain JSON: ${JSON.stringify(catalogResponse)}`);
   const catalog = JSON.parse(catalogText);
   assert.ok(catalogText.length < 10_000);
   assert.ok(Array.isArray(catalog.categories));
@@ -125,7 +140,12 @@ try {
 
   const prefabCatalogResponse = await client.callTool({
     name: "unity_list_advanced_tools",
-    arguments: { category: "prefab-asset", includeSchema: true, limit: 25 },
+    arguments: {
+      category: "prefab-asset",
+      includeSchema: true,
+      limit: 25,
+      port: Number(environment.UNITY_BRIDGE_PORT),
+    },
   });
   const prefabCatalogText = getJsonText(prefabCatalogResponse);
   const prefabCatalog = JSON.parse(prefabCatalogText);

@@ -113,4 +113,8 @@ test("default tool surface stays bounded and omits duplicate prefab aliases", ()
   const localizationUpsert = exposedByName.get("unity_localization_upsert_entry");
   assert.deepEqual(localizationUpsert.inputSchema.required, ["collection", "entries"]);
   assert.ok(localizationUpsert.inputSchema.properties.execution);
+
+  const refreshJob = exposedByName.get("unity_asset_get_refresh_job");
+  assert.ok(refreshJob);
+  assert.deepEqual(Object.keys(refreshJob.inputSchema.properties), ["jobId", "clear"]);
 });

@@ -46,7 +46,7 @@
 | **Scenes** | Open, save, create scenes, get full hierarchy tree with pagination |
 | **GameObjects** | Create (primitives/empty), delete, duplicate, reparent, activate/deactivate, transform (world/local) |
 | **Components** | Add, remove, get/set serialized properties, and wire one or many object references |
-| **Assets** | List, import, delete, search, move one or many assets, create prefabs, create & assign materials |
+| **Assets** | List, import, delete, search, move one or many assets, run reload-safe refresh jobs, poll refresh completion, create prefabs, create & assign materials |
 | **Scripts** | Create, read, update C# scripts |
 | **Builds** | Multi-platform builds (Windows, macOS, Linux, Android, iOS, WebGL) |
 | **Console & Compilation** | Read/clear Unity console logs (errors, warnings, info); get C# compilation errors via CompilationPipeline (independent of console buffer) |
