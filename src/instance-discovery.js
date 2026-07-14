@@ -225,6 +225,17 @@ export function getActivePort() {
   return CONFIG.editorBridgePort;
 }
 
+/** Return the project identity associated with this request's selected bridge port. */
+export function getActiveInstanceContext() {
+  const port = getActivePort();
+  const selected = _agentInstances.get(getRequestAgentId());
+  if (selected && selected.port === port) {
+    return selected;
+  }
+
+  return readRegistryFile().find((entry) => entry.port === port) || null;
+}
+
 /**
  * Discover all running Unity instances.
  * Reads the shared registry file first, then validates each entry is alive.

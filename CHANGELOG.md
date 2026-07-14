@@ -2,6 +2,23 @@
 
 All notable changes to this package will be documented in this file.
 
+## [3.2.0] - 2026-07-14
+
+### Breaking changes
+- Mutating requests now carry the selected Unity instance's expected project path/name and are rejected by the Editor when no target identity is available.
+- Replaced the obsolete `LostAfterReload` status with `UncertainAfterReload` for interrupted mutations; these results are non-retryable until the caller reconciles the target.
+
+### Added
+- Stable per-command idempotency keys reused across queue submission retries and legacy transport fallback.
+- First-class `unity_queue_cancel` support with agent ownership enforcement.
+
+### Changed
+- Only explicitly reload-safe read routes are replayed after a lost connection; package mutations are never blindly replayed.
+- Queue info, status, and context requests now forward selected-instance identity consistently.
+
+### Fixed
+- Treat `asset/refresh` as an explicitly replayable, plugin-idempotent reload workflow instead of returning a lost queue ticket when AssetDatabase refresh triggers a domain reload.
+
 ## [3.1.3] - 2026-07-14
 
 ### Fixed

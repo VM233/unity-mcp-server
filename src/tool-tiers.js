@@ -412,6 +412,11 @@ const CORE_TOOLS = new Set([
   "unity_console_clear",
   "unity_get_compilation_errors",
 
+  // Multi-agent queue control
+  "unity_queue_info",
+  "unity_queue_ticket_status",
+  "unity_queue_cancel",
+
   // Editor actions
   "unity_execute_menu_item",
   // Selection & search

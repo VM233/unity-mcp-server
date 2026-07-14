@@ -3,6 +3,8 @@ import test from "node:test";
 
 import {
   canReplayAfterLostTicket,
+  buildTargetHeaders,
+  createRequestId,
   getReloadReconnectBudgetMs,
   normalizeTerminalQueueStatus,
 } from "../src/unity-editor-bridge.js";
@@ -14,31 +16,32 @@ import { staticFirstClassPluginTools } from "../src/tools/plugin-first-class-too
 import { umaTools } from "../src/tools/uma-tools.js";
 import { pluginToolsFingerprint, splitToolTiers } from "../src/tool-tiers.js";
 
-test("LostAfterReload is a failed terminal status", () => {
+test("UncertainAfterReload is a non-retryable failed terminal status", () => {
   const result = normalizeTerminalQueueStatus({
     ticketId: 42,
     actionName: "wait/editor-idle",
-    status: "LostAfterReload",
-    retryable: true,
-    errorCode: "ticket_lost_after_reload",
+    status: "UncertainAfterReload",
+    retryable: false,
+    errorCode: "mutation_outcome_uncertain_after_reload",
     result: {
       success: false,
-      error: "Ticket state was lost after a Unity domain reload.",
-      errorCode: "ticket_lost_after_reload",
-      retryable: true,
+      error: "The mutation outcome is uncertain after a Unity domain reload.",
+      errorCode: "mutation_outcome_uncertain_after_reload",
+      retryable: false,
     },
   });
 
   assert.equal(result.success, false);
-  assert.equal(result.status, "LostAfterReload");
-  assert.equal(result.errorCode, "ticket_lost_after_reload");
-  assert.equal(result.retryable, true);
+  assert.equal(result.status, "UncertainAfterReload");
+  assert.equal(result.errorCode, "mutation_outcome_uncertain_after_reload");
+  assert.equal(result.retryable, false);
 });
 
 test("only explicitly replayable reload-safe routes are retried", () => {
   assert.equal(canReplayAfterLostTicket("wait/editor-idle"), true);
   assert.equal(canReplayAfterLostTicket("testing/list-tests"), true);
   assert.equal(canReplayAfterLostTicket("testing/get-package-job"), true);
+  assert.equal(canReplayAfterLostTicket("asset/refresh"), true);
   assert.equal(canReplayAfterLostTicket("prefab-asset/remove-gameobject"), false);
 });
 
@@ -52,6 +55,24 @@ test("reload-safe waits use their full command timeout instead of a fixed retry 
   assert.ok(defaultBudget >= 120_000);
   assert.ok(longWaitBudget >= 212_000);
   assert.equal(getReloadReconnectBudgetMs("prefab-asset/remove-gameobject", {}), 0);
+});
+
+test("mutating transport headers bind agent and selected Unity project", () => {
+  const headers = buildTargetHeaders({
+    projectPath: "D:/UnityProjects/BattleIdle/apps/game-client-unity",
+    projectName: "BattleIdle",
+  }, "agent-42", { "Content-Type": "application/json" });
+  assert.equal(headers["X-Agent-Id"], "agent-42");
+  assert.equal(headers["X-UnityMCP-Expected-Project-Path"],
+    "D:/UnityProjects/BattleIdle/apps/game-client-unity");
+  assert.equal(headers["X-UnityMCP-Expected-Project-Name"], "BattleIdle");
+});
+
+test("generated idempotency keys are unique command-scoped values", () => {
+  const first = createRequestId("asset/create-folder");
+  const second = createRequestId("asset/create-folder");
+  assert.notEqual(first, second);
+  assert.match(first, /asset\/create-folder/);
 });
 
 test("plugin tool metadata fingerprint is order independent and schema sensitive", () => {

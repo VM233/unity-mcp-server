@@ -2,12 +2,33 @@
 // Communicates with the C# plugin running inside Unity Editor
 // Supports both queue mode (async ticket-based) and legacy sync mode
 import { CONFIG } from "./config.js";
-import { getActiveBridgeUrl } from "./instance-discovery.js";
+import { getActiveBridgeUrl, getActiveInstanceContext } from "./instance-discovery.js";
 import { getRequestAgentId } from "./request-context.js";
 
 // Dynamic bridge URL â€" resolved per-call based on selected instance
 function getBridgeUrl() {
   return getActiveBridgeUrl();
+}
+
+function buildBridgeHeaders(additional = {}) {
+  return buildTargetHeaders(getActiveInstanceContext(), getRequestAgentId(), additional);
+}
+
+export function buildTargetHeaders(instance, agentId, additional = {}) {
+  const headers = { ...additional, "X-Agent-Id": agentId };
+  if (instance?.projectPath) {
+    headers["X-UnityMCP-Expected-Project-Path"] = instance.projectPath;
+  }
+  if (instance?.projectName) {
+    headers["X-UnityMCP-Expected-Project-Name"] = instance.projectName;
+  }
+  return headers;
+}
+
+let _requestSequence = 0;
+export function createRequestId(command) {
+  _requestSequence = (_requestSequence + 1) % Number.MAX_SAFE_INTEGER;
+  return `${getRequestAgentId()}-${command}-${Date.now()}-${_requestSequence}`;
 }
 
 // Legacy constant kept for backward compat in places that don't need dynamic routing
@@ -57,7 +78,9 @@ function isTransientError(error, response) {
 export function canReplayAfterLostTicket(command) {
   return (
     command.startsWith("_meta/") ||
-    command.startsWith("packages/") ||
+    command === "packages/list" ||
+    command === "packages/search" ||
+    command === "asset/refresh" ||
     command === "wait/editor-idle" ||
     command === "uitoolkit/wait-refresh" ||
     command === "testing/list-tests" ||
@@ -70,20 +93,21 @@ export function canReplayAfterLostTicket(command) {
  * Submit a command to the queue and get a ticket ID.
  * POST /api/queue/submit with {apiPath, method, body, agentId}
  */
-async function submitToQueue(apiPath, bodyString) {
+async function submitToQueue(apiPath, bodyString, requestId) {
   const url = `${getBridgeUrl()}/api/queue/submit`;
 
   const response = await fetch(url, {
     method: "POST",
-    headers: {
+    headers: buildBridgeHeaders({
       "Content-Type": "application/json",
-      "X-Agent-Id": getRequestAgentId(),
-    },
+      "Idempotency-Key": requestId,
+    }),
     body: JSON.stringify({
       apiPath,
       method: "POST",
       body: bodyString,
       agentId: getRequestAgentId(),
+      requestId,
     }),
     signal: AbortSignal.timeout(CONFIG.editorBridgeTimeout),
   });
@@ -101,9 +125,7 @@ async function fetchQueueStatusRaw(ticketId, timeoutMs = 10000) {
   const url = `${getBridgeUrl()}/api/queue/status?ticketId=${ticketId}`;
   const response = await fetch(url, {
     method: "GET",
-    headers: {
-      "X-Agent-Id": getRequestAgentId(),
-    },
+    headers: buildBridgeHeaders(),
     signal: AbortSignal.timeout(timeoutMs),
   });
 
@@ -127,9 +149,7 @@ async function fetchQueueInfoRaw(timeoutMs = 5000) {
   const url = `${getBridgeUrl()}/api/queue/info`;
   const response = await fetch(url, {
     method: "GET",
-    headers: {
-      "X-Agent-Id": getRequestAgentId(),
-    },
+    headers: buildBridgeHeaders(),
     signal: AbortSignal.timeout(timeoutMs),
   });
 
@@ -152,10 +172,7 @@ async function fetchEditorStateRaw(timeoutMs = 5000) {
   const url = `${getBridgeUrl()}/api/editor/state`;
   const response = await fetch(url, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Agent-Id": getRequestAgentId(),
-    },
+    headers: buildBridgeHeaders({ "Content-Type": "application/json" }),
     body: "{}",
     signal: AbortSignal.timeout(timeoutMs),
   });
@@ -203,7 +220,7 @@ export function normalizeTerminalQueueStatus(statusData) {
     };
   }
 
-  if (["Failed", "TimedOut", "LostAfterReload"].includes(statusData.status)) {
+  if (["Failed", "TimedOut", "Canceled", "UncertainAfterReload"].includes(statusData.status)) {
     return normalizeFailedQueueStatus(statusData);
   }
 
@@ -456,7 +473,7 @@ function normalizeFailedQueueStatus(statusData) {
  * Send command via legacy sync mode (direct POST).
  * Falls back to the original implementation.
  */
-async function sendCommandLegacyMode(command, params = {}) {
+async function sendCommandLegacyMode(command, params = {}, requestId = createRequestId(command)) {
   const url = `${getBridgeUrl()}/api/${command}`;
   let lastError = null;
   const startedAt = Date.now();
@@ -469,10 +486,10 @@ async function sendCommandLegacyMode(command, params = {}) {
     try {
       const response = await fetch(url, {
         method: "POST",
-        headers: {
+        headers: buildBridgeHeaders({
           "Content-Type": "application/json",
-          "X-Agent-Id": getRequestAgentId(),
-        },
+          "Idempotency-Key": requestId,
+        }),
         body: JSON.stringify(params),
         signal: controller.signal,
       });
@@ -544,13 +561,14 @@ async function sendCommandLegacyMode(command, params = {}) {
  */
 export async function sendCommand(command, params = {}) {
   const bodyString = JSON.stringify(params);
+  const requestId = createRequestId(command);
   let lostTicketReplayCount = 0;
   let submitRetryCount = 0;
   const startedAt = Date.now();
 
   // If we've determined the plugin doesn't support queue mode, use legacy
   if (_queueModeDetermined && !_useQueueMode) {
-    return sendCommandLegacyMode(command, params);
+    return sendCommandLegacyMode(command, params, requestId);
   }
 
   // Try queue mode (if not yet determined it's unavailable)
@@ -560,7 +578,7 @@ export async function sendCommand(command, params = {}) {
       let submitLastError = null;
       while (true) {
         try {
-          const ticketData = await submitToQueue(command, bodyString);
+          const ticketData = await submitToQueue(command, bodyString, requestId);
           const ticketId = ticketData.ticketId;
 
           // Log to stderr, not stdout — stdout is reserved for the MCP JSON-RPC
@@ -610,7 +628,7 @@ export async function sendCommand(command, params = {}) {
             );
             _queueModeDetermined = true;
             _useQueueMode = false;
-            return sendCommandLegacyMode(command, params);
+            return sendCommandLegacyMode(command, params, requestId);
           }
 
           // Other errors â€" don't retry, mark mode as undetermined and try legacy
@@ -629,7 +647,7 @@ export async function sendCommand(command, params = {}) {
         );
         _queueModeDetermined = true;
         _useQueueMode = false;
-        return sendCommandLegacyMode(command, params);
+        return sendCommandLegacyMode(command, params, requestId);
       }
     } catch (error) {
       console.warn(
@@ -637,12 +655,12 @@ export async function sendCommand(command, params = {}) {
       );
       _queueModeDetermined = true;
       _useQueueMode = false;
-      return sendCommandLegacyMode(command, params);
+      return sendCommandLegacyMode(command, params, requestId);
     }
   }
 
   // Fallback (should not reach here, but just in case)
-  return sendCommandLegacyMode(command, params);
+  return sendCommandLegacyMode(command, params, requestId);
 }
 
 /**
@@ -654,9 +672,7 @@ export async function getQueueInfo() {
     const url = `${getBridgeUrl()}/api/queue/info`;
     const response = await fetch(url, {
       method: "GET",
-      headers: {
-        "X-Agent-Id": getRequestAgentId(),
-      },
+      headers: buildBridgeHeaders(),
       signal: AbortSignal.timeout(CONFIG.editorBridgeTimeout),
     });
 
@@ -684,9 +700,7 @@ export async function getTicketStatus(ticketId) {
     const url = `${getBridgeUrl()}/api/queue/status?ticketId=${ticketId}`;
     const response = await fetch(url, {
       method: "GET",
-      headers: {
-        "X-Agent-Id": getRequestAgentId(),
-      },
+      headers: buildBridgeHeaders(),
       signal: AbortSignal.timeout(CONFIG.editorBridgeTimeout),
     });
 
@@ -702,6 +716,22 @@ export async function getTicketStatus(ticketId) {
       success: false,
       error: `Failed to get ticket status: ${error.message}`,
     };
+  }
+}
+
+/** Cancel one queued ticket owned by the current agent. */
+export async function cancelTicket(ticketId) {
+  try {
+    const response = await fetch(`${getBridgeUrl()}/api/queue/cancel`, {
+      method: "POST",
+      headers: buildBridgeHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ ticketId }),
+      signal: AbortSignal.timeout(CONFIG.editorBridgeTimeout),
+    });
+    const data = await response.json();
+    return response.ok ? { success: true, data } : { success: false, data };
+  } catch (error) {
+    return { success: false, error: `Failed to cancel ticket: ${error.message}` };
   }
 }
 
@@ -1996,7 +2026,7 @@ export async function getProjectContext(category = null) {
 
   const response = await fetch(url, {
     method: "GET",
-    headers: { "X-Agent-Id": getRequestAgentId() },
+    headers: buildBridgeHeaders(),
     signal: AbortSignal.timeout(5000),
   });
 

@@ -4252,6 +4252,23 @@ export const editorTools = [
       JSON.stringify(await bridge.getTicketStatus(ticketId)),
   },
   {
+    name: "unity_queue_cancel",
+    description:
+      "Cancel one queued request owned by the current agent. Requests already executing in Unity are not preempted.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        ticketId: {
+          type: "number",
+          description: "The queued ticket ID to cancel",
+        },
+      },
+      required: ["ticketId"],
+    },
+    handler: async ({ ticketId }) =>
+      JSON.stringify(await bridge.cancelTicket(ticketId)),
+  },
+  {
     name: "unity_agents_list",
     description:
       "List all active agent sessions connected to the AB Unity MCP bridge. Shows each agent's ID, connection time, last activity, current action, total actions count, queued/completed request counts, and average response time.",

@@ -127,6 +127,8 @@ The server automatically discovers all running Unity Editor instances on startup
 **Port Resilience** — The server includes a multi-layer protection system for reliable multi-project workflows:
 
 - **Port Identity Validation** — When restoring a saved connection, the server verifies the instance identity (project name + path) matches the expected target. If Unity restarts and a different project grabs the port, the server detects this and re-discovers the correct instance.
+- **Bound Mutations** — Every mutating request carries the selected instance's expected project path/name; the Editor rejects unbound or misrouted writes.
+- **Idempotent Queue Control** — Stable request keys survive retries, and `unity_queue_cancel` cancels queued work owned by the current agent without preempting an executing Unity API call.
 - **Compile-Time Resilience** — During long Unity compiles (when the editor is unresponsive), the server checks the shared instance registry. If the registry entry is fresh (updated within the last 5 minutes via heartbeat), the connection is preserved instead of dropped.
 - **Crash Detection** — The plugin sends a heartbeat every 30 seconds to the instance registry. If Unity crashes and the heartbeat stops, the server detects the stale registry entry (>5 minutes old) and clears it, allowing proper re-discovery.
 - **Port Affinity** — The plugin remembers its last-used port via EditorPrefs and reclaims it on restart, minimizing port swaps across editor restarts.
