@@ -8,7 +8,11 @@
 import { readFileSync } from "fs";
 import { CONFIG } from "./config.js";
 import { debugLog } from "./state-persistence.js";
-import { getRequestAgentId, getRequestPortOverride } from "./request-context.js";
+import {
+  getRequestAgentId,
+  getRequestPortOverride,
+  getRequestTargetInstance,
+} from "./request-context.js";
 
 // ─── Per-Agent Session State ───
 // Tracks which Unity instance each agent is targeting.
@@ -228,12 +232,27 @@ export function getActivePort() {
 /** Return the project identity associated with this request's selected bridge port. */
 export function getActiveInstanceContext() {
   const port = getActivePort();
+  const requestTarget = getRequestTargetInstance();
+  if (requestTarget && requestTarget.port === port) {
+    return requestTarget;
+  }
   const selected = _agentInstances.get(getRequestAgentId());
   if (selected && selected.port === port) {
     return selected;
   }
 
   return readRegistryFile().find((entry) => entry.port === port) || null;
+}
+
+/** Resolve the project identity for an explicit per-request port override. */
+export async function resolveInstanceContextForPort(port) {
+  const registryEntry = readRegistryFile().find((entry) => entry.port === port);
+  if (registryEntry?.projectPath || registryEntry?.projectName) {
+    return registryEntry;
+  }
+
+  const info = await getInstanceInfo(port);
+  return info ? { port, ...info } : null;
 }
 
 /**

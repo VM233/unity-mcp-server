@@ -44,6 +44,7 @@ import {
   autoSelectInstance,
   getSelectedInstance,
   isInstanceSelectionRequired,
+  resolveInstanceContextForPort,
   validateSelectedInstance,
 } from "./instance-discovery.js";
 import { debugLog } from "./state-persistence.js";
@@ -385,7 +386,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     || (typeof meta.port === "number" && meta.port)
     || null;
 
-  return runWithRequestContext({ agentId, portOverride }, async () => {
+  const targetInstance = portOverride
+    ? await resolveInstanceContextForPort(portOverride)
+    : null;
+
+  return runWithRequestContext({ agentId, portOverride, targetInstance }, async () => {
     let tool = null;
     try {
       if (portOverride) {

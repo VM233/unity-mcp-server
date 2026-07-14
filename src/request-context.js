@@ -7,10 +7,11 @@ export function setDefaultRequestAgentId(agentId) {
   defaultAgentId = agentId || "default";
 }
 
-export function runWithRequestContext({ agentId, portOverride } = {}, callback) {
+export function runWithRequestContext({ agentId, portOverride, targetInstance } = {}, callback) {
   const context = {
     agentId: agentId || defaultAgentId,
     portOverride: Number.isFinite(portOverride) ? portOverride : null,
+    targetInstance: targetInstance || null,
   };
   return requestContext.run(context, callback);
 }
@@ -21,4 +22,8 @@ export function getRequestAgentId() {
 
 export function getRequestPortOverride() {
   return requestContext.getStore()?.portOverride ?? null;
+}
+
+export function getRequestTargetInstance() {
+  return requestContext.getStore()?.targetInstance || null;
 }

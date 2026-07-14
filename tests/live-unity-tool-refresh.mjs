@@ -74,14 +74,28 @@ try {
 
   const initial = await client.listTools();
   const initialChars = JSON.stringify(initial).length;
-  assert.ok(initial.tools.length <= 105);
-  assert.ok(initialChars < 100_000);
+  // A warm metadata cache may already contain the current plugin's complete
+  // first-class surface. The static-only unit test keeps the cold core surface
+  // under 105; live cached/refreshed lists share the larger live bound.
+  assert.ok(initial.tools.length <= 155,
+    `expected initial tools/list at or below 155 tools, got ${initial.tools.length}`);
+  assert.ok(initialChars < 150_000,
+    `expected initial tools/list below 150000 chars, got ${initialChars}`);
   assert.equal(initial.tools.some((tool) => tool.description?.startsWith("IMPORTANT:")), false);
   const initialRefreshJob = initial.tools.find((tool) => tool.name === "unity_asset_get_refresh_job");
   assert.ok(initialRefreshJob);
   assert.deepEqual(Object.keys(initialRefreshJob.inputSchema.properties), ["jobId", "clear", "port"]);
 
-  await withTimeout(listChanged, 60000, "tool list change notification timed out");
+  const refreshedMetadataTools = [
+    "unity_testing_run_package_tests",
+    "unity_prefab_asset_move_component",
+    "unity_prefab_asset_transaction_edit",
+  ];
+  const initialAlreadyHasLiveMetadata = refreshedMetadataTools.every((toolName) =>
+    initial.tools.some((tool) => tool.name === toolName));
+  if (!initialAlreadyHasLiveMetadata) {
+    await withTimeout(listChanged, 60000, "tool list change notification timed out");
+  }
 
   const refreshed = await client.listTools();
   const refreshedChars = JSON.stringify(refreshed).length;
