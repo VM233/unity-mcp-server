@@ -12,6 +12,8 @@
     "dev": "node --watch src/index.js",
     "test": "node --test tests/*.test.mjs",
     "test:live": "node tests/live-unity-tool-refresh.mjs",
+    "test:multi-instance": "node tests/live-unity-multi-instance-binding.mjs",
+    "test:refresh-recovery": "node tests/live-unity-asset-refresh-recovery.mjs",
     "test:reload": "node tests/live-unity-reload-replay.mjs",
     "pack": "npx @anthropic-ai/mcpb pack . unity-mcp.mcpb && npx @anthropic-ai/mcpb clean unity-mcp.mcpb"
   },

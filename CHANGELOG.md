@@ -7,6 +7,7 @@ All notable changes to this package will be documented in this file.
 ### Added
 - Exposed `expectedProjectPath` alongside `port` on every Editor-targeting first-class tool schema, including `unity_asset_refresh`, `unity_execute_code`, and `unity_play_mode`.
 - Added exact request-ID recovery for persistent asset refresh jobs after queue polling or transport failures during a Unity domain reload.
+- Added reusable live diagnostics for cross-project instance binding and forced outer-timeout asset refresh recovery.
 
 ### Fixed
 - Resolve an explicit port against its live `/api/ping` identity before registry fallback, preventing stale registry data from producing false project-binding HTTP 409 responses.
