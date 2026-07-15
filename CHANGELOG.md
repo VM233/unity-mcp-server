@@ -2,6 +2,14 @@
 
 All notable changes to this package will be documented in this file.
 
+## [3.3.0] - 2026-07-15
+
+### Added
+- Added a startup fallback schema for `unity_prefab_asset_configure_component` while live Unity metadata is still loading.
+
+### Fixed
+- Keep every first-class tool already returned by `tools/list` callable for the lifetime of the MCP process. Volatile multi-instance metadata refreshes can no longer turn an advertised project tool such as `unity_pt_battle_get_runtime_ready_state` into `Unknown tool`; newer same-named metadata still replaces the remembered route and schema.
+
 ## [3.2.1] - 2026-07-15
 
 ### Added

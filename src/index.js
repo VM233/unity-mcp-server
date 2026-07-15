@@ -34,6 +34,7 @@ import { umaTools } from "./tools/uma-tools.js";
 import { contextTools } from "./tools/context-tools.js";
 import { instanceTools } from "./tools/instance-tools.js";
 import {
+  createAdvertisedToolRegistry,
   fetchFirstClassPluginTools,
   refreshPluginToolsMetadata,
   sanitizeToolMetadata,
@@ -128,6 +129,7 @@ const ALL_TOOLS = [
   ...metaTools,
   ...contextTools,
 ];
+const advertisedTools = createAdvertisedToolRegistry(ALL_TOOLS);
 console.error(
   `[MCP] Tool tiers: ${coreCount} core + ${advancedCount} advanced (via unity_advanced_tool) = ${coreCount + advancedCount} total, ${ALL_TOOLS.length} exposed`
 );
@@ -292,7 +294,7 @@ async function performInstanceDiscovery(agentId) {
 const server = new Server(
   {
     name: "unity-mcp",
-    version: "3.2.1",
+    version: "3.3.0",
   },
   {
     capabilities: {
@@ -324,23 +326,19 @@ function toolWithEditorBindingSchema({ name, description, inputSchema, annotatio
 }
 
 async function getExposedTools() {
-  const toolsByName = new Map(ALL_TOOLS.map((tool) => [tool.name, tool]));
   const projectTools = await fetchFirstClassPluginTools();
-
-  for (const tool of projectTools) {
-    // Unity owns route schemas. Live plugin metadata must replace a same-named
-    // server fallback so package upgrades take effect without reconnecting.
-    toolsByName.set(tool.name, tool);
-  }
-
-  return [...toolsByName.values()];
+  // Keep every tool already advertised during this MCP process callable. A
+  // live metadata refresh can temporarily switch to another Unity instance
+  // whose project catalog does not contain the same project-defined tools.
+  // New live metadata still replaces a same-named route/schema.
+  advertisedTools.remember(projectTools);
+  return advertisedTools.values();
 }
 
 async function findExposedTool(name) {
   const projectTools = await fetchFirstClassPluginTools();
-  return projectTools.find((tool) => tool.name === name) ||
-    ALL_TOOLS.find((tool) => tool.name === name) ||
-    null;
+  advertisedTools.remember(projectTools);
+  return advertisedTools.get(name);
 }
 
 server.setRequestHandler(ListToolsRequestSchema, async () => {

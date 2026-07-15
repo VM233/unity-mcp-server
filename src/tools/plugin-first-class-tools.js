@@ -74,6 +74,45 @@ export const detailedPrefabBatchOperationSchema = {
     },
     {
       type: "object",
+      description: "Ensure one component exists and configure its serialized properties and ObjectReferences.",
+      properties: {
+        type: typeProp("configureComponent"),
+        prefabPath: prefabPathProp,
+        componentType: {
+          type: "string",
+          description: "Component type name or full name.",
+        },
+        ...componentIndexProps,
+        addIfMissing: {
+          type: "boolean",
+          description: "Add the component when the selected index is missing. Defaults to true.",
+        },
+        properties: {
+          type: "object",
+          description: "Map of serialized property names/paths to JSON values.",
+        },
+        references: {
+          type: "array",
+          description: "ObjectReference assignments for the configured component.",
+          items: {
+            type: "object",
+            properties: {
+              propertyName: { type: "string" },
+              referenceAssetPath: { type: "string" },
+              referencePrefabPath: { type: "string" },
+              referenceComponentType: { type: "string" },
+              referenceComponentIndex: { type: "number" },
+              clear: { type: "boolean" },
+            },
+            required: ["propertyName"],
+          },
+        },
+      },
+      required: ["type", "componentType"],
+      additionalProperties: true,
+    },
+    {
+      type: "object",
       description: "Set serialized properties on an existing component.",
       properties: {
         type: typeProp("setProperty"),
@@ -432,6 +471,7 @@ const firstClassPluginRoutes = [
   "serialized-object/set",
   "prefab-asset/add-component",
   "prefab-asset/add-gameobject",
+  "prefab-asset/configure-component",
   "prefab-asset/get-properties",
   "prefab-asset/hierarchy",
   "prefab-asset/instantiate-prefab",
@@ -651,6 +691,42 @@ const detailedStaticFirstClassPluginTools = [
         componentType: { type: "string", description: "Component type name or full name." },
         properties: { type: "object", description: "Optional serialized properties to set on the new component." },
         waitForType: { type: "boolean", description: "Wait for compilation/import until the component type is available." },
+        ...diffProperties,
+      },
+      required: ["assetPath", "componentType"],
+    },
+  },
+  {
+    toolName: "unity_prefab_asset_configure_component",
+    route: "prefab-asset/configure-component",
+    category: "prefab-asset",
+    description: "Ensure one component exists and atomically configure serialized properties and ObjectReferences in one prefab save.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        assetPath: { type: "string", description: "Prefab asset path to edit." },
+        prefabPath: prefabPathProp,
+        componentType: { type: "string", description: "Component type name or full name." },
+        componentIndex: componentIndexProps.componentIndex,
+        addIfMissing: { type: "boolean", description: "Add the component when the selected index is missing. Defaults to true." },
+        properties: { type: "object", description: "Serialized property names/paths mapped to JSON values." },
+        references: {
+          type: "array",
+          description: "ObjectReference assignments applied to the configured component.",
+          items: {
+            type: "object",
+            properties: {
+              propertyName: { type: "string", description: "ObjectReference serialized property name/path." },
+              referenceAssetPath: { type: "string", description: "Project asset path to assign." },
+              referencePrefabPath: { type: "string", description: "GameObject path inside the same prefab to assign." },
+              referenceComponentType: { type: "string", description: "Component on referencePrefabPath to assign." },
+              referenceComponentIndex: { type: "number", description: "Component index when multiple referenced components have the same type." },
+              clear: { type: "boolean", description: "Clear the ObjectReference." },
+            },
+            required: ["propertyName"],
+          },
+        },
+        waitForTypes: { type: "boolean", description: "Wait for referenced component types before editing." },
         ...diffProperties,
       },
       required: ["assetPath", "componentType"],

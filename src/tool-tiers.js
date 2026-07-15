@@ -28,6 +28,30 @@ const PLUGIN_TOOLS_LIVE_REFRESH_INTERVAL_MS = 10_000;
 let livePluginToolsCache = null;
 let livePluginToolsFetchedAt = 0;
 
+export function createAdvertisedToolRegistry(initialTools = []) {
+  const toolsByName = new Map();
+
+  const remember = (tools = []) => {
+    for (const tool of tools) {
+      if (tool && typeof tool.name === "string" && tool.name.length > 0) {
+        toolsByName.set(tool.name, tool);
+      }
+    }
+  };
+
+  remember(initialTools);
+
+  return {
+    remember,
+    get(name) {
+      return toolsByName.get(name) || null;
+    },
+    values() {
+      return [...toolsByName.values()];
+    },
+  };
+}
+
 /**
  * Explicit route overrides for tools whose API endpoints
  * don't follow the standard name -> route derivation pattern.

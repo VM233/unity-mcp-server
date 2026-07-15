@@ -19,7 +19,11 @@ import { instanceTools } from "../src/tools/instance-tools.js";
 import { contextTools } from "../src/tools/context-tools.js";
 import { staticFirstClassPluginTools } from "../src/tools/plugin-first-class-tools.js";
 import { umaTools } from "../src/tools/uma-tools.js";
-import { pluginToolsFingerprint, splitToolTiers } from "../src/tool-tiers.js";
+import {
+  createAdvertisedToolRegistry,
+  pluginToolsFingerprint,
+  splitToolTiers,
+} from "../src/tool-tiers.js";
 
 test("UncertainAfterReload is a non-retryable failed terminal status", () => {
   const result = normalizeTerminalQueueStatus({
@@ -160,6 +164,29 @@ test("plugin tool metadata fingerprint is order independent and schema sensitive
   assert.notEqual(pluginToolsFingerprint(first), pluginToolsFingerprint(changed));
 });
 
+test("advertised project tools remain callable across volatile instance catalog refreshes", () => {
+  const core = { name: "unity_editor_ping", handler: () => "pong" };
+  const battleToolV1 = {
+    name: "unity_pt_battle_get_runtime_ready_state",
+    handler: () => "battle-v1",
+  };
+  const registry = createAdvertisedToolRegistry([core]);
+
+  registry.remember([battleToolV1]);
+  registry.remember([]);
+
+  assert.equal(registry.get(battleToolV1.name), battleToolV1);
+  assert.equal(registry.get(battleToolV1.name).handler(), "battle-v1");
+
+  const battleToolV2 = {
+    name: battleToolV1.name,
+    handler: () => "battle-v2",
+  };
+  registry.remember([battleToolV2]);
+  assert.equal(registry.get(battleToolV1.name), battleToolV2);
+  assert.equal(registry.get(battleToolV1.name).handler(), "battle-v2");
+});
+
 test("default tool surface stays bounded and omits duplicate prefab aliases", () => {
   const { coreTools, metaTools } = splitToolTiers([...editorTools, ...umaTools]);
   const exposedByName = new Map(
@@ -177,7 +204,7 @@ test("default tool surface stays bounded and omits duplicate prefab aliases", ()
   }
 
   const exposed = [...exposedByName.values()];
-  assert.ok(exposed.length <= 105, `expected <=105 tools, got ${exposed.length}`);
+  assert.ok(exposed.length <= 106, `expected <=106 tools, got ${exposed.length}`);
   assert.ok(JSON.stringify({ tools: exposed }).length <= 60_000);
   assert.equal(JSON.stringify(exposed).includes("Alias for"), false);
   assert.equal(exposedByName.has("unity_prefab_asset_batch_edit"), false);
@@ -192,6 +219,12 @@ test("default tool surface stays bounded and omits duplicate prefab aliases", ()
   assert.deepEqual(transaction.inputSchema.properties.execution.properties.mode.enum,
     ["auto", "immediate", "batched"]);
   assert.equal(transaction.inputSchema.properties.execution.properties.continueOnError, undefined);
+
+  const configureComponent = exposedByName.get("unity_prefab_asset_configure_component");
+  assert.ok(configureComponent);
+  assert.deepEqual(configureComponent.inputSchema.required, ["assetPath", "componentType"]);
+  assert.ok(configureComponent.inputSchema.properties.properties);
+  assert.ok(configureComponent.inputSchema.properties.references.items.properties.referenceAssetPath);
 
   const assetMove = exposedByName.get("unity_asset_move");
   assert.deepEqual(assetMove.inputSchema.required, ["moves"]);

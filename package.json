@@ -1,6 +1,6 @@
 {
   "name": "anklebreaker-unity-mcp",
-  "version": "3.2.1",
+  "version": "3.3.0",
   "description": "Multi-agent Unity MCP server with selected-instance binding, idempotent queues, and live plugin tool metadata.",
   "type": "module",
   "main": "src/index.js",
