@@ -27,6 +27,8 @@ export const CONFIG = {
   portRangeStart: parseInt(process.env.UNITY_PORT_RANGE_START || "7890"),
   portRangeEnd: parseInt(process.env.UNITY_PORT_RANGE_END || "7899"),
   instanceRegistryPath: process.env.UNITY_INSTANCE_REGISTRY || getRegistryPath(),
+  projectResolveTimeoutMs: parseInt(process.env.UNITY_PROJECT_RESOLVE_TIMEOUT || "15000"),
+  projectResolvePollIntervalMs: parseInt(process.env.UNITY_PROJECT_RESOLVE_POLL_INTERVAL || "250"),
 
   // Queue mode polling (for async ticket-based requests)
   queuePollIntervalMs: parseInt(process.env.UNITY_QUEUE_POLL_INTERVAL || "150"),

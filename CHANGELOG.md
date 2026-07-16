@@ -2,6 +2,13 @@
 
 All notable changes to this package will be documented in this file.
 
+## [3.3.2] - 2026-07-17
+
+### Fixed
+- Promote nested Unity Editor failures to top-level MCP bridge failures instead of returning `success: true` around `success: false` package or project-tool results.
+- Resolve `expectedProjectPath` for a bounded interval during transient Editor reloads and never fall back to a different auto-selected Unity project when the requested project remains unavailable.
+- Treat incomplete JSON responses from a reloading Editor as transient transport failures, allowing reload-safe polling commands to consume their real reconnect budget instead of returning an immediate false timeout.
+
 ## [3.3.1] - 2026-07-16
 
 ### Fixed

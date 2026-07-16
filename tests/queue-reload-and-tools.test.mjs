@@ -6,6 +6,8 @@ import {
   buildTargetHeaders,
   createRequestId,
   getReloadReconnectBudgetMs,
+  isTransientError,
+  normalizeEditorCommandResult,
   normalizeRecoveredAssetRefreshJob,
   normalizeTerminalQueueStatus,
   sendCommand,
@@ -44,6 +46,41 @@ test("UncertainAfterReload is a non-retryable failed terminal status", () => {
   assert.equal(result.status, "UncertainAfterReload");
   assert.equal(result.errorCode, "mutation_outcome_uncertain_after_reload");
   assert.equal(result.retryable, false);
+});
+
+test("completed queue tickets propagate nested Editor failures", () => {
+  const result = normalizeTerminalQueueStatus({
+    ticketId: 43,
+    actionName: "packages/update-git",
+    status: "Completed",
+    result: {
+      success: true,
+      data: {
+        success: false,
+        error: "Unable to resolve Git package.",
+        errorCode: "package_resolve_failed",
+      },
+    },
+  });
+
+  assert.equal(result.success, false);
+  assert.equal(result.error, "Unable to resolve Git package.");
+  assert.equal(result.errorCode, "package_resolve_failed");
+  assert.equal(result.ticketId, 43);
+  assert.equal(result.actionName, "packages/update-git");
+});
+
+test("legacy Editor responses propagate error-only payloads", () => {
+  const result = normalizeEditorCommandResult({ error: "Package Manager rejected the ref." });
+  assert.equal(result.success, false);
+  assert.equal(result.error, "Package Manager rejected the ref.");
+  assert.equal(result.errorCode, "editor_command_failed");
+});
+
+test("incomplete reload JSON is a transient transport failure", () => {
+  assert.equal(isTransientError(new SyntaxError("Unexpected end of JSON input"), null), true);
+  assert.equal(isTransientError(new Error("other side closed"), null), true);
+  assert.equal(isTransientError(new SyntaxError("Unexpected token at position 4"), null), false);
 });
 
 test("only explicitly replayable reload-safe routes are retried", () => {

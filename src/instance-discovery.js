@@ -257,7 +257,25 @@ export async function resolveInstanceContextForPort(port) {
   return newestRegistryEntry(readRegistryFile().filter((entry) => entry.port === port));
 }
 
-export async function resolveInstanceContextForProjectPath(projectPath) {
+export async function resolveInstanceContextForProjectPath(projectPath, options = {}) {
+  const timeoutMs = Math.max(0, Number(options.timeoutMs) || 0);
+  const pollIntervalMs = Math.max(10, Number(options.pollIntervalMs) || 250);
+  const startedAt = Date.now();
+
+  while (true) {
+    const match = await resolveInstanceContextForProjectPathOnce(projectPath);
+    if (match) return match;
+
+    const elapsedMs = Date.now() - startedAt;
+    if (elapsedMs >= timeoutMs) return null;
+    await new Promise((resolveDelay) => setTimeout(
+      resolveDelay,
+      Math.min(pollIntervalMs, timeoutMs - elapsedMs)
+    ));
+  }
+}
+
+async function resolveInstanceContextForProjectPathOnce(projectPath) {
   const normalizedPath = normalizeProjectPath(projectPath);
   if (!normalizedPath) return null;
 

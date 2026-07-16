@@ -81,6 +81,12 @@ try {
   }
 
   for (const target of targets) {
+    const pathResolvedPing = await call("unity_editor_ping", {
+      expectedProjectPath: target.projectPath,
+    }, `path-resolved ping ${target.port}`);
+    assert.equal(normalizePath(pathResolvedPing.projectPath), normalizePath(target.projectPath),
+      `expectedProjectPath resolved to ${pathResolvedPing.projectPath} instead of ${target.projectPath}`);
+
     const binding = { port: target.port, expectedProjectPath: target.projectPath };
     const ping = await call("unity_editor_ping", binding, `ping ${target.port}`);
     assert.equal(normalizePath(ping.projectPath), normalizePath(target.projectPath),

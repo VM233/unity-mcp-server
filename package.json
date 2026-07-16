@@ -1,6 +1,6 @@
 {
   "name": "anklebreaker-unity-mcp",
-  "version": "3.3.1",
+  "version": "3.3.2",
   "description": "Multi-agent Unity MCP server with selected-instance binding, idempotent queues, and live plugin tool metadata.",
   "type": "module",
   "main": "src/index.js",
@@ -13,6 +13,8 @@
     "test": "node --test tests/*.test.mjs",
     "test:live": "node tests/live-unity-tool-refresh.mjs",
     "test:multi-instance": "node tests/live-unity-multi-instance-binding.mjs",
+    "test:error-propagation": "node tests/live-unity-error-propagation.mjs",
+    "test:package-job-reload": "node tests/live-unity-package-job-reload.mjs",
     "test:refresh-recovery": "node tests/live-unity-asset-refresh-recovery.mjs",
     "test:refresh-job-reload": "node tests/live-unity-refresh-job-reload.mjs",
     "test:reload": "node tests/live-unity-reload-replay.mjs",

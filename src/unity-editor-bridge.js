@@ -66,16 +66,24 @@ function sleep(ms) {
  * Returns true if the error looks like a transient connection issue
  * (server temporarily down during Unity domain reload).
  */
-function isTransientError(error, response) {
+export function isTransientError(error, response) {
   if (error) {
     // Connection refused / reset / aborted â€" server is restarting
     const msg = error.message || "";
+    const normalizedMessage = msg.toLowerCase();
     return (
       error.code === "ECONNREFUSED" ||
       error.code === "ECONNRESET" ||
+      error.code === "EPIPE" ||
+      error.code === "UND_ERR_SOCKET" ||
       msg.includes("ECONNREFUSED") ||
       msg.includes("ECONNRESET") ||
       msg.includes("fetch failed") ||
+      normalizedMessage.includes("unexpected end of json input") ||
+      normalizedMessage.includes("premature close") ||
+      normalizedMessage.includes("socket closed") ||
+      normalizedMessage.includes("other side closed") ||
+      normalizedMessage === "terminated" ||
       error.name === "AbortError"
     );
   }
@@ -334,10 +342,16 @@ export function normalizeTerminalQueueStatus(statusData) {
   if (!statusData || typeof statusData !== "object") return null;
 
   if (statusData.status === "Completed") {
-    return {
-      success: true,
-      data: statusData.result !== undefined ? statusData.result : statusData,
-    };
+    const data = statusData.result !== undefined ? statusData.result : statusData;
+    const normalized = normalizeEditorCommandResult(data);
+    return normalized.success
+      ? normalized
+      : {
+        ...normalized,
+        ticketId: statusData.ticketId,
+        status: statusData.status,
+        actionName: statusData.actionName,
+      };
   }
 
   if (["Failed", "TimedOut", "Canceled", "UncertainAfterReload"].includes(statusData.status)) {
@@ -345,6 +359,35 @@ export function normalizeTerminalQueueStatus(statusData) {
   }
 
   return null;
+}
+
+export function normalizeEditorCommandResult(data) {
+  let current = data;
+  for (let depth = 0; depth < 4; depth++) {
+    if (!current || typeof current !== "object" || Array.isArray(current)) break;
+
+    const hasError = typeof current.error === "string" && current.error.trim().length > 0;
+    if (current.success === false || (current.success !== true && hasError)) {
+      const message = current.error || current.message || "Unity Editor command failed.";
+      return {
+        ...current,
+        success: false,
+        error: message,
+        message,
+        errorCode: current.errorCode || "editor_command_failed",
+        retryable: Boolean(current.retryable),
+      };
+    }
+
+    if (current.success === true && current.data &&
+        typeof current.data === "object" && !Array.isArray(current.data)) {
+      current = current.data;
+      continue;
+    }
+    break;
+  }
+
+  return { success: true, data };
 }
 
 function getQueuePollTimeoutMs(command, params = {}) {
@@ -651,7 +694,7 @@ async function sendCommandLegacyMode(command, params = {}, requestId = createReq
         );
       }
 
-      return { success: true, data };
+      return normalizeEditorCommandResult(data);
     } catch (error) {
       clearTimeout(timeout);
       lastError = error;

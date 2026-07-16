@@ -40,7 +40,7 @@ import {
   sanitizeToolMetadata,
   splitToolTiers,
 } from "./tool-tiers.js";
-import { getProjectContext } from "./unity-editor-bridge.js";
+import { getProjectContext, getReloadReconnectBudgetMs } from "./unity-editor-bridge.js";
 import {
   autoSelectInstance,
   getSelectedInstance,
@@ -198,6 +198,24 @@ async function ensureInstanceDiscovery() {
   return _discoverySingleFlight.run(agentId, () => performInstanceDiscovery(agentId));
 }
 
+function isStructuredToolFailure(result) {
+  if (Array.isArray(result)) {
+    return result.some((block) =>
+      block?.type === "text" && isStructuredToolFailure(block.text));
+  }
+
+  let value = result;
+  if (typeof value === "string") {
+    try {
+      value = JSON.parse(value);
+    } catch {
+      return false;
+    }
+  }
+
+  return Boolean(value && typeof value === "object" && value.success === false);
+}
+
 async function performInstanceDiscovery(agentId) {
   const _instanceDiscoveryDone = _discoveryDonePerAgent.get(agentId) || false;
   debugLog(`ensureInstanceDiscovery: _instanceDiscoveryDone=${_instanceDiscoveryDone}, selectedPort=${getSelectedInstance()?.port || 'null'}, selectionRequired=${isInstanceSelectionRequired()}`);
@@ -294,7 +312,7 @@ async function performInstanceDiscovery(agentId) {
 const server = new Server(
   {
     name: "unity-mcp",
-    version: "3.3.0",
+    version: "3.3.2",
   },
   {
     capabilities: {
@@ -349,6 +367,16 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
 });
 
 // ─── Call Tool Handler ───
+const reloadSafeCommandByToolName = {
+  unity_asset_refresh: "asset/refresh",
+  unity_asset_get_refresh_job: "asset/get-refresh-job",
+  unity_wait_editor_idle: "wait/editor-idle",
+  unity_uitoolkit_wait_refresh: "uitoolkit/wait-refresh",
+  unity_testing_list_tests: "testing/list-tests",
+  unity_testing_get_job: "testing/get-job",
+  unity_testing_get_package_job: "testing/get-package-job",
+};
+
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
   const meta = request.params._meta || {};
@@ -367,8 +395,37 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     ? await resolveInstanceContextForPort(portOverride)
     : null;
   if (!portOverride && expectedProjectPath) {
-    targetInstance = await resolveInstanceContextForProjectPath(expectedProjectPath);
+    const reloadSafeCommand = reloadSafeCommandByToolName[name];
+    const projectResolveTimeoutMs = Math.max(
+      CONFIG.projectResolveTimeoutMs,
+      reloadSafeCommand ? getReloadReconnectBudgetMs(reloadSafeCommand, args || {}) : 0
+    );
+    targetInstance = await resolveInstanceContextForProjectPath(expectedProjectPath, {
+      timeoutMs: projectResolveTimeoutMs,
+      pollIntervalMs: CONFIG.projectResolvePollIntervalMs,
+    });
     portOverride = targetInstance?.port || null;
+    if (!targetInstance) {
+      const message =
+        `No running Unity Editor instance could be resolved for expectedProjectPath ` +
+        `'${expectedProjectPath}' within ${projectResolveTimeoutMs}ms.`;
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify({
+            success: false,
+            errorCode: "target_project_unavailable",
+            retryable: true,
+            error: message,
+            message,
+            expectedProjectPath,
+            expectedProjectName,
+            resolveTimeoutMs: projectResolveTimeoutMs,
+          }),
+        }],
+        isError: true,
+      };
+    }
   }
   if (portOverride && expectedProjectPath && !targetInstance) {
     targetInstance = {
@@ -393,7 +450,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       let instancePrompt = null;
-      if (!portOverride && name !== "unity_list_instances" && name !== "unity_select_instance") {
+      if (!portOverride && !expectedProjectPath &&
+          name !== "unity_list_instances" && name !== "unity_select_instance") {
         instancePrompt = await ensureInstanceDiscovery();
       }
 
@@ -450,7 +508,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         contentBlocks.push({ type: "text", text: result });
       }
 
-      return { content: truncateResponseIfNeeded(contentBlocks) };
+      return {
+        content: truncateResponseIfNeeded(contentBlocks),
+        ...(isStructuredToolFailure(result) ? { isError: true } : {}),
+      };
     } catch (error) {
       return {
         content: [
@@ -543,7 +604,7 @@ async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   startPluginToolMetadataRefresh();
-  debugLog(`=== SERVER START === v3.2.0, agent=${PROCESS_AGENT_ID}, discoveryDone=${_discoveryDonePerAgent.get(PROCESS_AGENT_ID) || false}, selectedPort=${getSelectedInstance()?.port || 'null'}`);
+  debugLog(`=== SERVER START === v3.3.2, agent=${PROCESS_AGENT_ID}, discoveryDone=${_discoveryDonePerAgent.get(PROCESS_AGENT_ID) || false}, selectedPort=${getSelectedInstance()?.port || 'null'}`);
   console.error(
     `Unity MCP Server running on stdio (agent: ${PROCESS_AGENT_ID})`
   );
