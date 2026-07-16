@@ -53,6 +53,7 @@ const RETRY_BASE_DELAY_MS = 800; // 800ms, 1600ms, 3200ms, 6400ms
 const POLL_TRANSIENT_RETRY_BASE_MS = 500;
 const RELOAD_RETRY_MAX_DELAY_MS = 2000;
 const ASSET_REFRESH_RECOVERY_BUDGET_MS = 15000;
+const ASSET_REFRESH_POLL_RECONNECT_BUDGET_MS = 300000;
 
 /**
  * Sleep helper for retry backoff
@@ -91,6 +92,7 @@ export function canReplayAfterLostTicket(command) {
     command === "packages/list" ||
     command === "packages/search" ||
     command === "asset/refresh" ||
+    command === "asset/get-refresh-job" ||
     command === "wait/editor-idle" ||
     command === "uitoolkit/wait-refresh" ||
     command === "testing/list-tests" ||
@@ -347,6 +349,16 @@ export function normalizeTerminalQueueStatus(statusData) {
 
 function getQueuePollTimeoutMs(command, params = {}) {
   const configuredTimeout = CONFIG.queuePollTimeoutMs || CONFIG.editorBridgeTimeout;
+
+  if (command === "asset/get-refresh-job") {
+    const requestedTimeout = Number(params.timeoutMs);
+    return Math.max(
+      configuredTimeout,
+      Number.isFinite(requestedTimeout) && requestedTimeout > 0
+        ? requestedTimeout
+        : ASSET_REFRESH_POLL_RECONNECT_BUDGET_MS
+    );
+  }
 
   if (command === "wait/editor-idle" || command === "uitoolkit/wait-refresh") {
     const commandTimeout = Number(params.timeoutMs);

@@ -2,6 +2,12 @@
 
 All notable changes to this package will be documented in this file.
 
+## [3.3.1] - 2026-07-16
+
+### Fixed
+- Treat `asset/get-refresh-job` as a reload-safe replayable read and keep reconnecting for up to five minutes by default, so domain reloads and long compilation imports no longer surface as four-retry `editor_connection_failed` results.
+- Expose a per-call `timeoutMs` override for refresh-job reconnection waits.
+
 ## [3.3.0] - 2026-07-15
 
 ### Added

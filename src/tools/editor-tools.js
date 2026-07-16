@@ -260,7 +260,7 @@ export const editorTools = [
   },
   {
     name: "unity_asset_refresh",
-    description: "Refresh AssetDatabase, optionally forcing update or importing specific asset paths.",
+    description: "Start a reload-safe AssetDatabase refresh, optionally importing specific asset paths.",
     inputSchema: {
       type: "object",
       properties: {
@@ -271,7 +271,7 @@ export const editorTools = [
         },
         forceUpdate: {
           type: "boolean",
-          description: "Use ImportAssetOptions.ForceUpdate. Defaults to true.",
+          description: "Use ImportAssetOptions.ForceUpdate for full refreshes and non-compilation targeted assets. Compilation assets skip it to avoid broad dependency reimports. Defaults to false.",
         },
         saveAssets: {
           type: "boolean",

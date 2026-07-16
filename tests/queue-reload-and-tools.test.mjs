@@ -51,6 +51,7 @@ test("only explicitly replayable reload-safe routes are retried", () => {
   assert.equal(canReplayAfterLostTicket("testing/list-tests"), true);
   assert.equal(canReplayAfterLostTicket("testing/get-package-job"), true);
   assert.equal(canReplayAfterLostTicket("asset/refresh"), true);
+  assert.equal(canReplayAfterLostTicket("asset/get-refresh-job"), true);
   assert.equal(canReplayAfterLostTicket("prefab-asset/remove-gameobject"), false);
 });
 
@@ -63,6 +64,8 @@ test("reload-safe waits use their full command timeout instead of a fixed retry 
 
   assert.ok(defaultBudget >= 120_000);
   assert.ok(longWaitBudget >= 212_000);
+  assert.ok(getReloadReconnectBudgetMs("asset/get-refresh-job", {}) >= 300_000);
+  assert.ok(getReloadReconnectBudgetMs("asset/get-refresh-job", { timeoutMs: 420_000 }) >= 420_000);
   assert.equal(getReloadReconnectBudgetMs("prefab-asset/remove-gameobject", {}), 0);
 });
 
@@ -241,7 +244,7 @@ test("default tool surface stays bounded and omits duplicate prefab aliases", ()
   const refreshJob = exposedByName.get("unity_asset_get_refresh_job");
   assert.ok(refreshJob);
   assert.deepEqual(Object.keys(refreshJob.inputSchema.properties),
-    ["jobId", "refreshRequestId", "clear"]);
+    ["jobId", "refreshRequestId", "clear", "timeoutMs"]);
 });
 
 test("asset refresh queue failure is reconciled by exact persistent request ID", async () => {

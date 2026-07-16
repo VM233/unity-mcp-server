@@ -873,6 +873,11 @@ const detailedStaticFirstClassPluginTools = [
           type: "boolean",
           description: "Clear the persisted job after a terminal result is read. Defaults to false.",
         },
+        timeoutMs: {
+          type: "integer",
+          minimum: 1,
+          description: "Maximum reload reconnection wait. Defaults to 300000ms and is consumed by the MCP transport.",
+        },
       },
     },
   },
