@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  buildQueuePollTimeoutResult,
   canReplayAfterLostTicket,
   buildTargetHeaders,
   createRequestId,
@@ -23,6 +24,7 @@ import { staticFirstClassPluginTools } from "../src/tools/plugin-first-class-too
 import { umaTools } from "../src/tools/uma-tools.js";
 import {
   createAdvertisedToolRegistry,
+  invokeFirstClassPluginRoute,
   pluginToolsFingerprint,
   splitToolTiers,
 } from "../src/tool-tiers.js";
@@ -104,6 +106,79 @@ test("reload-safe waits use their full command timeout instead of a fixed retry 
   assert.ok(getReloadReconnectBudgetMs("asset/get-refresh-job", {}) >= 300_000);
   assert.ok(getReloadReconnectBudgetMs("asset/get-refresh-job", { timeoutMs: 420_000 }) >= 420_000);
   assert.equal(getReloadReconnectBudgetMs("prefab-asset/remove-gameobject", {}), 0);
+});
+
+test("idle editor state cannot turn a non-terminal queue ticket into success", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    const target = String(url);
+    if (target.includes("/api/queue/status?ticketId=71")) {
+      return Response.json({
+        ticketId: 71,
+        actionName: "wait/editor-idle",
+        status: "Queued",
+        queuePosition: 1,
+      });
+    }
+    if (target.endsWith("/api/queue/info")) {
+      return Response.json({ totalQueued: 1, executingCount: 0 });
+    }
+    if (target.endsWith("/api/editor/state")) {
+      return Response.json({
+        success: true,
+        data: {
+          isCompiling: false,
+          isUpdating: false,
+          isChangingPlayMode: false,
+        },
+      });
+    }
+    throw new Error(`unexpected fetch ${target}`);
+  };
+
+  try {
+    const result = await buildQueuePollTimeoutResult(
+      71, "wait/editor-idle", 60_000, 60_250);
+    assert.equal(result.success, false);
+    assert.equal(result.errorCode, "queue_poll_timeout");
+    assert.equal(result.finalTicketStatus.data.status, "Queued");
+    assert.equal(result.finalEditorState.isCompiling, false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("plugin-declared queue tools use direct control endpoints", async () => {
+  const originalFetch = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async (url, options = {}) => {
+    const target = String(url);
+    calls.push({ target, options });
+    if (target.endsWith("/api/queue/info"))
+      return Response.json({ totalQueued: 0 });
+    if (target.includes("/api/queue/status?ticketId=72"))
+      return Response.json({ ticketId: 72, status: "Completed" });
+    if (target.endsWith("/api/queue/cancel"))
+      return Response.json({ ticketId: 73, status: "Canceled" });
+    throw new Error(`unexpected fetch ${target}`);
+  };
+
+  try {
+    const info = await invokeFirstClassPluginRoute("queue/info");
+    const status = await invokeFirstClassPluginRoute("queue/status", { ticketId: 72 });
+    const canceled = await invokeFirstClassPluginRoute("queue/cancel", { ticketId: 73 });
+
+    assert.equal(info.success, true);
+    assert.equal(status.data.status, "Completed");
+    assert.equal(canceled.data.status, "Canceled");
+    assert.equal(calls.some(({ target }) => target.endsWith("/api/queue/submit")), false);
+    assert.equal(calls[0].options.method, "GET");
+    assert.equal(calls[1].options.method, "GET");
+    assert.equal(calls[2].options.method, "POST");
+    assert.deepEqual(JSON.parse(calls[2].options.body), { ticketId: 73 });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 test("mutating transport headers bind agent and selected Unity project", () => {
@@ -252,6 +327,8 @@ test("default tool surface stays bounded and omits duplicate prefab aliases", ()
   assert.equal(exposedByName.has("unity_component_batch_wire"), false);
   assert.equal(exposedByName.has("unity_localization_upsert_entries"), false);
   assert.equal(exposedByName.has("unity_prefab_asset_instantiate_child_prefab"), false);
+  assert.equal(exposedByName.has("unity_console_log"), false);
+  assert.equal(exposedByName.has("unity_console_query"), true);
 
   const transaction = exposedByName.get("unity_prefab_asset_transaction_edit");
   assert.ok(transaction);

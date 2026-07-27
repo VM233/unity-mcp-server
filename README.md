@@ -322,7 +322,7 @@ If Unity MCP helps your workflow, consider supporting its development! Your supp
 
 ## What's New in v2.26.0
 
-- **Compilation error detection** — New `unity_get_compilation_errors` tool retrieves C# compilation errors and warnings directly from Unity's `CompilationPipeline` API. Unlike `unity_console_log`, this is independent of the console log buffer — not affected by console clear, Play Mode log flooding, or buffer overflow. Supports filtering by severity (`error`, `warning`, `all`) and count limit. Registered as a core tool (always directly accessible, not behind `unity_advanced_tool`).
+- **Compilation error detection** — `unity_get_compilation_errors` retrieves C# compilation errors and warnings directly from Unity's `CompilationPipeline` API. Unlike `unity_console_query`, this is independent of the console log buffer — not affected by console clear, Play Mode log flooding, or buffer overflow. Supports filtering by severity (`error`, `warning`, `all`) and count limit.
 
 ## What's New in v2.25.0
 

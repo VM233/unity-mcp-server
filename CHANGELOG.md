@@ -2,6 +2,13 @@
 
 All notable changes to this package will be documented in this file.
 
+## [3.3.3] - 2026-07-28
+
+### Fixed
+- Never report `wait/editor-idle` as successful merely because a separate editor-state probe looks idle while the original queue ticket is still non-terminal.
+- Route plugin-declared `queue/info`, `queue/status`, and `queue/cancel` tools through their direct queue endpoints instead of resubmitting those control routes into the queue.
+- Remove the obsolete `unity_console_log` / `console/log` tool mapping; use the plugin-declared `unity_console_query` route.
+
 ## [3.3.2] - 2026-07-17
 
 ### Fixed

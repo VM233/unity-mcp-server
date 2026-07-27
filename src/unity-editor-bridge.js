@@ -329,15 +329,6 @@ function extractEditorState(rawState) {
   return data;
 }
 
-function editorStateLooksIdle(editorState) {
-  if (!editorState || typeof editorState !== "object") return false;
-  return (
-    editorState.isCompiling === false &&
-    editorState.isUpdating !== true &&
-    editorState.isChangingPlayMode !== true
-  );
-}
-
 export function normalizeTerminalQueueStatus(statusData) {
   if (!statusData || typeof statusData !== "object") return null;
 
@@ -459,7 +450,7 @@ function buildConnectionFailure(command, params, startedAt, retryCount, lastErro
   };
 }
 
-async function buildQueuePollTimeoutResult(ticketId, command, timeoutMs, elapsedMs) {
+export async function buildQueuePollTimeoutResult(ticketId, command, timeoutMs, elapsedMs) {
   const finalStatus = await fetchQueueStatusRaw(ticketId).catch((error) => ({
     success: false,
     error: error.message,
@@ -477,23 +468,6 @@ async function buildQueuePollTimeoutResult(ticketId, command, timeoutMs, elapsed
   ]);
 
   const editorState = extractEditorState(editorStateRaw);
-  if (command === "wait/editor-idle" && editorStateLooksIdle(editorState)) {
-    return {
-      success: true,
-      data: {
-        success: true,
-        recoveredAfterPollTimeout: true,
-        ticketId,
-        command,
-        pollTimedOut: true,
-        pollTimeoutMs: timeoutMs,
-        elapsedMs,
-        finalTicketStatus: finalStatus,
-        finalQueueInfo: queueInfo,
-        finalEditorState: editorState,
-      },
-    };
-  }
 
   return {
     success: false,
@@ -1038,10 +1012,6 @@ export async function updateScript(params) {
 
 export async function buildProject(params) {
   return sendCommand("build/start", params);
-}
-
-export async function getConsoleLog(params) {
-  return sendCommand("console/log", params);
 }
 
 export async function clearConsoleLog() {

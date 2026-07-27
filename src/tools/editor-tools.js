@@ -437,18 +437,6 @@ export const editorTools = [
 
   // â”€â”€â”€ Console / Logging â”€â”€â”€
   {
-    name: "unity_console_log",
-    description: "Get recent Unity console log messages (errors, warnings, info). Useful for debugging.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        count: { type: "number", description: "Number of recent messages to retrieve (default: 50)" },
-        type: { type: "string", description: "Filter: 'error', 'warning', 'info', or 'all' (default: 'all')" },
-      },
-    },
-    handler: async (params) => JSON.stringify(await bridge.getConsoleLog(params)),
-  },
-  {
     name: "unity_console_clear",
     description: "Clear the Unity console log.",
     inputSchema: { type: "object", properties: {} },
@@ -464,7 +452,7 @@ export const editorTools = [
       "Uses CompilationPipeline directly — independent of the console log buffer. " +
       "Not affected by console clear or Play Mode log flooding. " +
       "Returns errors from the last compilation cycle. " +
-      "Use this instead of unity_console_log when diagnosing script compilation issues.",
+      "Use this instead of Console-buffer queries when diagnosing script compilation issues.",
     inputSchema: {
       type: "object",
       properties: {

@@ -17,7 +17,12 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { dirname, join } from "path";
 import { CONFIG } from "./config.js";
-import { sendCommand } from "./unity-editor-bridge.js";
+import {
+  cancelTicket,
+  getQueueInfo,
+  getTicketStatus,
+  sendCommand,
+} from "./unity-editor-bridge.js";
 import { loadState, persistState } from "./state-persistence.js";
 import { staticFirstClassPluginTools } from "./tools/plugin-first-class-tools.js";
 
@@ -376,11 +381,24 @@ export async function fetchFirstClassPluginTools() {
       inputSchema: normalizeInputSchema(tool.inputSchema),
       annotations: sanitizeToolMetadata(tool.annotations || {}),
       handler: async (params = {}) =>
-        JSON.stringify(await sendCommand(tool.route, params || {})),
+        JSON.stringify(await invokeFirstClassPluginRoute(tool.route, params || {})),
     });
   }
 
   return exposed;
+}
+
+export async function invokeFirstClassPluginRoute(route, params = {}) {
+  switch (route) {
+    case "queue/info":
+      return getQueueInfo();
+    case "queue/status":
+      return getTicketStatus(params.ticketId);
+    case "queue/cancel":
+      return cancelTicket(params.ticketId);
+    default:
+      return sendCommand(route, params);
+  }
 }
 
 // Core tool names (always exposed individually)
@@ -432,7 +450,6 @@ const CORE_TOOLS = new Set([
   "unity_play_mode",
 
   // Console & Compilation
-  "unity_console_log",
   "unity_console_clear",
   "unity_get_compilation_errors",
 

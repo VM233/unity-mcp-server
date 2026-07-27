@@ -90,7 +90,7 @@ function truncateResponseIfNeeded(contentBlocks) {
           `• unity_scene_hierarchy: use maxNodes, parentPath, or component filters\n` +
           `• unity_search_by_name/component/tag/layer: use limit parameter\n` +
           `• unity_asset_list: use maxResults parameter\n` +
-          `• unity_console_log: use count parameter\n\n` +
+          `• unity_console_query: use count and type filters\n\n` +
           `Tip: For very large scenes, start with unity_scene_stats to get an overview, ` +
           `then use targeted searches (unity_search_by_name, unity_search_by_tag) instead of loading the full hierarchy.`,
       },
@@ -312,7 +312,7 @@ async function performInstanceDiscovery(agentId) {
 const server = new Server(
   {
     name: "unity-mcp",
-    version: "3.3.2",
+    version: "3.3.3",
   },
   {
     capabilities: {
@@ -604,7 +604,7 @@ async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   startPluginToolMetadataRefresh();
-  debugLog(`=== SERVER START === v3.3.2, agent=${PROCESS_AGENT_ID}, discoveryDone=${_discoveryDonePerAgent.get(PROCESS_AGENT_ID) || false}, selectedPort=${getSelectedInstance()?.port || 'null'}`);
+  debugLog(`=== SERVER START === v3.3.3, agent=${PROCESS_AGENT_ID}, discoveryDone=${_discoveryDonePerAgent.get(PROCESS_AGENT_ID) || false}, selectedPort=${getSelectedInstance()?.port || 'null'}`);
   console.error(
     `Unity MCP Server running on stdio (agent: ${PROCESS_AGENT_ID})`
   );
