@@ -2,6 +2,13 @@
 
 All notable changes to this package will be documented in this file.
 
+## [3.3.4] - 2026-07-28
+
+### Fixed
+- Stop advertising the removed `unity_search_assets` and `unity_asset_instantiate_prefab` tools; use the canonical `unity_asset_list` and `unity_scene_instantiate_prefab` tools backed by `asset/list` and `scene/instantiate-prefab`.
+- Synchronize the remaining static tool catalog with the Editor plugin's consolidated routes, including prefab-child instantiation, UI Toolkit refresh, screenshots, selection search, graphics previews, and texture import.
+- Match the startup fallback schemas for asset listing and scene prefab instantiation to the canonical Editor route schemas.
+
 ## [3.3.3] - 2026-07-28
 
 ### Fixed

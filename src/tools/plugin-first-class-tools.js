@@ -467,6 +467,7 @@ const localizationUpsertEntrySchema = () => ({
 const firstClassPluginRoutes = [
   "packages/update-git",
   "wait/editor-idle",
+  "scene/instantiate-prefab",
   "serialized-object/get",
   "serialized-object/set",
   "prefab-asset/add-component",
@@ -474,7 +475,7 @@ const firstClassPluginRoutes = [
   "prefab-asset/configure-component",
   "prefab-asset/get-properties",
   "prefab-asset/hierarchy",
-  "prefab-asset/instantiate-prefab",
+  "prefab-asset/instantiate-child-prefab",
   "prefab-asset/move-component",
   "prefab-asset/move-gameobject",
   "prefab-asset/find",
@@ -498,7 +499,6 @@ const firstClassPluginRoutes = [
   "uitoolkit/runtime-style",
   "uitoolkit/runtime-repaint",
   "uitoolkit/refresh",
-  "uitoolkit/wait-refresh",
   "uitoolkit/assert-layout",
   "uitoolkit/locate-element",
   "uitoolkit/capture-element",
@@ -552,11 +552,11 @@ const detailedStaticFirstClassPluginTools = [
     inputSchema: {
       type: "object",
       properties: {
-        assetPath: {
+        prefabPath: {
           type: "string",
           description: "Prefab asset path to instantiate.",
         },
-        parentPath: {
+        parent: {
           type: "string",
           description: "Optional scene parent GameObject path.",
         },
@@ -566,7 +566,7 @@ const detailedStaticFirstClassPluginTools = [
         },
         ...transformProps,
       },
-      required: ["assetPath"],
+      required: ["prefabPath"],
     },
   },
   {
@@ -801,8 +801,8 @@ const detailedStaticFirstClassPluginTools = [
     },
   },
   {
-    toolName: "unity_prefab_asset_instantiate_prefab",
-    route: "prefab-asset/instantiate-prefab",
+    toolName: "unity_prefab_asset_instantiate_child_prefab",
+    route: "prefab-asset/instantiate-child-prefab",
     category: "prefab-asset",
     description: "Instantiate a prefab asset as a child inside another prefab asset.",
     inputSchema: {

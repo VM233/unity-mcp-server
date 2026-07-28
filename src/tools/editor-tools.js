@@ -240,7 +240,8 @@ export const editorTools = [
         type: { type: "string", description: "Asset type filter: Script, Scene, Prefab, Material, Texture, AudioClip, AnimationClip, Shader, Font, Mesh, Model" },
         search: { type: "string", description: "Search query string" },
         recursive: { type: "boolean", description: "Search recursively in subfolders (default: true)" },
-        maxResults: { type: "number", description: "Maximum assets to return (default: 500). Use lower values for large projects." },
+        offset: { type: "number", description: "Result offset (default: 0)." },
+        limit: { type: "number", description: "Maximum assets to return (default: 100; capped at 500)." },
       },
     },
     handler: async (params) => JSON.stringify(await bridge.getAssetList(params)),
@@ -306,23 +307,6 @@ export const editorTools = [
     },
     handler: async (params) => JSON.stringify(await bridge.createPrefab(params)),
   },
-  {
-    name: "unity_asset_instantiate_prefab",
-    description: "Instantiate a prefab into the current scene.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        prefabPath: { type: "string", description: "Path to the prefab asset (e.g. 'Assets/Prefabs/Enemy.prefab')" },
-        name: { type: "string", description: "Name for the instantiated object" },
-        position: { type: "object", properties: { x: { type: "number" }, y: { type: "number" }, z: { type: "number" } } },
-        rotation: { type: "object", properties: { x: { type: "number" }, y: { type: "number" }, z: { type: "number" } } },
-        parent: { type: "string", description: "Parent GameObject path (optional)" },
-      },
-      required: ["prefabPath"],
-    },
-    handler: async (params) => JSON.stringify(await bridge.instantiatePrefab(params)),
-  },
-
   // â”€â”€â”€ Script / Code Operations â”€â”€â”€
   {
     name: "unity_script_create",
@@ -1539,19 +1523,6 @@ export const editorTools = [
     },
     handler: async (params) => JSON.stringify(await bridge.focusSceneView(params)),
   },
-  {
-    name: "unity_selection_find_by_type",
-    description: "Find all GameObjects in the scene that have a specific component type (e.g. 'Rigidbody', 'Camera', 'Light', 'AudioSource', or custom scripts).",
-    inputSchema: {
-      type: "object",
-      properties: {
-        typeName: { type: "string", description: "Component type name (e.g. 'Rigidbody', 'Camera', 'MyScript')" },
-      },
-      required: ["typeName"],
-    },
-    handler: async (params) => JSON.stringify(await bridge.findObjectsByType(params)),
-  },
-
   // â”€â”€â”€ Agent Management â”€â”€â”€
   {
     // â”€â”€â”€ Input Actions â”€â”€â”€
@@ -2516,20 +2487,6 @@ export const editorTools = [
     handler: async (params) => JSON.stringify(await bridge.findByShader(params)),
   },
   {
-    name: "unity_search_assets",
-    description: "Search for assets in the project by name, type, and folder. Uses Unity's AssetDatabase search.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        query: { type: "string", description: "Search query (asset name)" },
-        type: { type: "string", description: "Asset type filter (e.g. 'Material', 'Texture2D', 'Prefab', 'Scene', 'AnimationClip', 'ScriptableObject')" },
-        folder: { type: "string", description: "Folder to search in (e.g. 'Assets/Prefabs')" },
-        maxResults: { type: "number", description: "Maximum results to return (default: 100)" },
-      },
-    },
-    handler: async (params) => JSON.stringify(await bridge.searchAssets(params)),
-  },
-  {
     name: "unity_search_missing_references",
     description: "Find all missing/broken object references and missing scripts in the scene. Essential for cleanup and debugging.",
     inputSchema: {
@@ -2771,129 +2728,6 @@ export const editorTools = [
     },
   },
   {
-    name: "unity_graphics_scene_capture",
-    description:
-      "Capture the current Scene View as an inline image. Returns base64 PNG that Claude can see directly. Use to visually inspect the scene layout.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        width: {
-          type: "number",
-          description: "Image width in pixels (default: 512)",
-        },
-        height: {
-          type: "number",
-          description: "Image height in pixels (default: 512)",
-        },
-      },
-    },
-    handler: async (params) => {
-      const result = await bridge.captureSceneViewGraphics(params);
-      if (result.error) return JSON.stringify(result);
-      // Bridge wraps response: { success, data: { success, base64 } }
-      const imageData = result.data?.base64 || result.base64;
-      if (!imageData || typeof imageData !== "string") {
-        return JSON.stringify({ error: "Scene capture returned no image data", ...result });
-      }
-      const metadata = { ...result };
-      delete metadata.base64;
-      if (metadata.data) delete metadata.data.base64;
-      const b64 = imageData.replace(/^data:image\/\w+;base64,/, "");
-      return [
-        { type: "image", data: b64, mimeType: "image/png" },
-        { type: "text", text: JSON.stringify(metadata) },
-      ];
-    },
-  },
-  {
-    name: "unity_graphics_game_capture",
-    description:
-      "Capture the Game View camera as an inline image. Returns base64 PNG that Claude can see directly. Use to see what the player sees.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        width: {
-          type: "number",
-          description: "Image width in pixels (default: 512)",
-        },
-        height: {
-          type: "number",
-          description: "Image height in pixels (default: 512)",
-        },
-        cameraName: {
-          type: "string",
-          description:
-            "Name of camera to use (default: Camera.main / MainCamera tag)",
-        },
-      },
-    },
-    handler: async (params) => {
-      const result = await bridge.captureGameViewGraphics(params);
-      if (result.error) return JSON.stringify(result);
-      // Bridge wraps response: { success, data: { success, base64 } }
-      const imageData = result.data?.base64 || result.base64;
-      if (!imageData || typeof imageData !== "string") {
-        return JSON.stringify({ error: "Game capture returned no image data", ...result });
-      }
-      const metadata = { ...result };
-      delete metadata.base64;
-      if (metadata.data) delete metadata.data.base64;
-      const b64 = imageData.replace(/^data:image\/\w+;base64,/, "");
-      return [
-        { type: "image", data: b64, mimeType: "image/png" },
-        { type: "text", text: JSON.stringify(metadata) },
-      ];
-    },
-  },
-  {
-    name: "unity_graphics_prefab_render",
-    description:
-      "Render a prefab from a configurable angle as an inline image. Returns base64 PNG that Claude can see directly. Great for previewing 3D models and prefabs.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        assetPath: {
-          type: "string",
-          description: "Prefab asset path (e.g. 'Assets/Prefabs/Enemy.prefab')",
-        },
-        width: {
-          type: "number",
-          description: "Image width in pixels (default: 512)",
-        },
-        height: {
-          type: "number",
-          description: "Image height in pixels (default: 512)",
-        },
-        rotationY: {
-          type: "number",
-          description:
-            "Horizontal rotation angle in degrees (default: 30). Controls left-right viewing angle.",
-        },
-        rotationX: {
-          type: "number",
-          description:
-            "Vertical rotation angle in degrees (default: 20). Controls up-down viewing angle.",
-        },
-        padding: {
-          type: "number",
-          description:
-            "Padding multiplier around the object (default: 1.2). Higher = more space around object.",
-        },
-      },
-      required: ["assetPath"],
-    },
-    handler: async (params) => {
-      const result = await bridge.renderPrefabPreview(params);
-      if (result.error) return JSON.stringify(result);
-      const metadata = { ...result };
-      delete metadata.base64;
-      return [
-        { type: "image", data: result.base64, mimeType: "image/png" },
-        { type: "text", text: JSON.stringify(metadata) },
-      ];
-    },
-  },
-  {
     name: "unity_graphics_mesh_info",
     description:
       "Get detailed mesh geometry information: vertex count, triangle count, submeshes, UV channels, blend shapes, bone count, bounds. Works on mesh assets or scene GameObjects with MeshFilter/SkinnedMeshRenderer.",
@@ -2946,40 +2780,6 @@ export const editorTools = [
     },
     handler: async (params) => {
       const result = await bridge.getMaterialInfo(params);
-      if (result.error) return JSON.stringify(result);
-      if (result.base64) {
-        const metadata = { ...result };
-        delete metadata.base64;
-        return [
-          { type: "image", data: result.base64, mimeType: "image/png" },
-          { type: "text", text: JSON.stringify(metadata) },
-        ];
-      }
-      return JSON.stringify(result);
-    },
-  },
-  {
-    name: "unity_graphics_texture_info",
-    description:
-      "Get detailed texture information: dimensions, format, compression, mipmaps, memory estimate, import settings, and a visual preview thumbnail. Use for texture analysis and optimization.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        assetPath: {
-          type: "string",
-          description:
-            "Texture asset path (e.g. 'Assets/Textures/Wood_Diffuse.png')",
-        },
-        previewSize: {
-          type: "number",
-          description:
-            "Preview thumbnail size in pixels (default: 128). Set 0 to skip preview.",
-        },
-      },
-      required: ["assetPath"],
-    },
-    handler: async (params) => {
-      const result = await bridge.getTextureInfoGraphics(params);
       if (result.error) return JSON.stringify(result);
       if (result.base64) {
         const metadata = { ...result };
@@ -3714,33 +3514,6 @@ export const editorTools = [
     },
     handler: async (params) => JSON.stringify(await bridge.reimportTexture(params)),
   },
-  {
-    name: "unity_texture_set_sprite",
-    description: "Quick-set a texture as a Sprite with optional pixels-per-unit and single/multiple mode.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        path: { type: "string", description: "Asset path of the texture" },
-        pixelsPerUnit: { type: "number", description: "Pixels per unit (default: 100)" },
-        multiple: { type: "boolean", description: "Use Multiple sprite mode for spritesheets (default: false = Single)" },
-      },
-      required: ["path"],
-    },
-    handler: async (params) => JSON.stringify(await bridge.setTextureAsSprite(params)),
-  },
-  {
-    name: "unity_texture_set_normalmap",
-    description: "Quick-set a texture as a Normal Map.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        path: { type: "string", description: "Asset path of the texture" },
-      },
-      required: ["path"],
-    },
-    handler: async (params) => JSON.stringify(await bridge.setTextureAsNormalMap(params)),
-  },
-
   // â”€â”€â”€ Navigation â”€â”€â”€
 
   {

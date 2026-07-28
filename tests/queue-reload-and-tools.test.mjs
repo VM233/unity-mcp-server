@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import {
@@ -302,7 +303,7 @@ test("advertised project tools remain callable across volatile instance catalog 
   assert.equal(registry.get(battleToolV1.name).handler(), "battle-v2");
 });
 
-test("default tool surface stays bounded and omits duplicate prefab aliases", () => {
+test("default tool surface stays bounded and exposes only canonical consolidated tools", () => {
   const { coreTools, metaTools } = splitToolTiers([...editorTools, ...umaTools]);
   const exposedByName = new Map(
     [...instanceTools, ...hubTools, ...coreTools, ...metaTools, ...contextTools]
@@ -326,9 +327,70 @@ test("default tool surface stays bounded and omits duplicate prefab aliases", ()
   assert.equal(exposedByName.has("unity_asset_move_batch"), false);
   assert.equal(exposedByName.has("unity_component_batch_wire"), false);
   assert.equal(exposedByName.has("unity_localization_upsert_entries"), false);
-  assert.equal(exposedByName.has("unity_prefab_asset_instantiate_child_prefab"), false);
   assert.equal(exposedByName.has("unity_console_log"), false);
   assert.equal(exposedByName.has("unity_console_query"), true);
+
+  const retiredToolNames = [
+    "unity_asset_instantiate_prefab",
+    "unity_search_assets",
+    "unity_selection_find_by_type",
+    "unity_graphics_scene_capture",
+    "unity_graphics_game_capture",
+    "unity_graphics_prefab_render",
+    "unity_graphics_texture_info",
+    "unity_texture_set_sprite",
+    "unity_texture_set_normalmap",
+    "unity_prefab_asset_instantiate_prefab",
+    "unity_uitoolkit_wait_refresh",
+  ];
+  const declaredToolNames = new Set([
+    ...editorTools.map((tool) => tool.name),
+    ...staticFirstClassPluginTools.map((tool) => tool.toolName),
+  ]);
+  const manifest = JSON.parse(
+    readFileSync(new URL("../manifest.json", import.meta.url), "utf8"));
+  const manifestToolNames = new Set(manifest.tools.map((tool) => tool.name));
+  for (const toolName of retiredToolNames) {
+    assert.equal(declaredToolNames.has(toolName), false, toolName);
+    assert.equal(exposedByName.has(toolName), false, toolName);
+    assert.equal(manifestToolNames.has(toolName), false, toolName);
+  }
+
+  for (const toolName of [
+    "unity_asset_list",
+    "unity_scene_instantiate_prefab",
+    "unity_prefab_asset_instantiate_child_prefab",
+    "unity_uitoolkit_refresh",
+  ]) {
+    assert.equal(exposedByName.has(toolName), true, toolName);
+  }
+
+  const staleStaticRoutes = [
+    "asset/instantiate-prefab",
+    "search/assets",
+    "selection/find-by-type",
+    "graphics/scene-capture",
+    "graphics/game-capture",
+    "graphics/prefab-render",
+    "graphics/texture-info",
+    "texture/set-sprite",
+    "texture/set-normalmap",
+    "prefab-asset/instantiate-prefab",
+    "uitoolkit/wait-refresh",
+  ];
+  const staticRoutes = new Set(staticFirstClassPluginTools.map((tool) => tool.route));
+  for (const route of staleStaticRoutes) {
+    assert.equal(staticRoutes.has(route), false, route);
+  }
+
+  const assetList = exposedByName.get("unity_asset_list");
+  assert.ok(assetList.inputSchema.properties.limit);
+  assert.equal(assetList.inputSchema.properties.maxResults, undefined);
+
+  const sceneInstantiate = exposedByName.get("unity_scene_instantiate_prefab");
+  assert.deepEqual(sceneInstantiate.inputSchema.required, ["prefabPath"]);
+  assert.ok(sceneInstantiate.inputSchema.properties.parent);
+  assert.equal(sceneInstantiate.inputSchema.properties.assetPath, undefined);
 
   const transaction = exposedByName.get("unity_prefab_asset_transaction_edit");
   assert.ok(transaction);

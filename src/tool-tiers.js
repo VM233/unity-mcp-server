@@ -438,7 +438,6 @@ const CORE_TOOLS = new Set([
   "unity_asset_refresh",
   "unity_asset_delete",
   "unity_asset_create_prefab",
-  "unity_asset_instantiate_prefab",
 
   // Script management
   "unity_script_create",
@@ -465,7 +464,6 @@ const CORE_TOOLS = new Set([
   "unity_selection_set",
   "unity_search_by_component",
   "unity_search_by_name",
-  "unity_search_assets",
 
   // Screenshots & capture
   "unity_screenshot_game",

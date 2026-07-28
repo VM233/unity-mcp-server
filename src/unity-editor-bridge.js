@@ -102,7 +102,7 @@ export function canReplayAfterLostTicket(command) {
     command === "asset/refresh" ||
     command === "asset/get-refresh-job" ||
     command === "wait/editor-idle" ||
-    command === "uitoolkit/wait-refresh" ||
+    command === "uitoolkit/refresh" ||
     command === "testing/list-tests" ||
     command === "testing/get-job" ||
     command === "testing/get-package-job"
@@ -394,7 +394,7 @@ function getQueuePollTimeoutMs(command, params = {}) {
     );
   }
 
-  if (command === "wait/editor-idle" || command === "uitoolkit/wait-refresh") {
+  if (command === "wait/editor-idle" || command === "uitoolkit/refresh") {
     const commandTimeout = Number(params.timeoutMs);
     const stableMs = Number(params.stableMs);
     const requestedWaitMs = Number.isFinite(commandTimeout) && commandTimeout > 0
@@ -1038,10 +1038,6 @@ export async function createPrefab(params) {
   return sendCommand("asset/create-prefab", params);
 }
 
-export async function instantiatePrefab(params) {
-  return sendCommand("asset/instantiate-prefab", params);
-}
-
 export async function setMaterial(params) {
   return sendCommand("renderer/set-material", params);
 }
@@ -1342,10 +1338,6 @@ export async function setSelection(params) {
 
 export async function focusSceneView(params) {
   return sendCommand("selection/focus-scene-view", params);
-}
-
-export async function findObjectsByType(params) {
-  return sendCommand("selection/find-by-type", params);
 }
 
 // â"€â"€â"€ Input Actions â"€â"€â"€
@@ -1670,10 +1662,6 @@ export async function findByShader(params) {
   return sendCommand("search/by-shader", params);
 }
 
-export async function searchAssets(params) {
-  return sendCommand("search/assets", params);
-}
-
 export async function findMissingReferences(params) {
   return sendCommand("search/missing-references", params);
 }
@@ -1766,28 +1754,12 @@ export async function captureAssetPreview(params) {
   return sendCommand("graphics/asset-preview", params);
 }
 
-export async function captureSceneViewGraphics(params) {
-  return sendCommand("graphics/scene-capture", params);
-}
-
-export async function captureGameViewGraphics(params) {
-  return sendCommand("graphics/game-capture", params);
-}
-
-export async function renderPrefabPreview(params) {
-  return sendCommand("graphics/prefab-render", params);
-}
-
 export async function getMeshInfo(params) {
   return sendCommand("graphics/mesh-info", params);
 }
 
 export async function getMaterialInfo(params) {
   return sendCommand("graphics/material-info", params);
-}
-
-export async function getTextureInfoGraphics(params) {
-  return sendCommand("graphics/texture-info", params);
 }
 
 export async function getRendererInfo(params) {
@@ -1984,14 +1956,6 @@ export async function setTextureImportSettings(params) {
 
 export async function reimportTexture(params) {
   return sendCommand("texture/reimport", params);
-}
-
-export async function setTextureAsSprite(params) {
-  return sendCommand("texture/set-sprite", params);
-}
-
-export async function setTextureAsNormalMap(params) {
-  return sendCommand("texture/set-normalmap", params);
 }
 
 // ─── Sprite Atlas ───
