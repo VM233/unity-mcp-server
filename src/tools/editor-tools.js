@@ -25,7 +25,7 @@ export const editorTools = [
   },
   {
     name: "unity_scene_open",
-    description: "Open a scene by its asset path (relative to Assets/).",
+    description: "Open a scene by its asset path without modal dialogs. Returns a structured error when any loaded scene has unsaved changes; save explicitly and retry.",
     inputSchema: {
       type: "object",
       properties: {
@@ -37,13 +37,19 @@ export const editorTools = [
   },
   {
     name: "unity_scene_save",
-    description: "Save the current scene.",
-    inputSchema: { type: "object", properties: {} },
-    handler: async () => JSON.stringify(await bridge.saveScene()),
+    description: "Save the current scene without modal dialogs. Untitled scenes require an explicit asset path.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        path: { type: "string", description: "Optional .unity asset path under Assets/. Required for an untitled scene." },
+        overwrite: { type: "boolean", description: "Allow an explicit save path to replace an existing unloaded scene asset. Defaults to false." },
+      },
+    },
+    handler: async (params) => JSON.stringify(await bridge.saveScene(params)),
   },
   {
     name: "unity_scene_new",
-    description: "Create a new empty scene.",
+    description: "Create a new empty scene without modal dialogs. Returns a structured error when a loaded scene has unsaved changes.",
     inputSchema: { type: "object", properties: {} },
     handler: async () => JSON.stringify(await bridge.newScene()),
   },

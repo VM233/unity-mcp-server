@@ -2,6 +2,11 @@
 
 All notable changes to this package will be documented in this file.
 
+## [3.3.5] - 2026-07-28
+
+### Fixed
+- Expose modal-free scene open/new behavior and explicit-path scene saving, so dirty or untitled scenes return actionable errors instead of blocking every subsequent MCP command behind a Unity dialog.
+
 ## [3.3.4] - 2026-07-28
 
 ### Fixed

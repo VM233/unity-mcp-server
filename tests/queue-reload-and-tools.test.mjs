@@ -423,6 +423,18 @@ test("default tool surface stays bounded and exposes only canonical consolidated
     ["jobId", "refreshRequestId", "clear", "timeoutMs"]);
 });
 
+test("scene tools advertise modal-free explicit save behavior", () => {
+  const openScene = editorTools.find((tool) => tool.name === "unity_scene_open");
+  const saveScene = editorTools.find((tool) => tool.name === "unity_scene_save");
+  const newScene = editorTools.find((tool) => tool.name === "unity_scene_new");
+
+  assert.match(openScene.description, /without modal dialogs/i);
+  assert.match(newScene.description, /without modal dialogs/i);
+  assert.deepEqual(Object.keys(saveScene.inputSchema.properties).sort(),
+    ["overwrite", "path"]);
+  assert.match(saveScene.description, /explicit asset path/i);
+});
+
 test("asset refresh queue failure is reconciled by exact persistent request ID", async () => {
   const originalFetch = globalThis.fetch;
   let submittedRequestId = "";

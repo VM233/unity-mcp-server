@@ -926,8 +926,8 @@ export async function openScene(scenePath) {
   return sendCommand("scene/open", { path: scenePath });
 }
 
-export async function saveScene() {
-  return sendCommand("scene/save");
+export async function saveScene(params = {}) {
+  return sendCommand("scene/save", params);
 }
 
 export async function newScene() {
