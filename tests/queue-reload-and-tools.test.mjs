@@ -112,8 +112,7 @@ test("a transient queue-submit 404 retries the queue without poisoning later com
       const target = String(url);
       calls.push(target);
       if (target.endsWith("/api/queue/submit")) {
-        const body = JSON.parse(options.body);
-        requestIds.push(body.requestId);
+        requestIds.push(options.headers["Idempotency-Key"]);
         submitCount++;
         if (submitCount === 1) {
           return new Response("bridge is reloading", { status: 404 });
@@ -161,6 +160,45 @@ test("a transient queue-submit 404 retries the queue without poisoning later com
     } finally {
       globalThis.fetch = originalFetch;
       CONFIG.queueReloadRecoveryTimeoutMs = originalRecoveryTimeout;
+    }
+  });
+
+test("non-retryable structured queue submission errors keep their Unity error code",
+  async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async (url) => {
+      if (String(url).endsWith("/api/queue/submit")) {
+        return Response.json({
+          success: false,
+          error: "The request reached the wrong Unity project.",
+          errorCode: "target_project_mismatch",
+          retryable: false,
+          actualProjectPath: "D:/OtherProject",
+        }, { status: 409 });
+      }
+      throw new Error(`unexpected fetch ${url}`);
+    };
+
+    try {
+      const result = await runWithRequestContext({
+        agentId: "agent-project-mismatch",
+        portOverride: 7891,
+        targetInstance: {
+          port: 7891,
+          projectPath: "D:/UnityProjects/BattleIdle/apps/game-client-unity",
+          projectName: "BattleIdle",
+        },
+        expectedProjectPath:
+          "D:/UnityProjects/BattleIdle/apps/game-client-unity",
+      }, () => sendCommand("scene/info", {}));
+
+      assert.equal(result.success, false);
+      assert.equal(result.errorCode, "target_project_mismatch");
+      assert.equal(result.retryable, false);
+      assert.equal(result.actualProjectPath, "D:/OtherProject");
+      assert.equal(result.error.includes("HTTP 409"), false);
+    } finally {
+      globalThis.fetch = originalFetch;
     }
   });
 
@@ -309,6 +347,50 @@ test("fresh Unity BOM registry leases remain discoverable while ping is unavaila
   }
 });
 
+test("reachable Unity instances report main-thread queue warm-up separately from liveness", async () => {
+  const originalFetch = globalThis.fetch;
+  const originalRegistryPath = CONFIG.instanceRegistryPath;
+  const originalPortStart = CONFIG.portRangeStart;
+  const originalPortEnd = CONFIG.portRangeEnd;
+  const registryPath = join(
+    mkdtempSync(join(tmpdir(), "unity-mcp-warming-discovery-")), "instances.json");
+  const port = 32124;
+  const baseEntry = {
+    port,
+    projectName: "WarmingProject",
+    projectPath: "D:/UnityProjects/WarmingProject",
+    processId: process.pid,
+    registeredAt: new Date().toISOString(),
+    lastSeen: new Date().toISOString(),
+    isReloading: false,
+  };
+
+  globalThis.fetch = async () => Response.json({
+    status: "ok",
+    queueReady: false,
+    projectName: baseEntry.projectName,
+    projectPath: baseEntry.projectPath,
+    unityVersion: "6000.4.10f1",
+  });
+  CONFIG.instanceRegistryPath = registryPath;
+  CONFIG.portRangeStart = port;
+  CONFIG.portRangeEnd = port;
+
+  try {
+    writeFileSync(registryPath, JSON.stringify([baseEntry]));
+    const instances = await discoverInstances();
+    assert.equal(instances.length, 1);
+    assert.equal(instances[0].isReachable, true);
+    assert.equal(instances[0].queueReady, false);
+    assert.equal(instances[0].status, "warming_up");
+  } finally {
+    globalThis.fetch = originalFetch;
+    CONFIG.instanceRegistryPath = originalRegistryPath;
+    CONFIG.portRangeStart = originalPortStart;
+    CONFIG.portRangeEnd = originalPortEnd;
+  }
+});
+
 test("a non-terminal queue ticket remains a timeout failure", async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async (url) => {
@@ -332,7 +414,10 @@ test("a non-terminal queue ticket remains a timeout failure", async () => {
       71, "wait/editor-idle", 60_000, 60_250);
     assert.equal(result.success, false);
     assert.equal(result.errorCode, "queue_poll_timeout");
-    assert.equal(result.finalTicketStatus.data.status, "Queued");
+    assert.equal(result.retryable, false);
+    assert.equal(result.nextTool, "unity_queue_ticket_status");
+    assert.equal(result.lastKnownTicket.status, "Queued");
+    assert.equal(result.queueState.totalQueued, 1);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -433,7 +518,9 @@ test("first-class Editor schemas expose explicit project binding", () => {
       required: ["value"],
     });
     assert.ok(schema.properties.port, name);
+    assert.equal(schema.properties.port.type, "integer", name);
     assert.ok(schema.properties.expectedProjectPath, name);
+    assert.ok(schema.properties.expectedProjectName, name);
     assert.deepEqual(schema.required, ["value"]);
   }
 
@@ -451,6 +538,7 @@ test("execute code schema exposes one-off namespace imports and project configur
   assert.equal(executeCode.inputSchema.properties.usings.type, "array");
   assert.equal(executeCode.inputSchema.properties.usings.items.type, "string");
   assert.match(executeCode.inputSchema.properties.usings.description, /Project Settings > Unity MCP/);
+  assert.equal(executeCode.inputSchema.properties.includeStackTrace.type, "boolean");
 });
 
 test("asset refresh recovery returns persistent job truth instead of transport failure", () => {
@@ -487,8 +575,8 @@ test("generated idempotency keys are unique command-scoped values", () => {
 
 test("plugin tool metadata fingerprint is order independent and schema sensitive", () => {
   const first = [
-    { toolName: "unity_b", route: "b/run", firstClass: true, inputSchema: { type: "object" } },
-    { toolName: "unity_a", route: "a/run", firstClass: true, inputSchema: { type: "object" } },
+    { toolName: "unity_asset_refresh", route: "asset/refresh", firstClass: true, inputSchema: { type: "object" } },
+    { toolName: "unity_asset_list", route: "asset/list", firstClass: true, inputSchema: { type: "object" } },
   ];
   const reordered = [first[1], first[0]];
   const changed = [
@@ -500,7 +588,7 @@ test("plugin tool metadata fingerprint is order independent and schema sensitive
   assert.notEqual(pluginToolsFingerprint(first), pluginToolsFingerprint(changed));
 });
 
-test("advertised project tools remain callable across volatile instance catalog refreshes", () => {
+test("advertised tools remain callable across volatile instance catalog refreshes", () => {
   const core = { name: "unity_editor_ping", handler: () => "pong" };
   const battleToolV1 = {
     name: "unity_pt_battle_get_runtime_ready_state",
@@ -588,7 +676,7 @@ test("default tool surface stays bounded and exposes only canonical consolidated
   for (const toolName of [
     "unity_asset_list",
     "unity_scene_instantiate_prefab",
-    "unity_prefab_asset_instantiate_child_prefab",
+    "unity_build_get_job",
     "unity_uitoolkit_refresh",
   ]) {
     assert.equal(exposedByName.has(toolName), true, toolName);
@@ -621,12 +709,7 @@ test("default tool surface stays bounded and exposes only canonical consolidated
   assert.ok(sceneInstantiate.inputSchema.properties.parent);
   assert.equal(sceneInstantiate.inputSchema.properties.assetPath, undefined);
 
-  const transaction = exposedByName.get("unity_prefab_asset_transaction_edit");
-  assert.ok(transaction);
-  assert.ok(JSON.stringify(transaction.inputSchema).length < 2_500);
-  assert.deepEqual(transaction.inputSchema.properties.execution.properties.mode.enum,
-    ["auto", "immediate", "batched"]);
-  assert.equal(transaction.inputSchema.properties.execution.properties.continueOnError, undefined);
+  assert.equal(exposedByName.has("unity_prefab_asset_transaction_edit"), false);
 
   const configureComponent = exposedByName.get("unity_prefab_asset_configure_component");
   assert.ok(configureComponent);
@@ -642,9 +725,7 @@ test("default tool surface stays bounded and exposes only canonical consolidated
   assert.deepEqual(setReference.inputSchema.required, ["references"]);
   assert.ok(setReference.inputSchema.properties.execution.properties.continueOnError);
 
-  const localizationUpsert = exposedByName.get("unity_localization_upsert_entry");
-  assert.deepEqual(localizationUpsert.inputSchema.required, ["collection", "entries"]);
-  assert.ok(localizationUpsert.inputSchema.properties.execution);
+  assert.equal(exposedByName.has("unity_localization_upsert_entry"), false);
 
   const refreshJob = exposedByName.get("unity_asset_get_refresh_job");
   assert.ok(refreshJob);
@@ -676,7 +757,7 @@ test("asset refresh queue failure is reconciled by exact persistent request ID",
       assert.equal(options.headers["X-UnityMCP-Expected-Project-Path"],
         "D:/UnityProjects/BattleIdle/apps/game-client-unity");
       if (body.apiPath === "asset/refresh") {
-        submittedRequestId = body.requestId;
+        submittedRequestId = options.headers["Idempotency-Key"];
         return Response.json({ ticketId: 17 });
       }
       if (body.apiPath === "asset/get-refresh-job") {

@@ -15,10 +15,9 @@
 //
 // Project Context:
 //   Exposes project-specific documentation via MCP Resources and a dedicated tool.
-//   Auto-injects context summary on the first tool call per session so agents
-//   receive project knowledge without needing to explicitly request it.
 
 import { randomBytes } from "crypto";
+import { createRequire } from "module";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
@@ -57,57 +56,16 @@ import {
   setDefaultRequestAgentId,
 } from "./request-context.js";
 import { AsyncSingleFlight } from "./async-single-flight.js";
+import {
+  compactSuccessfulToolResult,
+  guardResponseSize,
+  isStructuredToolFailure,
+  serializeToolError,
+  toContentBlocks,
+} from "./tool-response.js";
 
-// ─── Response size protection ───
-// Prevents "Write EOF" errors when tool responses exceed stdio transport limits.
-// Large Unity projects (79K+ objects) can generate multi-MB responses that crash the pipe.
-function truncateResponseIfNeeded(contentBlocks) {
-  // Estimate total size across all text blocks
-  let totalSize = 0;
-  for (const block of contentBlocks) {
-    if (block.type === "text") {
-      totalSize += (block.text || "").length;
-    } else if (block.type === "image") {
-      totalSize += (block.data || "").length;
-    }
-  }
-
-  const softLimit = CONFIG.responseSoftLimitBytes;
-  const hardLimit = CONFIG.responseHardLimitBytes;
-
-  if (totalSize > hardLimit) {
-    const sizeMB = (totalSize / (1024 * 1024)).toFixed(1);
-    const limitMB = (hardLimit / (1024 * 1024)).toFixed(1);
-    console.error(`[MCP] Response truncated: ${sizeMB}MB exceeds hard limit of ${limitMB}MB`);
-    return [
-      {
-        type: "text",
-        text:
-          `⚠️ Response too large (${sizeMB} MB, limit: ${limitMB} MB) — truncated to prevent Write EOF error.\n\n` +
-          `The requested data was too large to return in a single response. ` +
-          `Use pagination parameters to request smaller chunks:\n` +
-          `• unity_scene_hierarchy: use maxNodes, parentPath, or component filters\n` +
-          `• unity_search_by_name/component/tag/layer: use limit parameter\n` +
-          `• unity_asset_list: use limit parameter\n` +
-          `• unity_console_query: use count and type filters\n\n` +
-          `Tip: For very large scenes, start with unity_scene_stats to get an overview, ` +
-          `then use targeted searches (unity_search_by_name, unity_search_by_tag) instead of loading the full hierarchy.`,
-      },
-    ];
-  }
-
-  if (totalSize > softLimit) {
-    const sizeMB = (totalSize / (1024 * 1024)).toFixed(1);
-    console.error(`[MCP] Large response warning: ${sizeMB}MB exceeds soft limit`);
-    // Still return the data but add a warning
-    contentBlocks.push({
-      type: "text",
-      text: `\n⚠️ Large response (${sizeMB} MB). Consider using pagination parameters for better performance.`,
-    });
-  }
-
-  return contentBlocks;
-}
+const require = createRequire(import.meta.url);
+const { version: SERVER_VERSION } = require("../package.json");
 
 // ─── Per-process agent identity ───
 // Each MCP stdio process = one Cowork agent.
@@ -139,54 +97,9 @@ console.error(
 // getting its own context, and Agent A's instance discovery would be skipped for Agent B.
 // We key state by agent ID to prevent cross-agent contamination.
 
-// Context auto-inject: each agent gets project context on their first tool call.
-const _contextInjectedPerAgent = new Map(); // agentId → boolean
-let _contextCache = null; // Shared cache (same project context for all agents)
-
 // Instance auto-discovery: each agent discovers instances on their first tool call.
 const _discoveryDonePerAgent = new Map(); // agentId → boolean
 const _discoverySingleFlight = new AsyncSingleFlight();
-
-async function getContextSummaryOnce() {
-  const agentId = getRequestAgentId();
-  if (_contextInjectedPerAgent.get(agentId)) return null;
-  _contextInjectedPerAgent.set(agentId, true);
-
-  try {
-    if (!_contextCache) {
-      _contextCache = await getProjectContext();
-    }
-
-    // Only inject if context is enabled and has content
-    if (
-      !_contextCache ||
-      !_contextCache.enabled ||
-      !_contextCache.categories ||
-      _contextCache.categories.length === 0
-    ) {
-      return null;
-    }
-
-    let summary =
-      "=== PROJECT CONTEXT (auto-provided by AB Unity MCP) ===\n\n";
-    for (const entry of _contextCache.categories) {
-      summary += `--- ${entry.category} ---\n`;
-      // Truncate very long files for auto-inject
-      let content = entry.content || "";
-      if (content.length > 2000) {
-        content =
-          content.substring(0, 2000) +
-          "\n... [truncated — use unity_get_project_context for full content]";
-      }
-      summary += content + "\n\n";
-    }
-    summary += "=== END PROJECT CONTEXT ===";
-    return summary;
-  } catch {
-    // Context fetch failed (Unity not connected yet, etc.) — silently skip
-    return null;
-  }
-}
 
 /**
  * Perform instance discovery on first tool call.
@@ -195,24 +108,6 @@ async function getContextSummaryOnce() {
 async function ensureInstanceDiscovery() {
   const agentId = getRequestAgentId();
   return _discoverySingleFlight.run(agentId, () => performInstanceDiscovery(agentId));
-}
-
-function isStructuredToolFailure(result) {
-  if (Array.isArray(result)) {
-    return result.some((block) =>
-      block?.type === "text" && isStructuredToolFailure(block.text));
-  }
-
-  let value = result;
-  if (typeof value === "string") {
-    try {
-      value = JSON.parse(value);
-    } catch {
-      return false;
-    }
-  }
-
-  return Boolean(value && typeof value === "object" && value.success === false);
 }
 
 async function performInstanceDiscovery(agentId) {
@@ -226,13 +121,16 @@ async function performInstanceDiscovery(agentId) {
     const validated = await validateSelectedInstance();
     if (validated) {
       debugLog(`Persisted selection validated OK: ${validated.projectName} on port ${validated.port}`);
-    } else if (getSelectedInstance() === null) {
-      // Validation cleared the selection (project no longer running).
-      // Re-run discovery on next call.
-      debugLog(`Persisted selection invalidated — project no longer found. Will re-discover.`);
-      _discoveryDonePerAgent.set(agentId, false);
+      return {
+        status: "selected",
+        instance: validated,
+      };
     }
-    return null;
+
+    // Validation cleared the selection (project no longer running). Re-discover
+    // during this call so callers do not need one guaranteed failing request.
+    debugLog(`Persisted selection invalidated - re-discovering now.`);
+    _discoveryDonePerAgent.set(agentId, false);
   }
 
   _discoveryDonePerAgent.set(agentId, true);
@@ -241,69 +139,40 @@ async function performInstanceDiscovery(agentId) {
     const result = await autoSelectInstance();
 
     if (result.autoSelected) {
-      // Single instance found and auto-selected
-      const inst = result.instance;
-      const cloneInfo = inst.isClone ? ` (ParrelSync clone #${inst.cloneIndex})` : "";
-      return (
-        `=== UNITY INSTANCE (auto-connected) ===\n` +
-        `Project: ${inst.projectName}${cloneInfo}\n` +
-        `Port: ${inst.port}\n` +
-        `Unity: ${inst.unityVersion || "unknown"}\n` +
-        `Path: ${inst.projectPath || "unknown"}\n` +
-        `=== END INSTANCE INFO ===`
-      );
+      return {
+        status: "selected",
+        instance: result.instance,
+      };
     }
 
     if (result.instances.length === 0) {
-      return (
-        `=== UNITY MCP WARNING ===\n` +
-        `No Unity Editor instances were detected.\n` +
-        `Make sure Unity is running with the MCP plugin enabled.\n` +
-        `You can still use Unity Hub tools (unity_hub_*).\n` +
-        `=== END WARNING ===`
-      );
+      return {
+        status: "unavailable",
+        instances: [],
+      };
     }
 
     // Multiple instances found — check if one is already selected
     const alreadySelected = getSelectedInstance();
     if (alreadySelected) {
-      // User already selected an instance before discovery ran — just confirm
-      const cloneInfo = alreadySelected.isClone ? ` (ParrelSync clone #${alreadySelected.cloneIndex})` : "";
-      return (
-        `=== UNITY INSTANCE (user-selected) ===\n` +
-        `Project: ${alreadySelected.projectName}${cloneInfo}\n` +
-        `Port: ${alreadySelected.port}\n` +
-        `Unity: ${alreadySelected.unityVersion || "unknown"}\n` +
-        `Path: ${alreadySelected.projectPath || "unknown"}\n` +
-        `(${result.instances.length} instances available — use unity_select_instance to switch)\n` +
-        `=== END INSTANCE INFO ===`
-      );
+      return {
+        status: "selected",
+        instance: alreadySelected,
+        instances: result.instances,
+      };
     }
 
-    // No instance selected yet — prompt user to select
-    let prompt =
-      `=== MULTIPLE UNITY INSTANCES DETECTED ===\n` +
-      `Found ${result.instances.length} running Unity Editor instances.\n` +
-      `You MUST ask the user which instance to work with before proceeding.\n\n` +
-      `Available instances:\n`;
-
-    for (const inst of result.instances) {
-      const cloneInfo = inst.isClone ? ` [ParrelSync clone #${inst.cloneIndex}]` : "";
-      prompt += `  • Port ${inst.port}: ${inst.projectName}${cloneInfo} (Unity ${inst.unityVersion || "?"})\n`;
-      if (inst.projectPath) {
-        prompt += `    Path: ${inst.projectPath}\n`;
-      }
-    }
-
-    prompt +=
-      `\nCall unity_select_instance with the port number once the user has chosen.\n` +
-      `=== END INSTANCE SELECTION REQUIRED ===`;
-
-    return prompt;
+    return {
+      status: "selection_required",
+      instances: result.instances,
+    };
   } catch (err) {
     _discoveryDonePerAgent.set(agentId, false);
     console.error(`[MCP] Instance discovery failed: ${err.message}`);
-    return null;
+    return {
+      status: "discovery_failed",
+      error: err.message,
+    };
   }
 }
 
@@ -311,7 +180,7 @@ async function performInstanceDiscovery(agentId) {
 const server = new Server(
   {
     name: "unity-mcp",
-    version: "4.0.0",
+    version: SERVER_VERSION,
   },
   {
     capabilities: {
@@ -343,18 +212,17 @@ function toolWithEditorBindingSchema({ name, description, inputSchema, annotatio
 }
 
 async function getExposedTools() {
-  const projectTools = await fetchFirstClassPluginTools();
-  // Keep every tool already advertised during this MCP process callable. A
-  // live metadata refresh can temporarily switch to another Unity instance
-  // whose project catalog does not contain the same project-defined tools.
-  // New live metadata still replaces a same-named route/schema.
-  advertisedTools.remember(projectTools);
+  const pluginTools = await fetchFirstClassPluginTools();
+  // Keep release-managed tools already advertised during this MCP process
+  // callable through transient Editor reloads. Live metadata replaces the
+  // schema and handler for a same-named route.
+  advertisedTools.remember(pluginTools);
   return advertisedTools.values();
 }
 
 async function findExposedTool(name) {
-  const projectTools = await fetchFirstClassPluginTools();
-  advertisedTools.remember(projectTools);
+  const pluginTools = await fetchFirstClassPluginTools();
+  advertisedTools.remember(pluginTools);
   return advertisedTools.get(name);
 }
 
@@ -411,16 +279,16 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       return {
         content: [{
           type: "text",
-          text: JSON.stringify({
-            success: false,
-            errorCode: "target_project_unavailable",
-            retryable: true,
-            error: message,
+          text: serializeToolError(
+            "target_project_unavailable",
             message,
-            expectedProjectPath,
-            expectedProjectName,
-            resolveTimeoutMs: projectResolveTimeoutMs,
-          }),
+            {
+              retryable: true,
+              expectedProjectPath,
+              ...(expectedProjectName ? { expectedProjectName } : {}),
+              resolveTimeoutMs: projectResolveTimeoutMs,
+            }
+          ),
         }],
         isError: true,
       };
@@ -448,15 +316,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         debugLog(`Port override active: ${portOverride} for tool ${name}`);
       }
 
-      let instancePrompt = null;
+      let discoveryResult = null;
       if (!portOverride && !expectedProjectPath &&
           name !== "unity_list_instances" && name !== "unity_select_instance") {
-        instancePrompt = await ensureInstanceDiscovery();
+        discoveryResult = await ensureInstanceDiscovery();
       }
 
       const selectionRequired = !portOverride && isInstanceSelectionRequired();
       const selectedInstance = getSelectedInstance();
-      debugLog(`Tool=${name}, agent=${agentId}, portOverride=${portOverride || 'null'}, selectionRequired=${selectionRequired}, selectedPort=${selectedInstance?.port || 'null'}, instancePrompt=${instancePrompt ? 'SET' : 'null'}, discoveryDone=${_discoveryDonePerAgent.get(agentId) || false}`);
+      debugLog(`Tool=${name}, agent=${agentId}, portOverride=${portOverride || 'null'}, selectionRequired=${selectionRequired}, selectedPort=${selectedInstance?.port || 'null'}, discoveryStatus=${discoveryResult?.status || 'none'}, discoveryDone=${_discoveryDonePerAgent.get(agentId) || false}`);
       if (
         selectionRequired &&
         !name.startsWith("unity_hub_") &&
@@ -468,11 +336,38 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           content: [
             {
               type: "text",
-              text:
-                instancePrompt ||
-                "Multiple Unity instances are running. You must call unity_list_instances and then unity_select_instance before using other Unity tools.",
+              text: serializeToolError(
+                "unity_instance_selection_required",
+                "Multiple Unity Editor instances are running. Select one before calling Editor tools.",
+                {
+                  availableInstances: discoveryResult?.instances || [],
+                  nextTool: "unity_select_instance",
+                }
+              ),
             },
           ],
+          isError: true,
+        };
+      }
+
+      if (
+        !portOverride &&
+        !selectedInstance &&
+        discoveryResult?.status === "unavailable" &&
+        !name.startsWith("unity_hub_") &&
+        name !== "unity_list_instances" &&
+        name !== "unity_select_instance" &&
+        name !== "unity_get_project_context"
+      ) {
+        return {
+          content: [{
+            type: "text",
+            text: serializeToolError(
+              "unity_instance_unavailable",
+              "No running Unity Editor instance was detected.",
+              { nextTool: "unity_list_instances" }
+            ),
+          }],
           isError: true,
         };
       }
@@ -480,7 +375,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       tool = await findExposedTool(name);
       if (!tool) {
         return {
-          content: [{ type: "text", text: `Unknown tool: ${name}` }],
+          content: [{
+            type: "text",
+            text: serializeToolError(
+              "unknown_tool",
+              `Unknown tool: ${name}`,
+              { tool: name }
+            ),
+          }],
           isError: true,
         };
       }
@@ -490,33 +392,35 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         delete handlerArgs.port;
       }
 
-      const result = await tool.handler(handlerArgs);
-      const contentBlocks = [];
-      if (instancePrompt) {
-        contentBlocks.push({ type: "text", text: instancePrompt });
-      }
-
-      const contextSummary = await getContextSummaryOnce();
-      if (contextSummary) {
-        contentBlocks.push({ type: "text", text: contextSummary });
-      }
-
-      if (Array.isArray(result)) {
-        contentBlocks.push(...result);
-      } else {
-        contentBlocks.push({ type: "text", text: result });
+      const result = compactSuccessfulToolResult(await tool.handler(handlerArgs));
+      const sizeGuard = guardResponseSize(toContentBlocks(result), {
+        softLimitBytes: CONFIG.responseSoftLimitBytes,
+        hardLimitBytes: CONFIG.responseHardLimitBytes,
+      });
+      if (sizeGuard.exceedsSoftLimit) {
+        const sizeMB = (sizeGuard.totalBytes / (1024 * 1024)).toFixed(1);
+        console.error(
+          `[MCP] Large tool response from ${name}: ${sizeMB}MB` +
+          (sizeGuard.exceedsHardLimit ? " (replaced with structured error)" : "")
+        );
       }
 
       return {
-        content: truncateResponseIfNeeded(contentBlocks),
-        ...(isStructuredToolFailure(result) ? { isError: true } : {}),
+        content: sizeGuard.content,
+        ...((sizeGuard.exceedsHardLimit || isStructuredToolFailure(result))
+          ? { isError: true }
+          : {}),
       };
     } catch (error) {
       return {
         content: [
           {
             type: "text",
-            text: `Error executing ${name}: ${error.message}`,
+            text: serializeToolError(
+              "tool_execution_failed",
+              `Error executing ${name}: ${error.message}`,
+              { tool: name }
+            ),
           },
         ],
         isError: true,
@@ -603,7 +507,7 @@ async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   startPluginToolMetadataRefresh();
-  debugLog(`=== SERVER START === v4.0.0, agent=${PROCESS_AGENT_ID}, discoveryDone=${_discoveryDonePerAgent.get(PROCESS_AGENT_ID) || false}, selectedPort=${getSelectedInstance()?.port || 'null'}`);
+  debugLog(`=== SERVER START === v${SERVER_VERSION}, agent=${PROCESS_AGENT_ID}, discoveryDone=${_discoveryDonePerAgent.get(PROCESS_AGENT_ID) || false}, selectedPort=${getSelectedInstance()?.port || 'null'}`);
   console.error(
     `Unity MCP Server running on stdio (agent: ${PROCESS_AGENT_ID})`
   );

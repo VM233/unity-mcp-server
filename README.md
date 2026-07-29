@@ -91,7 +91,7 @@ Claude / AI Assistant ←→ MCP Server (this repo) ←→ Unity Editor Plugin (
 
 This server communicates with:
 - **Unity Hub** via its current `--headless` CLI
-- **Unity Editor** via the companion [unity-mcp-plugin](https://github.com/AnkleBreaker-Studio/unity-mcp-plugin) which runs an HTTP API inside the editor
+- **Unity Editor** via the companion [VM Unity MCP](https://github.com/VM233/VMUnityMCP) package, which runs a queue-only HTTP bridge inside the editor
 
 ### 300+ Tools Across 30+ Categories
 > Scene management, GameObjects, components, physics, terrain, Shader Graph, profiling, animation, NavMesh, builds, multiplayer, and more.
@@ -103,7 +103,7 @@ This server communicates with:
 ### Two-Tier Tool System
 
 To avoid overwhelming MCP clients with 300+ tools, the server uses a two-tier architecture:
-- **Core and high-frequency plugin tools** stay near 100 concrete tools
+- **Core and high-frequency plugin tools** stay near 60 release-managed concrete tools
 - **Advanced tools** are accessed through `unity_advanced_tool` with lazy metadata loading
 
 This keeps the tool count manageable while preserving access to every Unity feature. `unity_list_advanced_tools` returns compact category counts by default; pass `category`, `offset`, `limit`, and optional `includeSchema` to inspect one paginated category.
@@ -120,8 +120,9 @@ Project-defined tools use a separate three-stage contract:
 2. `unity_project_tools_get` returns the complete descriptor and input schema for one selected tool.
 3. `unity_project_tools_execute` executes that tool with validated arguments.
 
-The server advertises MCP tool-list change notifications and refreshes live plugin metadata in the background. When a package update adds or changes a first-class Unity route, compatible MCP clients automatically request the updated tool list without reconnecting.
-Metadata refresh requests compact schema-bearing first-class pages only; they do not transfer the full plugin route catalog.
+Project-defined tools are deliberately not promoted to concrete Node-server tools, even when the Editor package marks one first-class. This prevents a tool from one open Unity project remaining advertised after the MCP session switches to another project.
+
+The server advertises MCP tool-list change notifications and refreshes live plugin metadata in the background. When a package update changes one of the release-managed concrete routes, compatible MCP clients automatically request the updated tool list without reconnecting. Metadata refresh requests compact schema-bearing first-class pages only; they do not transfer the full plugin route catalog.
 
 ### Multi-Instance Support
 
@@ -144,7 +145,7 @@ The server automatically discovers all running Unity Editor instances on startup
 
 In Unity: **Window > Package Manager > + > Add package from git URL:**
 ```
-https://github.com/AnkleBreaker-Studio/unity-mcp-plugin.git
+https://github.com/VM233/VMUnityMCP.git
 ```
 
 ### 2. Install this MCP Server
@@ -225,7 +226,7 @@ Features for uninstalled packages return helpful messages explaining what to ins
 
 - Node.js 18+
 - Unity Hub (for Hub tools)
-- Unity Editor with [unity-mcp-plugin](https://github.com/AnkleBreaker-Studio/unity-mcp-plugin) installed (for Editor tools)
+- Unity Editor with [VM Unity MCP](https://github.com/VM233/VMUnityMCP) installed (for Editor tools)
 
 ## Troubleshooting
 
@@ -357,7 +358,7 @@ Yes. The server supports multi-agent operation with session tracking, action log
 
 ## Related Projects
 
-- **[unity-mcp-plugin](https://github.com/AnkleBreaker-Studio/unity-mcp-plugin)** — The companion Unity Editor plugin (UPM package) that this server connects to
+- **[VM Unity MCP](https://github.com/VM233/VMUnityMCP)** — The companion Unity Editor package that this server connects to
 - **[Model Context Protocol](https://modelcontextprotocol.io)** — The open standard that powers this integration
 - **[Claude Desktop](https://claude.ai/download)** — Anthropic's AI assistant with built-in MCP support
 - **[AnkleBreaker Studio](https://github.com/AnkleBreaker-Studio)** — The game studio behind this project

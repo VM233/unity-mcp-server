@@ -14,24 +14,16 @@ export const instanceTools = [
     description:
       "List registered Unity Editor instances, including reload status and current reachability. " +
       "Returns each instance's project name, port, Unity version, and whether it's a ParrelSync clone. " +
-      "Use this to see which Unity projects are currently open before selecting one to work with. " +
-      "IMPORTANT: When multiple instances are detected, always call this first and then use " +
-      "unity_select_instance to choose which project to target.",
+      "Use this to see which Unity projects are currently open before selecting one to work with.",
     inputSchema: {
       type: "object",
-      properties: {
-        refresh: {
-          type: "boolean",
-          description:
-            "Force a fresh discovery scan (default: true). Set to false to use cached results.",
-        },
-      },
+      properties: {},
     },
-    handler: async ({ refresh = true } = {}) => {
+    handler: async () => {
       const instances = await discoverInstances();
       const selected = getSelectedInstance();
 
-      const result = {
+      return JSON.stringify({
         instances: instances.map((inst) => ({
           port: inst.port,
           projectName: inst.projectName,
@@ -40,26 +32,15 @@ export const instanceTools = [
           isClone: inst.isClone,
           cloneIndex: inst.cloneIndex,
           status: inst.status || (inst.alive ? "ready" : "temporarily_unreachable"),
+          queueReady: inst.queueReady !== false,
+          ...(inst.busyReason ? { busyReason: inst.busyReason } : {}),
           isReloading: inst.isReloading === true,
           isReachable: inst.isReachable !== false,
           source: inst.source,
           isSelected: selected ? selected.port === inst.port : false,
         })),
-        totalCount: instances.length,
         selectedPort: selected?.port || null,
-        selectedProject: selected?.projectName || null,
-      };
-
-      if (instances.length === 0) {
-        result.message =
-          "No Unity Editor instances found. Make sure Unity is running with the MCP plugin enabled.";
-      } else if (!selected) {
-        result.message = `Found ${instances.length} Unity instance(s). Use unity_select_instance to choose which project to work with.`;
-      } else {
-        result.message = `Found ${instances.length} Unity instance(s). Currently targeting: ${selected.projectName} (port ${selected.port})`;
-      }
-
-      return JSON.stringify(result);
+      });
     },
   },
 
@@ -68,16 +49,15 @@ export const instanceTools = [
     description:
       "Select which Unity Editor instance to work with for this session. " +
       "All subsequent unity_* commands will be routed to the selected instance. " +
-      "You must provide the port number of the instance (get it from unity_list_instances). " +
-      "IMPORTANT: Call unity_list_instances first to see available instances and their ports. " +
-      "PARALLEL SAFETY: After selecting, include 'port: <number>' as a parameter in ALL " +
-      "subsequent unity_* tool calls to guarantee routing to this instance even when " +
-      "multiple agents share the same MCP process.",
+      "Provide a port returned by unity_list_instances. A later call may still override " +
+      "the target with its own port or expectedProjectPath.",
     inputSchema: {
       type: "object",
       properties: {
         port: {
-          type: "number",
+          type: "integer",
+          minimum: 1,
+          maximum: 65535,
           description:
             "The port number of the Unity instance to select (from unity_list_instances output).",
         },
@@ -85,32 +65,19 @@ export const instanceTools = [
       required: ["port"],
     },
     handler: async ({ port }) => {
-      if (!port || typeof port !== "number") {
+      if (!Number.isInteger(port) || port < 1 || port > 65535) {
         return JSON.stringify(
           {
             success: false,
+            errorCode: "invalid_port",
+            retryable: false,
             error:
-              "Port number is required. Use unity_list_instances to see available instances.",
-          },
-          null,
-          2
+              "port must be an integer between 1 and 65535.",
+          }
         );
       }
 
       const result = await selectInstance(port);
-
-      // Enhance successful responses with parallel-safe routing instructions
-      if (result.success) {
-        result.routing = {
-          port: port,
-          instruction:
-            `IMPORTANT — PARALLEL SAFETY: To guarantee your commands reach "${result.instance?.projectName || "this instance"}" ` +
-            `(port ${port}), you MUST include  port: ${port}  as a parameter in ALL subsequent unity_* tool calls. ` +
-            `This prevents cross-agent routing issues when multiple tasks run in parallel. ` +
-            `Example: unity_execute_code({ code: "...", port: ${port} })`,
-        };
-      }
-
       return JSON.stringify(result);
     },
   },

@@ -1,0 +1,1231 @@
+{
+  "schemaVersion": 1,
+  "capturedAt": "2026-07-29T21:24:05.357Z",
+  "port": 7892,
+  "projectPath": "D:/UnityProjects/BattleIdle/apps/game-client-unity",
+  "counts": {
+    "serverSurface": 58,
+    "pluginFirstClass": 127,
+    "combinedExposed": 174
+  },
+  "tools": [
+    {
+      "name": "unity_list_instances",
+      "route": "",
+      "category": "list",
+      "source": "server",
+      "description": "List registered Unity Editor instances, including reload status and current reachability. Returns each instance's project name, port, Unity version, and whether it's a ParrelSync clone. Use this to see which Unity projects are currently open before selecting one to work with."
+    },
+    {
+      "name": "unity_select_instance",
+      "route": "",
+      "category": "select",
+      "source": "server",
+      "description": "Select which Unity Editor instance to work with for this session. All subsequent unity_* commands will be routed to the selected instance. Provide a port returned by unity_list_instances. A later call may still override the target with its own port or expectedProjectPath."
+    },
+    {
+      "name": "unity_hub_list_editors",
+      "route": "",
+      "category": "hub",
+      "source": "server",
+      "description": "List all Unity Editor versions currently installed via Unity Hub, including their installation paths."
+    },
+    {
+      "name": "unity_hub_available_releases",
+      "route": "",
+      "category": "hub",
+      "source": "server",
+      "description": "List Unity Editor versions available for download from Unity Hub."
+    },
+    {
+      "name": "unity_hub_install_editor",
+      "route": "",
+      "category": "hub",
+      "source": "server",
+      "description": "Install a specific Unity Editor version. Optionally include platform modules (android, ios, webgl, linux, macos, windows-il2cpp)."
+    },
+    {
+      "name": "unity_hub_install_modules",
+      "route": "",
+      "category": "hub",
+      "source": "server",
+      "description": "Install additional platform modules to an already-installed Unity Editor version."
+    },
+    {
+      "name": "unity_hub_get_install_path",
+      "route": "",
+      "category": "hub",
+      "source": "server",
+      "description": "Get the current default installation path for Unity Editors."
+    },
+    {
+      "name": "unity_hub_set_install_path",
+      "route": "",
+      "category": "hub",
+      "source": "server",
+      "description": "Set the default installation directory for Unity Editors."
+    },
+    {
+      "name": "unity_editor_ping",
+      "route": "",
+      "category": "editor",
+      "source": "server",
+      "description": "Check if the Unity Editor bridge is running and responsive. Returns editor version, project name, and connection status."
+    },
+    {
+      "name": "unity_editor_state",
+      "route": "",
+      "category": "editor",
+      "source": "server",
+      "description": "Get the current Unity Editor state: play mode, compilation status, active scene, project path."
+    },
+    {
+      "name": "unity_scene_info",
+      "route": "",
+      "category": "scene",
+      "source": "server",
+      "description": "Get information about the currently open scene(s), including name, path, dirty state, and root game objects."
+    },
+    {
+      "name": "unity_scene_open",
+      "route": "",
+      "category": "scene",
+      "source": "server",
+      "description": "Open a scene by its asset path without modal dialogs. Returns a structured error when any loaded scene has unsaved changes; save explicitly and retry."
+    },
+    {
+      "name": "unity_scene_save",
+      "route": "",
+      "category": "scene",
+      "source": "server",
+      "description": "Save the current scene without modal dialogs. Untitled scenes require an explicit asset path."
+    },
+    {
+      "name": "unity_scene_new",
+      "route": "",
+      "category": "scene",
+      "source": "server",
+      "description": "Create a new empty scene without modal dialogs. Returns a structured error when a loaded scene has unsaved changes."
+    },
+    {
+      "name": "unity_scene_hierarchy",
+      "route": "scene/hierarchy",
+      "category": "scene",
+      "source": "plugin",
+      "description": "Read the active scene hierarchy, optionally returning compact matches filtered by component type."
+    },
+    {
+      "name": "unity_gameobject_create",
+      "route": "",
+      "category": "gameobject",
+      "source": "server",
+      "description": "Create a new GameObject in the scene. Can specify primitive type (Cube, Sphere, Capsule, Cylinder, Plane, Quad), parent, and initial transform."
+    },
+    {
+      "name": "unity_gameobject_delete",
+      "route": "",
+      "category": "gameobject",
+      "source": "server",
+      "description": "Delete a GameObject from the scene by path or name."
+    },
+    {
+      "name": "unity_gameobject_info",
+      "route": "",
+      "category": "gameobject",
+      "source": "server",
+      "description": "Get detailed info about a specific GameObject: transform, components, children, active state, tags, layer."
+    },
+    {
+      "name": "unity_gameobject_set_transform",
+      "route": "",
+      "category": "gameobject",
+      "source": "server",
+      "description": "Set the transform (position, rotation, scale) of a GameObject."
+    },
+    {
+      "name": "unity_component_add",
+      "route": "",
+      "category": "component",
+      "source": "server",
+      "description": "Add a component to a GameObject. Supports built-in types (Rigidbody, BoxCollider, AudioSource, Light, Camera, etc.) and custom scripts."
+    },
+    {
+      "name": "unity_component_remove",
+      "route": "",
+      "category": "component",
+      "source": "server",
+      "description": "Remove a component from a GameObject."
+    },
+    {
+      "name": "unity_component_get_properties",
+      "route": "",
+      "category": "component",
+      "source": "server",
+      "description": "Get all serialized properties of a component on a GameObject."
+    },
+    {
+      "name": "unity_component_set_property",
+      "route": "component/set-property",
+      "category": "component",
+      "source": "plugin",
+      "description": "Set a serialized component property, including inherited Behaviour.enabled, on a scene GameObject."
+    },
+    {
+      "name": "unity_component_get_referenceable",
+      "route": "",
+      "category": "component",
+      "source": "server",
+      "description": "Discover what objects can be assigned to an ObjectReference property. Returns matching scene objects and project assets filtered by the expected type. Useful before wiring references to know what's available."
+    },
+    {
+      "name": "unity_asset_list",
+      "route": "asset/list",
+      "category": "asset",
+      "source": "plugin",
+      "description": "Lazy Unity route: asset/list"
+    },
+    {
+      "name": "unity_asset_import",
+      "route": "asset/import",
+      "category": "asset",
+      "source": "plugin",
+      "description": "Preflight and import one or more external assets with shared TextureImporter defaults, image-content deduplication, configurable execution, per-item results, and rollback."
+    },
+    {
+      "name": "unity_asset_refresh",
+      "route": "asset/refresh",
+      "category": "asset",
+      "source": "plugin",
+      "description": "Start a reload-safe AssetDatabase refresh job. Poll asset/get-refresh-job until it reaches a terminal state."
+    },
+    {
+      "name": "unity_asset_delete",
+      "route": "",
+      "category": "asset",
+      "source": "server",
+      "description": "Delete an asset from the project."
+    },
+    {
+      "name": "unity_asset_create_prefab",
+      "route": "",
+      "category": "asset",
+      "source": "server",
+      "description": "Create a prefab from an existing GameObject in the scene."
+    },
+    {
+      "name": "unity_script_create",
+      "route": "",
+      "category": "script",
+      "source": "server",
+      "description": "Create a new C# script file in the project with the given content."
+    },
+    {
+      "name": "unity_script_read",
+      "route": "",
+      "category": "script",
+      "source": "server",
+      "description": "Read the contents of a C# script file from the project."
+    },
+    {
+      "name": "unity_script_update",
+      "route": "",
+      "category": "script",
+      "source": "server",
+      "description": "Update the contents of an existing C# script file."
+    },
+    {
+      "name": "unity_execute_code",
+      "route": "",
+      "category": "execute",
+      "source": "server",
+      "description": "Execute arbitrary C# code inside the Unity Editor. The code runs in the editor context with access to all Unity APIs. Recurring namespace imports can be configured in Project Settings > Unity MCP > Execute Code. Return values are serialized to JSON."
+    },
+    {
+      "name": "unity_console_clear",
+      "route": "",
+      "category": "console",
+      "source": "server",
+      "description": "Clear the Unity console log."
+    },
+    {
+      "name": "unity_get_compilation_errors",
+      "route": "",
+      "category": "get",
+      "source": "server",
+      "description": "Get C# compilation errors and warnings from the Unity Editor. Uses CompilationPipeline directly — independent of the console log buffer. Not affected by console clear or Play Mode log flooding. Returns errors from the last compilation cycle. Use this instead of Console-buffer queries when diagnosing script compilation issues."
+    },
+    {
+      "name": "unity_play_mode",
+      "route": "",
+      "category": "play",
+      "source": "server",
+      "description": "Control Unity Editor play mode: enter play, pause, or stop."
+    },
+    {
+      "name": "unity_execute_menu_item",
+      "route": "",
+      "category": "execute",
+      "source": "server",
+      "description": "Execute a Unity Editor menu command by its path (e.g. 'File/Save', 'GameObject/3D Object/Cube', 'Window/General/Console')."
+    },
+    {
+      "name": "unity_project_info",
+      "route": "",
+      "category": "project",
+      "source": "server",
+      "description": "Get project information: name, path, Unity version, render pipeline, packages, build settings."
+    },
+    {
+      "name": "unity_prefab_info",
+      "route": "",
+      "category": "prefab",
+      "source": "server",
+      "description": "Get detailed prefab information: overrides, variant status, added/removed components. Works on both prefab assets and scene instances."
+    },
+    {
+      "name": "unity_gameobject_duplicate",
+      "route": "",
+      "category": "gameobject",
+      "source": "server",
+      "description": "Duplicate a GameObject with all its children and components."
+    },
+    {
+      "name": "unity_gameobject_set_active",
+      "route": "",
+      "category": "gameobject",
+      "source": "server",
+      "description": "Set a GameObject active or inactive."
+    },
+    {
+      "name": "unity_gameobject_reparent",
+      "route": "",
+      "category": "gameobject",
+      "source": "server",
+      "description": "Move a GameObject under a new parent in the hierarchy."
+    },
+    {
+      "name": "unity_selection_get",
+      "route": "",
+      "category": "selection",
+      "source": "server",
+      "description": "Get the currently selected GameObjects in the Unity Editor."
+    },
+    {
+      "name": "unity_selection_set",
+      "route": "",
+      "category": "selection",
+      "source": "server",
+      "description": "Set the editor selection to specific GameObjects."
+    },
+    {
+      "name": "unity_search_by_component",
+      "route": "",
+      "category": "search",
+      "source": "server",
+      "description": "Find all GameObjects in the scene that have a specific component type. Returns their paths and instance IDs."
+    },
+    {
+      "name": "unity_search_by_name",
+      "route": "",
+      "category": "search",
+      "source": "server",
+      "description": "Find all GameObjects whose name contains a pattern. Supports substring matching or regex."
+    },
+    {
+      "name": "unity_scene_stats",
+      "route": "",
+      "category": "scene",
+      "source": "server",
+      "description": "Get comprehensive scene statistics: total objects, vertices, triangles, lights, cameras, colliders, and top component types."
+    },
+    {
+      "name": "unity_screenshot_game",
+      "route": "screenshot/game",
+      "category": "screenshot",
+      "source": "plugin",
+      "description": "Capture the current Game View during active or paused Play Mode, suppress and restore Game View Gizmos and Stats by default or preserve them when they are the evidence subject, fail without creating an image in Edit Mode, and return only after the PNG is fully written and decodable."
+    },
+    {
+      "name": "unity_screenshot_scene",
+      "route": "",
+      "category": "screenshot",
+      "source": "server",
+      "description": "Capture a screenshot of the Scene View camera. Returns immediately with the saved file path."
+    },
+    {
+      "name": "unity_packages_list",
+      "route": "packages/list",
+      "category": "packages",
+      "source": "plugin",
+      "description": "Lazy Unity route: packages/list"
+    },
+    {
+      "name": "unity_packages_update_git",
+      "route": "packages/update-git",
+      "category": "packages",
+      "source": "plugin",
+      "description": "Update a Git-based Unity package and return the resolved packages-lock hash."
+    },
+    {
+      "name": "unity_packages_lint_metas",
+      "route": "packages/lint-metas",
+      "category": "packages",
+      "source": "plugin",
+      "description": "Lint a Unity package root for missing .meta files."
+    },
+    {
+      "name": "unity_queue_info",
+      "route": "queue/info",
+      "category": "queue",
+      "source": "plugin",
+      "description": "Inspect queue capacity, active work, and per-agent depth."
+    },
+    {
+      "name": "unity_queue_ticket_status",
+      "route": "",
+      "category": "queue",
+      "source": "server",
+      "description": "Check the status of a specific queue ticket by ID. Returns the ticket's current status (Queued, Executing, Completed, Failed, TimedOut), result data if completed, and timing information."
+    },
+    {
+      "name": "unity_queue_cancel",
+      "route": "queue/cancel",
+      "category": "queue",
+      "source": "plugin",
+      "description": "Cancel one owned queued request; executing Unity work is not preempted."
+    },
+    {
+      "name": "unity_list_advanced_tools",
+      "route": "",
+      "category": "list",
+      "source": "server",
+      "description": "List fallback Unity tools organized by category. Prefer directly exposed unity_* tools first; use unity_advanced_tool only when no concrete tool exists or metadata is stale. Categories include: animation, prefab, physics, lighting, audio, shadergraph, terrain, particle, navmesh, ui, texture, profiler, memory, settings, input, asmdef, scriptableobject, constraint, lod, editorprefs, playerprefs, vfx, graphics, sceneview, and more."
+    },
+    {
+      "name": "unity_advanced_tool",
+      "route": "",
+      "category": "advanced",
+      "source": "server",
+      "description": "Fallback generic Unity entrypoint. Prefer directly exposed unity_* tools first. Use this only when no concrete tool exists, a route is new, or metadata is stale."
+    },
+    {
+      "name": "unity_get_project_context",
+      "route": "",
+      "category": "get",
+      "source": "server",
+      "description": "Get project-specific context and documentation that the team has prepared for AI agents. This includes project guidelines, architecture docs, game design documents, networking rules, and any other project knowledge stored in Assets/MCP/Context/. Call this without arguments to get ALL context, or specify a category for a specific document. IMPORTANT: Call this early in your session to understand the project's conventions and architecture."
+    },
+    {
+      "name": "unity__meta_capabilities",
+      "route": "_meta/capabilities",
+      "category": "_meta",
+      "source": "plugin",
+      "description": "List core and optional Unity MCP capabilities detected in this project."
+    },
+    {
+      "name": "unity__meta_tools",
+      "route": "_meta/tools",
+      "category": "_meta",
+      "source": "plugin",
+      "description": "Lazy Unity route: _meta/tools"
+    },
+    {
+      "name": "unity_animation_connect_states",
+      "route": "animation/connect-states",
+      "category": "animation",
+      "source": "plugin",
+      "description": "Create transitions between every pair of the provided Animator states."
+    },
+    {
+      "name": "unity_animation_transition_info",
+      "route": "animation/transition-info",
+      "category": "animation",
+      "source": "plugin",
+      "description": "Read full Animator transition details including conditions, exit time, duration, and offset."
+    },
+    {
+      "name": "unity_animation_update_state",
+      "route": "animation/update-state",
+      "category": "animation",
+      "source": "plugin",
+      "description": "Modify an existing Animator state, including motion, speed, tag, graph position, and default state."
+    },
+    {
+      "name": "unity_animation_update_transition",
+      "route": "animation/update-transition",
+      "category": "animation",
+      "source": "plugin",
+      "description": "Modify an existing Animator transition, including settings and condition edits."
+    },
+    {
+      "name": "unity_asset_copy",
+      "route": "asset/copy",
+      "category": "asset",
+      "source": "plugin",
+      "description": "Copy one or more Unity asset files with parent-folder creation, overwrite snapshots, and rollback."
+    },
+    {
+      "name": "unity_asset_create_folder",
+      "route": "asset/create-folder",
+      "category": "asset",
+      "source": "plugin",
+      "description": "Create or ensure an Assets folder hierarchy through AssetDatabase, with dry-run support."
+    },
+    {
+      "name": "unity_asset_dependencies",
+      "route": "asset/dependencies",
+      "category": "asset",
+      "source": "plugin",
+      "description": "Read paginated outgoing dependencies and incoming references for an asset."
+    },
+    {
+      "name": "unity_asset_export_unitypackage",
+      "route": "asset/export-unitypackage",
+      "category": "asset",
+      "source": "plugin",
+      "description": "Export one or more Unity assets to a .unitypackage file using AssetDatabase.ExportPackage."
+    },
+    {
+      "name": "unity_asset_get_refresh_job",
+      "route": "asset/get-refresh-job",
+      "category": "asset",
+      "source": "plugin",
+      "description": "Poll the current or latest reload-safe AssetDatabase refresh job."
+    },
+    {
+      "name": "unity_asset_import_unitypackage",
+      "route": "asset/import-unitypackage",
+      "category": "asset",
+      "source": "plugin",
+      "description": "Start a reload-safe, non-interactive .unitypackage import. Poll jobs/get with the returned jobId and jobType until the AssetDatabase completion callback is confirmed."
+    },
+    {
+      "name": "unity_asset_move",
+      "route": "asset/move",
+      "category": "asset",
+      "source": "plugin",
+      "description": "Preflight and move one or more Unity assets with configurable execution, GUID preservation, Single Sprite internal-name synchronization when filenames change, and rollback."
+    },
+    {
+      "name": "unity_asset_rename",
+      "route": "asset/rename",
+      "category": "asset",
+      "source": "plugin",
+      "description": "Safely rename a Unity asset using AssetDatabase while preserving its .meta GUID and synchronizing Single Sprite internal names."
+    },
+    {
+      "name": "unity_asset_transaction",
+      "route": "asset/transaction",
+      "category": "asset",
+      "source": "plugin",
+      "description": "Apply folder, copy, move, delete, and serialized-property edits as one rollback-capable asset transaction."
+    },
+    {
+      "name": "unity_build_get_job",
+      "route": "build/get-job",
+      "category": "build",
+      "source": "plugin",
+      "description": "Poll the current or latest persistent Player build job and return its final BuildReport and optional run result."
+    },
+    {
+      "name": "unity_build_start",
+      "route": "build/start",
+      "category": "build",
+      "source": "plugin",
+      "description": "Start a persistent Player build job, optionally run the executable, and return immediately with a job ID. Poll build/get-job for the final BuildReport; no post-build asset refresh is required."
+    },
+    {
+      "name": "unity_component_set_reference",
+      "route": "component/set-reference",
+      "category": "component",
+      "source": "plugin",
+      "description": "Assign one or more component ObjectReference properties with configurable immediate or frame-batched execution."
+    },
+    {
+      "name": "unity_console_query",
+      "route": "console/query",
+      "category": "console",
+      "source": "plugin",
+      "description": "Query recent Unity Console entries with time, source, message, stack, and last-Play filters."
+    },
+    {
+      "name": "unity_editor_play_mode",
+      "route": "editor/play-mode",
+      "category": "editor",
+      "source": "plugin",
+      "description": "Enter, pause, resume, step one frame, or stop Play Mode and return only after Unity confirms the requested state."
+    },
+    {
+      "name": "unity_jobs_get",
+      "route": "jobs/get",
+      "category": "jobs",
+      "source": "plugin",
+      "description": "Get one persistent Unity MCP job snapshot with owner enforcement."
+    },
+    {
+      "name": "unity_jobs_list",
+      "route": "jobs/list",
+      "category": "jobs",
+      "source": "plugin",
+      "description": "List paginated persistent Unity MCP job history owned by the current agent."
+    },
+    {
+      "name": "unity_localization_collections",
+      "route": "localization/collections",
+      "category": "localization",
+      "source": "plugin",
+      "description": "List String and Asset Table Collections with their Locale tables."
+    },
+    {
+      "name": "unity_localization_create_collection",
+      "route": "localization/create-collection",
+      "category": "localization",
+      "source": "plugin",
+      "description": "Create a String or Asset Table Collection for selected Locales."
+    },
+    {
+      "name": "unity_localization_create_locale",
+      "route": "localization/create-locale",
+      "category": "localization",
+      "source": "plugin",
+      "description": "Create a Locale asset and optionally register it with Localization Settings."
+    },
+    {
+      "name": "unity_localization_entries",
+      "route": "localization/entries",
+      "category": "localization",
+      "source": "plugin",
+      "description": "Read paginated String or Asset Table entries across Locale tables."
+    },
+    {
+      "name": "unity_localization_locales",
+      "route": "localization/locales",
+      "category": "localization",
+      "source": "plugin",
+      "description": "List project Locales registered with Unity Localization."
+    },
+    {
+      "name": "unity_localization_remove_entry",
+      "route": "localization/remove-entry",
+      "category": "localization",
+      "source": "plugin",
+      "description": "Remove a localization entry from one Locale table or the entire collection."
+    },
+    {
+      "name": "unity_localization_remove_variable",
+      "route": "localization/remove-variable",
+      "category": "localization",
+      "source": "plugin",
+      "description": "Remove a Smart String persistent variable from a registered group."
+    },
+    {
+      "name": "unity_localization_set_selected_locale",
+      "route": "localization/set-selected-locale",
+      "category": "localization",
+      "source": "plugin",
+      "description": "Set the currently selected Unity Localization Locale."
+    },
+    {
+      "name": "unity_localization_settings",
+      "route": "localization/settings",
+      "category": "localization",
+      "source": "plugin",
+      "description": "Read or update Localization Settings, project Locale, and selected Locale."
+    },
+    {
+      "name": "unity_localization_status",
+      "route": "localization/status",
+      "category": "localization",
+      "source": "plugin",
+      "description": "Inspect Unity Localization package, settings, locale, and table collection status."
+    },
+    {
+      "name": "unity_localization_upsert_entry",
+      "route": "localization/upsert-entry",
+      "category": "localization",
+      "source": "plugin",
+      "description": "Create or update one or more localized String, Smart String, or Asset Table entries with configurable execution."
+    },
+    {
+      "name": "unity_localization_upsert_variable",
+      "route": "localization/upsert-variable",
+      "category": "localization",
+      "source": "plugin",
+      "description": "Create or update a Smart String persistent variable and optionally create its group asset."
+    },
+    {
+      "name": "unity_localization_validate",
+      "route": "localization/validate",
+      "category": "localization",
+      "source": "plugin",
+      "description": "Find missing, empty, and duplicate localization entries across Locale tables."
+    },
+    {
+      "name": "unity_localization_variables",
+      "route": "localization/variables",
+      "category": "localization",
+      "source": "plugin",
+      "description": "List Smart String persistent variable groups and values."
+    },
+    {
+      "name": "unity_packages_add",
+      "route": "packages/add",
+      "category": "packages",
+      "source": "plugin",
+      "description": "Add a Unity package by registry name, Git URL, local path, or tarball and wait for Package Manager completion."
+    },
+    {
+      "name": "unity_packages_info",
+      "route": "packages/info",
+      "category": "packages",
+      "source": "plugin",
+      "description": "Lazy Unity route: packages/info"
+    },
+    {
+      "name": "unity_packages_remove",
+      "route": "packages/remove",
+      "category": "packages",
+      "source": "plugin",
+      "description": "Remove a Unity package dependency and wait for Package Manager completion."
+    },
+    {
+      "name": "unity_packages_search",
+      "route": "packages/search",
+      "category": "packages",
+      "source": "plugin",
+      "description": "Search Unity Package Manager registry packages with bounded results."
+    },
+    {
+      "name": "unity_packages_status",
+      "route": "packages/status",
+      "category": "packages",
+      "source": "plugin",
+      "description": "Read Package Manager manifest and lock status for one package or all Git packages."
+    },
+    {
+      "name": "unity_prefab_asset_add_component",
+      "route": "prefab-asset/add-component",
+      "category": "prefab-asset",
+      "source": "plugin",
+      "description": "Add a component to a prefab asset after waiting for a newly compiled script type to become available."
+    },
+    {
+      "name": "unity_prefab_asset_add_gameobject",
+      "route": "prefab-asset/add-gameobject",
+      "category": "prefab-asset",
+      "source": "plugin",
+      "description": "Create a child GameObject inside a prefab asset with an explicit or parent-inherited Layer."
+    },
+    {
+      "name": "unity_prefab_asset_cleanup_missing_overrides",
+      "route": "prefab-asset/cleanup-missing-overrides",
+      "category": "prefab-asset",
+      "source": "plugin",
+      "description": "Remove Prefab Variant property overrides whose serialized target field no longer exists."
+    },
+    {
+      "name": "unity_prefab_asset_configure_component",
+      "route": "prefab-asset/configure-component",
+      "category": "prefab-asset",
+      "source": "plugin",
+      "description": "Ensure and configure one component on a prefab asset GameObject, including serialized properties and ObjectReferences, in one atomic save."
+    },
+    {
+      "name": "unity_prefab_asset_find",
+      "route": "prefab-asset/find",
+      "category": "prefab-asset",
+      "source": "plugin",
+      "description": "Find GameObjects inside a prefab asset by name/path, component type, and serialized property value."
+    },
+    {
+      "name": "unity_prefab_asset_get_properties",
+      "route": "prefab-asset/get-properties",
+      "category": "prefab-asset",
+      "source": "plugin",
+      "description": "Read serialized properties from a component on a GameObject inside a prefab asset."
+    },
+    {
+      "name": "unity_prefab_asset_hierarchy",
+      "route": "prefab-asset/hierarchy",
+      "category": "prefab-asset",
+      "source": "plugin",
+      "description": "Get the full hierarchy tree of a prefab asset directly from disk."
+    },
+    {
+      "name": "unity_prefab_asset_instantiate_child_prefab",
+      "route": "prefab-asset/instantiate-child-prefab",
+      "category": "prefab-asset",
+      "source": "plugin",
+      "description": "Instantiate a prefab asset as a child inside another prefab asset."
+    },
+    {
+      "name": "unity_prefab_asset_move_component",
+      "route": "prefab-asset/move-component",
+      "category": "prefab-asset",
+      "source": "plugin",
+      "description": "Atomically move a component between GameObjects inside one prefab asset while preserving serialized data and remapping references to the moved component."
+    },
+    {
+      "name": "unity_prefab_asset_move_gameobject",
+      "route": "prefab-asset/move-gameobject",
+      "category": "prefab-asset",
+      "source": "plugin",
+      "description": "Move or reorder a GameObject inside a prefab asset."
+    },
+    {
+      "name": "unity_prefab_asset_remove_component",
+      "route": "prefab-asset/remove-component",
+      "category": "prefab-asset",
+      "source": "plugin",
+      "description": "Remove a component from a GameObject inside a prefab asset."
+    },
+    {
+      "name": "unity_prefab_asset_remove_gameobject",
+      "route": "prefab-asset/remove-gameobject",
+      "category": "prefab-asset",
+      "source": "plugin",
+      "description": "Remove a child GameObject from inside a prefab asset."
+    },
+    {
+      "name": "unity_prefab_asset_set_property",
+      "route": "prefab-asset/set-property",
+      "category": "prefab-asset",
+      "source": "plugin",
+      "description": "Set a serialized property on a component inside a prefab asset."
+    },
+    {
+      "name": "unity_prefab_asset_set_reference",
+      "route": "prefab-asset/set-reference",
+      "category": "prefab-asset",
+      "source": "plugin",
+      "description": "Set an ObjectReference property on a component inside a prefab asset."
+    },
+    {
+      "name": "unity_prefab_asset_transaction_edit",
+      "route": "prefab-asset/transaction-edit",
+      "category": "prefab-asset",
+      "source": "plugin",
+      "description": "Apply ordered prefab edits in one transaction with configurable immediate or frame-batched execution."
+    },
+    {
+      "name": "unity_profiler_analyze",
+      "route": "profiler/analyze",
+      "category": "profiler",
+      "source": "plugin",
+      "description": "Analyze current memory, rendering, and recorded Profiler frame data with optimization findings."
+    },
+    {
+      "name": "unity_profiler_enable",
+      "route": "profiler/enable",
+      "category": "profiler",
+      "source": "plugin",
+      "description": "Enable or disable the Unity Profiler and optional deep profiling."
+    },
+    {
+      "name": "unity_profiler_frame_data",
+      "route": "profiler/frame-data",
+      "category": "profiler",
+      "source": "plugin",
+      "description": "Read a paginated CPU timing hierarchy from a recorded Unity Profiler frame."
+    },
+    {
+      "name": "unity_profiler_memory",
+      "route": "profiler/memory",
+      "category": "profiler",
+      "source": "plugin",
+      "description": "Read current allocated, reserved, managed-heap, graphics-driver, and temporary allocator memory."
+    },
+    {
+      "name": "unity_profiler_memory_breakdown",
+      "route": "profiler/memory-breakdown",
+      "category": "profiler",
+      "source": "plugin",
+      "description": "Scan loaded assets and summarize runtime memory by asset category."
+    },
+    {
+      "name": "unity_profiler_memory_snapshot",
+      "route": "profiler/memory-snapshot",
+      "category": "profiler",
+      "source": "plugin",
+      "description": "Capture a Memory Profiler snapshot and wait for confirmed completion when com.unity.memoryprofiler is installed."
+    },
+    {
+      "name": "unity_profiler_memory_snapshot_status",
+      "route": "profiler/memory-snapshot-status",
+      "category": "profiler",
+      "source": "plugin",
+      "description": "Poll the current Memory Profiler snapshot job after a long capture outlives the initiating request."
+    },
+    {
+      "name": "unity_profiler_memory_status",
+      "route": "profiler/memory-status",
+      "category": "profiler",
+      "source": "plugin",
+      "description": "Read Memory Profiler availability and a quick current memory summary."
+    },
+    {
+      "name": "unity_profiler_memory_top_assets",
+      "route": "profiler/memory-top-assets",
+      "category": "profiler",
+      "source": "plugin",
+      "description": "List the largest loaded assets by runtime memory usage."
+    },
+    {
+      "name": "unity_profiler_stats",
+      "route": "profiler/stats",
+      "category": "profiler",
+      "source": "plugin",
+      "description": "Read current Unity rendering statistics such as batches, draw calls, triangles, and frame time."
+    },
+    {
+      "name": "unity_pt_battle_apply_knockback",
+      "route": "project-tools/call/battleidle/apply-knockback",
+      "category": "project-tools",
+      "source": "project",
+      "description": "Apply a deterministic knockback packet to one runtime BattleIdle element for physics and movement-control debugging."
+    },
+    {
+      "name": "unity_pt_battle_generate_level_range",
+      "route": "project-tools/call/battleidle/generate-level-range",
+      "category": "project-tools",
+      "source": "project",
+      "description": "Generate a contiguous BattleIdle level range with arithmetic progression for rewards, waves, monster counts, path patterns, and per-node overrides."
+    },
+    {
+      "name": "unity_pt_battle_get_battle_state",
+      "route": "project-tools/call/battleidle/get-battle-state",
+      "category": "project-tools",
+      "source": "project",
+      "description": "Return the selected BattleIdle map battle state, settlement result, node, and delay ticks."
+    },
+    {
+      "name": "unity_pt_battle_get_combat_event_sample",
+      "route": "project-tools/call/battleidle/get-combat-event-sample",
+      "category": "project-tools",
+      "source": "project",
+      "description": "Start, read, or stop a combat event sample containing attack starts, hits, skill ids, cooldown values, logic ticks, targets, and deaths."
+    },
+    {
+      "name": "unity_pt_battle_get_monster_animation_sample",
+      "route": "project-tools/call/battleidle/get-monster-animation-sample",
+      "category": "project-tools",
+      "source": "project",
+      "description": "Start, read, or stop a frame-driven monster Animator sample containing controller, state, clip, sprite, pooling, death, grounding, and mismatch data."
+    },
+    {
+      "name": "unity_pt_battle_get_role_equipment",
+      "route": "project-tools/call/battleidle/get-role-equipment",
+      "category": "project-tools",
+      "source": "project",
+      "description": "Return Origin and Runtime role weapon, armor, and accessory slots with item id, active state, and minimum level."
+    },
+    {
+      "name": "unity_pt_battle_get_runtime_ready_state",
+      "route": "project-tools/call/battleidle/get-runtime-ready-state",
+      "category": "project-tools",
+      "source": "project",
+      "description": "Return whether BattleIdle runtime managers and the selected map are ready for play mode debugging."
+    },
+    {
+      "name": "unity_pt_battle_inspect_monster_drop_table",
+      "route": "project-tools/call/battleidle/inspect-monster-drop-table",
+      "category": "project-tools",
+      "source": "project",
+      "description": "Inspect a BattleIdle monster drop table in a compact, non-instantiating form."
+    },
+    {
+      "name": "unity_pt_battle_inspect_world_drops",
+      "route": "project-tools/call/battleidle/inspect-world-drops",
+      "category": "project-tools",
+      "source": "project",
+      "description": "Inspect every runtime coin and item drop with active/dead state, carried item or gold, Root/Graphic/Sprite coordinates, GraphicYOffset, pickup radius, and animation state."
+    },
+    {
+      "name": "unity_pt_battle_play_mode_summary",
+      "route": "project-tools/call/battleidle/play-mode-summary",
+      "category": "project-tools",
+      "source": "project",
+      "description": "Return a BattleIdle play mode summary including maps, roles, monsters, boss, progress, UI, and screen size."
+    },
+    {
+      "name": "unity_pt_battle_set_role_equipment",
+      "route": "project-tools/call/battleidle/set-role-equipment",
+      "category": "project-tools",
+      "source": "project",
+      "description": "Equip by Item id, unequip a slot, or clear an Origin role equipment container and verify Origin to Runtime synchronization."
+    },
+    {
+      "name": "unity_pt_battle_simulate_monster_drop_table",
+      "route": "project-tools/call/battleidle/simulate-monster-drop-table",
+      "category": "project-tools",
+      "source": "project",
+      "description": "Simulate a BattleIdle monster drop table without creating runtime items."
+    },
+    {
+      "name": "unity_pt_battle_start_current_battle",
+      "route": "project-tools/call/battleidle/start-current-battle",
+      "category": "project-tools",
+      "source": "project",
+      "description": "Start the current BattleIdle level node on the selected map and return before/after battle state."
+    },
+    {
+      "name": "unity_pt_battle_start_game",
+      "route": "project-tools/call/battleidle/start-game",
+      "category": "project-tools",
+      "source": "project",
+      "description": "Start BattleIdle game flow in Play Mode and return before/after runtime summaries."
+    },
+    {
+      "name": "unity_pt_battle_update_monster_drop_table",
+      "route": "project-tools/call/battleidle/update-monster-drop-table",
+      "category": "project-tools",
+      "source": "project",
+      "description": "Atomically create or replace supported entries in a BattleIdle monster drop table. Chooser types: range and simple."
+    },
+    {
+      "name": "unity_pt_battle_upsert_item_content",
+      "route": "project-tools/call/battleidle/upsert-item-content",
+      "category": "project-tools",
+      "source": "project",
+      "description": "Batch create or update BattleIdle item content: ItemConfig, localization, optional dedicated icon, rarity/tags, prefab variant, equipment slot tag, BaseBoostFloat properties, registration, and reference readback."
+    },
+    {
+      "name": "unity_pt_battle_upsert_level_node",
+      "route": "project-tools/call/battleidle/upsert-level-node",
+      "category": "project-tools",
+      "source": "project",
+      "description": "Create or update one complete BattleIdle level node, monster set, rewards, boss/drop references, GamePrefab registration, and chapter registration."
+    },
+    {
+      "name": "unity_pt_battle_validate_game_content",
+      "route": "project-tools/call/battleidle/validate-game-content",
+      "category": "project-tools",
+      "source": "project",
+      "description": "Validate BattleIdle content globally: item prefabs/tags/localization, GamePrefab registration, levels/drop references, commands/actions/cooldowns, CommonPreset values, shared Attack Range wiring, prefab references/variants, and high-confidence UI hierarchy placement."
+    },
+    {
+      "name": "unity_project_tools_execute",
+      "route": "project-tools/execute",
+      "category": "project-tools",
+      "source": "plugin",
+      "description": "Execute a project-defined MCP tool after discovering it with project-tools/list and inspecting it with project-tools/get."
+    },
+    {
+      "name": "unity_project_tools_get",
+      "route": "project-tools/get",
+      "category": "project-tools",
+      "source": "plugin",
+      "description": "Get the complete descriptor and input schema for one project-defined MCP tool."
+    },
+    {
+      "name": "unity_project_tools_list",
+      "route": "project-tools/list",
+      "category": "project-tools",
+      "source": "plugin",
+      "description": "List compact project-defined MCP tool summaries without parameter schemas."
+    },
+    {
+      "name": "unity_queue_status",
+      "route": "queue/status",
+      "category": "queue",
+      "source": "plugin",
+      "description": "Read one owned queue ticket and its terminal result."
+    },
+    {
+      "name": "unity_serialized_object_get",
+      "route": "serialized-object/get",
+      "category": "serialized-object",
+      "source": "plugin",
+      "description": "Read serialized properties from a scene object, component, or asset via SerializedObject."
+    },
+    {
+      "name": "unity_serialized_object_set",
+      "route": "serialized-object/set",
+      "category": "serialized-object",
+      "source": "plugin",
+      "description": "Set one serialized property on a scene object, component, or asset via SerializedObject. SerializeReference values use '$managedReferenceType' when their concrete type cannot be inferred."
+    },
+    {
+      "name": "unity_testing_get_job",
+      "route": "testing/get-job",
+      "category": "testing",
+      "source": "plugin",
+      "description": "Poll a Unity Test Runner job, including progress, failures, and optional result details."
+    },
+    {
+      "name": "unity_testing_get_package_job",
+      "route": "testing/get-package-job",
+      "category": "testing",
+      "source": "plugin",
+      "description": "Poll a persistent package test workflow through testable enablement, test execution, and exact manifest restoration."
+    },
+    {
+      "name": "unity_testing_list_tests",
+      "route": "testing/list-tests",
+      "category": "testing",
+      "source": "plugin",
+      "description": "List discoverable Unity tests with mode and name filters."
+    },
+    {
+      "name": "unity_testing_run_package_tests",
+      "route": "testing/run-package-tests",
+      "category": "testing",
+      "source": "plugin",
+      "description": "Run tests from a Git package by temporarily enabling package testables, surviving domain reloads, and restoring manifest.json exactly."
+    },
+    {
+      "name": "unity_testing_run_tests",
+      "route": "testing/run-tests",
+      "category": "testing",
+      "source": "plugin",
+      "description": "Start a Unity Test Runner job and return a job ID for polling."
+    },
+    {
+      "name": "unity_texture_apply_sprite_preset",
+      "route": "texture/apply-sprite-preset",
+      "category": "texture",
+      "source": "plugin",
+      "description": "Apply high-level TextureImporter/Sprite settings such as pixel sprite preset, PPU, pivot, border, and reference settings."
+    },
+    {
+      "name": "unity_texture_find_duplicates",
+      "route": "texture/find-duplicates",
+      "category": "texture",
+      "source": "plugin",
+      "description": "Audit project image assets for duplicate file bytes or identical decoded RGBA pixels, even when PNG/JPEG encoding differs."
+    },
+    {
+      "name": "unity_texture_info",
+      "route": "texture/info",
+      "category": "texture",
+      "source": "plugin",
+      "description": "Inspect a texture asset, runtime format and memory, and its TextureImporter settings, including sprite PPU, pivot, and border when applicable."
+    },
+    {
+      "name": "unity_uitoolkit_assert_layout",
+      "route": "uitoolkit/assert-layout",
+      "category": "uitoolkit",
+      "source": "plugin",
+      "description": "Assert UI Toolkit runtime layout constraints such as edge touching, containment, and size."
+    },
+    {
+      "name": "unity_uitoolkit_asset_inspect",
+      "route": "uitoolkit/asset-inspect",
+      "category": "uitoolkit",
+      "source": "plugin",
+      "description": "Inspect UXML and USS assets for VisualElement names, types, unconditional class defaults, contextual selectors, and pseudo-state rules."
+    },
+    {
+      "name": "unity_uitoolkit_audit_uss_styles",
+      "route": "uitoolkit/audit-uss-styles",
+      "category": "uitoolkit",
+      "source": "plugin",
+      "description": "Audit USS selectors that serve exactly one authored UXML element and declarations that repeat the same winning value already supplied by the loaded PanelSettings theme or another loaded stylesheet."
+    },
+    {
+      "name": "unity_uitoolkit_audit_uxml_layout",
+      "route": "uitoolkit/audit-uxml-layout",
+      "category": "uitoolkit",
+      "source": "plugin",
+      "description": "Audit authored UXML for tooltip attributes, unconsumed element names, fully fixed flex partitions, fixed cross-axis content wrappers inside single-axis ScrollViews, layout-only manually centered containers, removable single-child centering wrappers, visually inert centered-label stretching or growth, repeated inline layout variants, and inline declarations already owned by loaded USS defaults."
+    },
+    {
+      "name": "unity_uitoolkit_authoring_transaction",
+      "route": "uitoolkit/authoring-transaction",
+      "category": "uitoolkit",
+      "source": "plugin",
+      "description": "Apply UXML and USS edits across multiple files with atomic file snapshots and rollback."
+    },
+    {
+      "name": "unity_uitoolkit_builder_preview",
+      "route": "uitoolkit/builder-preview",
+      "category": "uitoolkit",
+      "source": "plugin",
+      "description": "Open a UXML asset in UI Builder, expand an undersized canvas through Match Game View, wait for the preview to settle, and optionally capture the window."
+    },
+    {
+      "name": "unity_uitoolkit_capture_element",
+      "route": "uitoolkit/capture-element",
+      "category": "uitoolkit",
+      "source": "plugin",
+      "description": "Capture an Editor or runtime UI Toolkit element by taking its containing window screenshot and cropping to the element bounds."
+    },
+    {
+      "name": "unity_uitoolkit_compare_element",
+      "route": "uitoolkit/compare-element",
+      "category": "uitoolkit",
+      "source": "plugin",
+      "description": "Capture a UI Toolkit element and compare the cropped image against a reference image."
+    },
+    {
+      "name": "unity_uitoolkit_edit_uss",
+      "route": "uitoolkit/edit-uss",
+      "category": "uitoolkit",
+      "source": "plugin",
+      "description": "Add, remove, or update USS selectors and declarations, then synchronously reimport the asset."
+    },
+    {
+      "name": "unity_uitoolkit_edit_uxml",
+      "route": "uitoolkit/edit-uxml",
+      "category": "uitoolkit",
+      "source": "plugin",
+      "description": "Structurally edit UXML elements by VisualElementPath or authored name, then synchronously reimport the asset."
+    },
+    {
+      "name": "unity_uitoolkit_locate_element",
+      "route": "uitoolkit/locate-element",
+      "category": "uitoolkit",
+      "source": "plugin",
+      "description": "Locate an Editor or runtime UI Toolkit element and return its VisualElementPath, world bounds, crop rect, and context."
+    },
+    {
+      "name": "unity_uitoolkit_refresh",
+      "route": "uitoolkit/refresh",
+      "category": "uitoolkit",
+      "source": "plugin",
+      "description": "Refresh UI Toolkit assets, repaint runtime and Editor panels, and return after stable Editor frames."
+    },
+    {
+      "name": "unity_uitoolkit_runtime_documents",
+      "route": "uitoolkit/runtime-documents",
+      "category": "uitoolkit",
+      "source": "plugin",
+      "description": "List runtime UIDocuments with root visual element metadata."
+    },
+    {
+      "name": "unity_uitoolkit_runtime_query",
+      "route": "uitoolkit/runtime-query",
+      "category": "uitoolkit",
+      "source": "plugin",
+      "description": "Query runtime UIDocument UI Toolkit elements by VisualElementPath, name, class, type, or text."
+    },
+    {
+      "name": "unity_uitoolkit_runtime_repaint",
+      "route": "uitoolkit/runtime-repaint",
+      "category": "uitoolkit",
+      "source": "plugin",
+      "description": "Trigger repaint for a runtime UIDocument or one of its elements."
+    },
+    {
+      "name": "unity_uitoolkit_runtime_style",
+      "route": "uitoolkit/runtime-style",
+      "category": "uitoolkit",
+      "source": "plugin",
+      "description": "Read inline, resolved, and background style data for a runtime UI Toolkit element."
+    },
+    {
+      "name": "unity_uitoolkit_runtime_tree",
+      "route": "uitoolkit/runtime-tree",
+      "category": "uitoolkit",
+      "source": "plugin",
+      "description": "Read a runtime UIDocument UI Toolkit visual tree."
+    },
+    {
+      "name": "unity_wait_editor_idle",
+      "route": "wait/editor-idle",
+      "category": "wait",
+      "source": "plugin",
+      "description": "Wait until the Unity Editor is idle after compilation, domain reload, package refresh, or asset import."
+    }
+  ]
+}

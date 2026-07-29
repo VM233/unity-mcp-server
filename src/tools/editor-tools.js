@@ -368,6 +368,7 @@ export const editorTools = [
         maxResultItems: { type: "number", description: "Maximum serialized collection/object entries (default: 200, capped at 2000)." },
         maxResultDepth: { type: "number", description: "Maximum serialized result depth (default: 8, capped at 16)." },
         maxResultStringLength: { type: "number", description: "Maximum characters per returned string (default: 20000, capped at 200000)." },
+        includeStackTrace: { type: "boolean", description: "Include a full managed stack trace when executed code throws. Defaults to false." },
       },
       required: ["code"],
     },
@@ -4165,3 +4166,73 @@ export const editorTools = [
     handler: async (params) => JSON.stringify(await bridge.listSpriteAtlases(params)),
   },
 ];
+
+function humanizeSchemaName(name) {
+  return String(name)
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/[_-]+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+function inferSchemaDescription(name, parentName = "") {
+  const axisNames = new Set(["x", "y", "z", "w"]);
+  const colorChannels = new Set(["r", "g", "b", "a"]);
+  if (axisNames.has(name) && parentName) {
+    return `${name.toUpperCase()} component of ${humanizeSchemaName(parentName)}.`;
+  }
+  if (colorChannels.has(name) && parentName) {
+    return `${name.toUpperCase()} channel of ${humanizeSchemaName(parentName)}.`;
+  }
+
+  const knownDescriptions = {
+    position: "Position vector.",
+    rotation: "Euler rotation vector in degrees.",
+    scale: "Scale vector.",
+    color: "RGBA color.",
+    ambientColor: "Ambient RGBA color.",
+    fogColor: "Fog RGBA color.",
+    dryColor: "Dry-detail RGBA color.",
+    healthyColor: "Healthy-detail RGBA color.",
+    anchoredPosition: "RectTransform anchored position.",
+    sizeDelta: "RectTransform size delta.",
+    origin: "World-space ray origin.",
+    direction: "World-space ray direction.",
+    center: "World-space query center.",
+    halfExtents: "Box half-extents.",
+    gravity: "World-space gravity vector.",
+    pivot: "Scene View pivot.",
+    lookAt: "World-space look-at point.",
+    startPosition: "Starting world-space position.",
+    area: "Placement area bounds.",
+    positions: "Explicit placement positions.",
+    motions: "Blend-tree child motions.",
+    clipPath: "AnimationClip asset path.",
+    threshold: "Blend-tree threshold.",
+    timeScale: "Child motion playback speed multiplier.",
+  };
+  return knownDescriptions[name] || `${humanizeSchemaName(name)} value.`;
+}
+
+function completeSchemaDescriptions(schema, parentName = "") {
+  if (!schema || typeof schema !== "object" || Array.isArray(schema)) return;
+
+  for (const [name, propertySchema] of Object.entries(schema.properties || {})) {
+    if (!propertySchema || typeof propertySchema !== "object" || Array.isArray(propertySchema)) continue;
+    if (!String(propertySchema.description || "").trim()) {
+      propertySchema.description = inferSchemaDescription(name, parentName);
+    }
+    completeSchemaDescriptions(propertySchema, name);
+  }
+
+  if (schema.items) completeSchemaDescriptions(schema.items, parentName);
+  for (const keyword of ["allOf", "anyOf", "oneOf"]) {
+    for (const variant of schema[keyword] || []) {
+      completeSchemaDescriptions(variant, parentName);
+    }
+  }
+}
+
+for (const tool of editorTools) {
+  completeSchemaDescriptions(tool.inputSchema);
+}

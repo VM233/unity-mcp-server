@@ -15,13 +15,20 @@ export function injectEditorBindingSchema(name, inputSchema) {
   const baseSchema = inputSchema || { type: "object", properties: {} };
   const properties = { ...(baseSchema.properties || {}) };
   properties.port ??= {
-    type: "number",
-    description: "Target Editor port.",
+    type: "integer",
+    minimum: 1,
+    maximum: 65535,
+    description: "Target Unity Editor bridge port.",
   };
   properties.expectedProjectPath ??= {
     type: "string",
     description:
       "Expected Unity project root path. Also resolves the target instance when port is omitted; the request is rejected before mutation if the path does not match.",
+  };
+  properties.expectedProjectName ??= {
+    type: "string",
+    description:
+      "Optional expected Unity project name used with expectedProjectPath as an additional target-binding check.",
   };
 
   return {

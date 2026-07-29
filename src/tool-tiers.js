@@ -1,12 +1,12 @@
 // AnkleBreaker Unity MCP - two-tier tool system
 // Reduces the exposed tool count to avoid overwhelming MCP clients.
 //
-// Core tools: Always exposed as individual MCP tools (~60 tools)
-// Advanced tools: Fallback access through unity_advanced_tool (200+ tools)
+// Core tools: Always exposed as a deliberately small set of individual MCP tools.
+// Advanced tools: Discoverable fallback access through unity_advanced_tool.
 //
 // Why: MCP clients like Claude Cowork silently fail when a server
-// exposes too many tools (our 268 tools / 125KB response was ~5x
-// larger than working servers). This keeps us under the safe limit.
+// exposes too many tools. The generated manifest and catalog tests keep the
+// default surface bounded while preserving lazy access to every route.
 //
 // Lazy loading: Advanced tools support dynamic dispatch. If a tool
 // isn't in the cached map, callers can pass a raw Unity route directly
@@ -24,13 +24,18 @@ import {
   sendCommand,
 } from "./unity-editor-bridge.js";
 import { staticFirstClassPluginTools } from "./tools/plugin-first-class-tools.js";
+import { STATIC_FIRST_CLASS_PLUGIN_ROUTES } from "./plugin-tool-policy.js";
+import { logDebug } from "./logger.js";
+import { serializeToolError } from "./tool-response.js";
 
-const PLUGIN_TOOLS_CACHE_SCHEMA_VERSION = 2;
+const PLUGIN_TOOLS_CACHE_SCHEMA_VERSION = 3;
 const PLUGIN_TOOLS_CACHE_FILE = join(
   dirname(CONFIG.instanceRegistryPath),
   "plugin-tools-metadata-cache-v3.json"
 );
 const PLUGIN_TOOLS_LIVE_REFRESH_INTERVAL_MS = 10_000;
+const STATIC_FIRST_CLASS_PLUGIN_ROUTE_SET =
+  new Set(STATIC_FIRST_CLASS_PLUGIN_ROUTES);
 
 let livePluginToolsCache = null;
 let livePluginToolsFetchedAt = 0;
@@ -78,6 +83,13 @@ const ROUTE_OVERRIDES = {
   unity_mppm_deactivate_player: "mppm/deactivate-player",
 };
 
+const TOOL_NAME_OVERRIDES = {
+  "build/start": "unity_build",
+  "compilation/errors": "unity_get_compilation_errors",
+  "editor/play-mode": "unity_play_mode",
+  "queue/status": "unity_queue_ticket_status",
+};
+
 const ROUTE_CATEGORY_PREFIXES = [
   ["prefab_asset", "prefab-asset"],
   ["serialized_object", "serialized-object"],
@@ -114,6 +126,7 @@ function toolNameToRoute(toolName) {
 }
 
 function routeToToolName(route) {
+  if (TOOL_NAME_OVERRIDES[route]) return TOOL_NAME_OVERRIDES[route];
   return "unity_" + route.replace(/\//g, "_").replace(/-/g, "_");
 }
 
@@ -190,8 +203,9 @@ async function fetchPluginToolsLive(firstClassOnly = true, {
       }
       return tools;
     }
-  } catch (_) {
+  } catch (error) {
     // The live plugin may be temporarily unavailable during a domain reload.
+    logDebug(`[MCP] Live Unity tool discovery unavailable: ${error?.message || error}`);
   }
 
   return [];
@@ -203,9 +217,10 @@ export function pluginToolsFingerprint(tools) {
   return JSON.stringify(
     tools
       .filter((tool) =>
-        tool?.firstClass === true ||
-        tool?.preferred === true ||
-        tool?.exposure === "first-class")
+        STATIC_FIRST_CLASS_PLUGIN_ROUTE_SET.has(tool?.route) &&
+        (tool?.firstClass === true ||
+         tool?.preferred === true ||
+         tool?.exposure === "first-class"))
       .map((tool) => ({
         toolName: tool?.toolName || "",
         route: tool?.route || "",
@@ -250,18 +265,6 @@ async function fetchPluginToolsForToolList() {
 async function fetchPluginToolsForCatalog({ category, includeSchema = false } = {}) {
   return fetchPluginToolsLive(false, { category, includeSchema, cache: false })
     .catch(() => []);
-}
-
-function isFirstClassProjectTool(tool) {
-  return (
-    tool &&
-    !isFallbackTool(tool) &&
-    typeof tool.toolName === "string" &&
-    typeof tool.projectToolName === "string" &&
-    tool.projectToolName.length > 0 &&
-    typeof tool.route === "string" &&
-    tool.route.startsWith("project-tools/call/")
-  );
 }
 
 function isFallbackTool(tool) {
@@ -332,7 +335,8 @@ export async function fetchFirstClassPluginTools() {
   }
 
   for (const tool of pluginTools) {
-    if (!isFirstClassProjectTool(tool) && !isFirstClassRouteTool(tool)) continue;
+    if (!STATIC_FIRST_CLASS_PLUGIN_ROUTE_SET.has(tool?.route)) continue;
+    if (!isFirstClassRouteTool(tool)) continue;
     if (!tool.toolName) continue;
     candidatesByName.set(tool.toolName, tool);
   }
@@ -377,7 +381,6 @@ const CORE_TOOLS = new Set([
   "unity_scene_info",
   "unity_scene_open",
   "unity_scene_save",
-  "unity_scene_new",
   "unity_scene_hierarchy",
   "unity_scene_stats",
 
@@ -386,49 +389,32 @@ const CORE_TOOLS = new Set([
   "unity_gameobject_delete",
   "unity_gameobject_info",
   "unity_gameobject_set_transform",
-  "unity_gameobject_duplicate",
-  "unity_gameobject_set_active",
-  "unity_gameobject_reparent",
 
   // Component management
   "unity_component_add",
   "unity_component_remove",
   "unity_component_get_properties",
   "unity_component_set_property",
-  "unity_component_get_referenceable",
 
   // Asset management
   "unity_asset_list",
   "unity_asset_import",
   "unity_asset_refresh",
   "unity_asset_delete",
-  "unity_asset_create_prefab",
 
-  // Script management
-  "unity_script_create",
-  "unity_script_read",
-  "unity_script_update",
+  // Generic scripting escape hatch
   "unity_execute_code",
 
   // Build & play
+  "unity_build",
   "unity_play_mode",
 
   // Console & Compilation
   "unity_console_clear",
   "unity_get_compilation_errors",
 
-  // Multi-agent queue control
+  // Multi-agent queue diagnostics
   "unity_queue_info",
-  "unity_queue_ticket_status",
-  "unity_queue_cancel",
-
-  // Editor actions
-  "unity_execute_menu_item",
-  // Selection & search
-  "unity_selection_get",
-  "unity_selection_set",
-  "unity_search_by_component",
-  "unity_search_by_name",
 
   // Screenshots & capture
   "unity_screenshot_game",
@@ -437,10 +423,6 @@ const CORE_TOOLS = new Set([
   // Prefab basics
   "unity_prefab_info",
 
-  // Packages
-  "unity_packages_list",
-  "unity_packages_update_git",
-  "unity_packages_lint_metas",
 ]);
 
 /**
@@ -531,7 +513,7 @@ export function splitToolTiers(allEditorTools) {
       let dynamicCount = 0;
 
       for (const tool of pluginTools) {
-        if (isFirstClassProjectTool(tool) || isFirstClassRouteTool(tool)) continue;
+        if (STATIC_FIRST_CLASS_PLUGIN_ROUTE_SET.has(tool?.route)) continue;
 
         const route = tool.route;
         const toolName = tool.toolName || (route ? routeToToolName(route) : null);
@@ -577,12 +559,25 @@ export function splitToolTiers(allEditorTools) {
           });
 
         const allTools = [
-          ...matching.map((t) => ({ name: t.name, description: sanitizeToolMetadata(t.description) })),
+          ...matching.map((tool) => {
+            const result = {
+              name: tool.name,
+              description: sanitizeToolMetadata(tool.description),
+            };
+            if (includeSchema) {
+              result.inputSchema = sanitizeToolMetadata(tool.inputSchema);
+            }
+            return result;
+          }),
           ...dynamicTools,
         ];
 
         if (allTools.length === 0) {
-          return `No advanced tools found for category "${category}". Available categories: ${Object.keys(mergedCategories).join(", ")}`;
+          return serializeToolError(
+            "advanced_category_not_found",
+            `No advanced tools were found for category "${category}".`,
+            { availableCategories: Object.keys(mergedCategories).sort() }
+          );
         }
         const page = allTools.slice(offset, offset + limit);
         const nextOffset = offset + page.length;
@@ -607,9 +602,7 @@ export function splitToolTiers(allEditorTools) {
           dynamicTools: dynamicCount,
           categories: categorySummaries,
           hint: "Call again with category to list paginated tools and optional schemas.",
-        },
-        null,
-        2
+        }
       );
     },
   };
@@ -638,16 +631,23 @@ export function splitToolTiers(allEditorTools) {
     },
     handler: async ({ tool, params } = {}) => {
       if (!tool) {
-        return "Error: 'tool' parameter is required. Use unity_list_advanced_tools to see available tools.";
+        return serializeToolError(
+          "advanced_tool_required",
+          "tool is required. Use unity_list_advanced_tools to discover fallback tools."
+        );
       }
 
       if (isUnityRoute(tool)) {
         try {
-          console.error(`[MCP] Calling raw Unity route "${tool}" via fallback generic entry`);
+          logDebug(`[MCP] Calling raw Unity route "${tool}" via fallback generic entry`);
           const result = await sendCommand(tool, params || {});
           return JSON.stringify(result);
         } catch (err) {
-          return `Error executing route "${tool}": ${err.message}`;
+          return serializeToolError(
+            "advanced_route_failed",
+            `Failed to execute route "${tool}": ${err.message}`,
+            { route: tool }
+          );
         }
       }
 
@@ -660,11 +660,15 @@ export function splitToolTiers(allEditorTools) {
       const dynamicTool = pluginTools.find((item) => item.toolName === tool);
       if (dynamicTool?.route) {
         try {
-          console.error(`[MCP] Lazy-loading tool "${tool}" via plugin route "${dynamicTool.route}"`);
+          logDebug(`[MCP] Lazy-loading tool "${tool}" via plugin route "${dynamicTool.route}"`);
           const result = await sendCommand(dynamicTool.route, params || {});
           return JSON.stringify(result);
         } catch (err) {
-          return `Error executing "${tool}" (lazy route: ${dynamicTool.route}): ${err.message}`;
+          return serializeToolError(
+            "advanced_tool_failed",
+            `Failed to execute "${tool}": ${err.message}`,
+            { tool, route: dynamicTool.route }
+          );
         }
       }
 
@@ -675,15 +679,23 @@ export function splitToolTiers(allEditorTools) {
       if (route) {
         try {
           // Log to stderr, not stdout - stdout carries the MCP JSON-RPC transport.
-          console.error(`[MCP] Lazy-loading tool "${tool}" via route "${route}"`);
+          logDebug(`[MCP] Lazy-loading tool "${tool}" via route "${route}"`);
           const result = await sendCommand(route, params || {});
           return JSON.stringify(result);
         } catch (err) {
-          return `Error executing "${tool}" (lazy route: ${route}): ${err.message}`;
+          return serializeToolError(
+            "advanced_tool_failed",
+            `Failed to execute "${tool}": ${err.message}`,
+            { tool, route }
+          );
         }
       }
 
-      return `Error: Unknown tool "${tool}". Use unity_list_advanced_tools to see available tools.`;
+      return serializeToolError(
+        "advanced_tool_not_found",
+        `Unknown fallback tool "${tool}". Use unity_list_advanced_tools to discover available tools.`,
+        { tool }
+      );
     },
   };
 

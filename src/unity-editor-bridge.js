@@ -8,6 +8,7 @@ import {
   getRequestExpectedProjectName,
   getRequestExpectedProjectPath,
 } from "./request-context.js";
+import { logDebug, logWarn } from "./logger.js";
 
 // Dynamic bridge URL â€" resolved per-call based on selected instance
 function getBridgeUrl() {
@@ -116,22 +117,30 @@ async function submitToQueue(apiPath, bodyString, requestId) {
     }),
     body: JSON.stringify({
       apiPath,
-      method: "POST",
       body: bodyString,
-      agentId: getRequestAgentId(),
-      requestId,
     }),
     signal: AbortSignal.timeout(CONFIG.editorBridgeTimeout),
   });
 
   if (!response.ok) {
-    const text = await response.text();
-    const error = new Error(`HTTP ${response.status}: ${text}`);
+    const payload = await readHttpErrorPayload(response);
+    const error = new Error(payload.error);
     error.status = response.status;
+    error.payload = payload;
     throw error;
   }
 
   const data = await response.json();
+  if (!Number.isSafeInteger(data?.ticketId) || data.ticketId < 1) {
+    const error = new Error("Unity queue submission did not return a valid ticketId.");
+    error.payload = {
+      success: false,
+      errorCode: "invalid_queue_ticket",
+      retryable: false,
+      error: error.message,
+    };
+    throw error;
+  }
   return data; // { ticketId, queuePosition, ... }
 }
 
@@ -144,12 +153,16 @@ async function fetchQueueStatusRaw(ticketId, timeoutMs = 10000) {
   });
 
   if (!response.ok) {
-    const text = await response.text();
+    const payload = await readHttpErrorPayload(response);
     return {
       success: false,
       statusCode: response.status,
-      retryable: isTransientError(null, response),
-      error: `HTTP ${response.status}: ${text}`,
+      retryable: typeof payload.retryable === "boolean"
+        ? payload.retryable
+        : isTransientError(null, response),
+      error: payload.error,
+      errorCode: payload.errorCode,
+      data: payload,
     };
   }
 
@@ -168,17 +181,52 @@ async function fetchQueueInfoRaw(timeoutMs = 5000) {
   });
 
   if (!response.ok) {
-    const text = await response.text();
+    const payload = await readHttpErrorPayload(response);
     return {
       success: false,
       statusCode: response.status,
-      error: `HTTP ${response.status}: ${text}`,
+      retryable: typeof payload.retryable === "boolean"
+        ? payload.retryable
+        : isTransientError(null, response),
+      error: payload.error,
+      errorCode: payload.errorCode,
+      data: payload,
     };
   }
 
   return {
     success: true,
     data: await response.json(),
+  };
+}
+
+async function readHttpErrorPayload(response) {
+  const text = await response.text();
+  let payload = null;
+  try {
+    payload = JSON.parse(text);
+  } catch {
+    payload = null;
+  }
+
+  if (payload && typeof payload === "object" && !Array.isArray(payload)) {
+    return {
+      ...payload,
+      success: false,
+      errorCode: payload.errorCode || `http_${response.status}`,
+      error: payload.error || payload.message || response.statusText ||
+        `Unity bridge returned HTTP ${response.status}.`,
+    };
+  }
+
+  const conciseBody = text.trim().slice(0, 500);
+  return {
+    success: false,
+    errorCode: `http_${response.status}`,
+    transportOnly: true,
+    error: conciseBody
+      ? `Unity bridge returned HTTP ${response.status}: ${conciseBody}`
+      : `Unity bridge returned HTTP ${response.status} ${response.statusText}`.trim(),
   };
 }
 
@@ -284,7 +332,6 @@ export function normalizeEditorCommandResult(data) {
         ...current,
         success: false,
         error: message,
-        message,
         errorCode: current.errorCode || "editor_command_failed",
         retryable: Boolean(current.retryable),
       };
@@ -352,6 +399,9 @@ export function getQueueSubmitReconnectBudgetMs(command, params = {}, error = nu
 }
 
 export function isTransientQueueSubmitError(error) {
+  if (error?.payload && error.payload.retryable === false) {
+    return false;
+  }
   const status = Number(error?.status);
   return status === 404 || status === 500 || status === 503 ||
     isTransientError(error, null);
@@ -458,9 +508,11 @@ export async function buildQueuePollTimeoutResult(ticketId, command, timeoutMs, 
 
   return {
     success: false,
-    retryable: true,
+    retryable: false,
     errorCode: "queue_poll_timeout",
-    error: `Queue polling timed out after ${timeoutMs}ms for ticket ${ticketId}`,
+    error:
+      `Queue polling timed out after ${timeoutMs}ms for ticket ${ticketId}. ` +
+      "Inspect the existing ticket before retrying the command.",
     ticketId,
     command,
     pollTimedOut: true,
@@ -468,8 +520,49 @@ export async function buildQueuePollTimeoutResult(ticketId, command, timeoutMs, 
     elapsedMs,
     wallElapsedMs: timing.wallElapsedMs ?? elapsedMs,
     reloadRecoveryElapsedMs: timing.reloadRecoveryElapsedMs ?? 0,
-    finalTicketStatus: finalStatus,
-    finalQueueInfo: queueInfo,
+    lastKnownTicket: summarizeFinalTicketStatus(finalStatus),
+    queueState: summarizeQueueState(queueInfo),
+    nextTool: "unity_queue_ticket_status",
+  };
+}
+
+function summarizeFinalTicketStatus(statusResult) {
+  if (!statusResult || typeof statusResult !== "object") return null;
+  if (!statusResult.success) {
+    return {
+      reachable: false,
+      statusCode: statusResult.statusCode,
+      errorCode: statusResult.errorCode,
+      error: statusResult.error,
+    };
+  }
+
+  const data = statusResult.data || {};
+  return {
+    reachable: true,
+    ticketId: data.ticketId,
+    status: data.status,
+    actionName: data.actionName,
+  };
+}
+
+function summarizeQueueState(queueResult) {
+  if (!queueResult || typeof queueResult !== "object") return null;
+  if (!queueResult.success) {
+    return {
+      reachable: false,
+      statusCode: queueResult.statusCode,
+      errorCode: queueResult.errorCode,
+      error: queueResult.error,
+    };
+  }
+
+  const data = queueResult.data || {};
+  return {
+    reachable: true,
+    totalQueued: data.totalQueued,
+    executingCount: data.executingCount,
+    activeAgents: data.activeAgents,
   };
 }
 
@@ -555,7 +648,7 @@ export async function pollQueueStatus(ticketId, command, params = {}) {
             POLL_TRANSIENT_RETRY_BASE_MS * Math.pow(1.5, transientRetryCount++),
             maxIntervalMs
           ));
-          console.error(
+          logWarn(
             `[MCP Bridge] Queue poll ${statusResult.error} for ticket ${ticketId}; retrying in ${delay}ms...`
           );
           await sleep(delay);
@@ -576,13 +669,28 @@ export async function pollQueueStatus(ticketId, command, params = {}) {
           return {
             success: false,
             retryable: true,
+            errorCode: "queue_ticket_lost_after_reload",
             error: `Queue ticket ${ticketId} was lost after a Unity reload: ${statusResult.error}`,
+            ticketId,
+            command,
+          };
+        }
+
+        if (statusResult.data && statusResult.data.success === false) {
+          return {
+            ...statusResult.data,
+            ticketId,
+            command,
           };
         }
 
         return {
           success: false,
-          error: `Failed to poll queue status: ${statusResult.error}`,
+          errorCode: statusResult.errorCode || "queue_status_failed",
+          retryable: Boolean(statusResult.retryable),
+          error: statusResult.error,
+          ticketId,
+          command,
         };
       }
 
@@ -612,7 +720,7 @@ export async function pollQueueStatus(ticketId, command, params = {}) {
           POLL_TRANSIENT_RETRY_BASE_MS * Math.pow(1.5, transientRetryCount++),
           maxIntervalMs
         ));
-        console.error(
+        logWarn(
           `[MCP Bridge] Queue poll transient error for ticket ${ticketId}: ${error.message}; retrying in ${delay}ms...`
         );
         await sleep(delay);
@@ -621,7 +729,11 @@ export async function pollQueueStatus(ticketId, command, params = {}) {
 
       return {
         success: false,
+        errorCode: "queue_poll_failed",
+        retryable: false,
         error: `Error polling queue: ${error.message}`,
+        ticketId,
+        command,
       };
     }
   }
@@ -635,7 +747,6 @@ function normalizeFailedQueueStatus(statusData) {
       ...result,
       success: false,
       error: message,
-      message,
       errorCode: result.errorCode || statusData.errorCode || "queue_processing_failed",
       retryable: Boolean(result.retryable || statusData.retryable),
       ticketId: statusData.ticketId,
@@ -648,7 +759,6 @@ function normalizeFailedQueueStatus(statusData) {
   return {
     success: false,
     error: message,
-    message,
     errorCode: statusData?.errorCode || "queue_processing_failed",
     retryable: Boolean(statusData?.retryable),
     ticketId: statusData?.ticketId,
@@ -679,7 +789,7 @@ export async function sendCommand(command, params = {}) {
 
       // Log to stderr, not stdout — stdout is reserved for the MCP JSON-RPC
       // transport and any non-JSON data there closes strict clients (e.g. Codex).
-      console.error(`[MCP Bridge] Submitted ${command} to queue, ticket: ${ticketId}`);
+      logDebug(`[MCP Bridge] Submitted ${command} to queue, ticket: ${ticketId}`);
 
       const result = await pollQueueStatus(ticketId, command, params);
       if (!result.success) {
@@ -692,7 +802,7 @@ export async function sendCommand(command, params = {}) {
         lostTicketReplayCount++;
         const delay = getTransientRetryDelayMs(
           command, params, startedAt, lostTicketReplayCount - 1);
-        console.error(
+        logWarn(
           `[MCP Bridge] Replaying "${command}" after lost queue ticket ${ticketId} in ${delay}ms (retry ${lostTicketReplayCount})...`
         );
         await sleep(delay);
@@ -713,12 +823,15 @@ export async function sendCommand(command, params = {}) {
         const delay = getQueueSubmitRetryDelayMs(
           command, params, queueSubmitStartedAt, queueSubmitRetryCount,
           submitError);
-        console.error(
+        logWarn(
           `[MCP Bridge] Error submitting to queue: ${submitError.message}, retrying in ${delay}ms (retry ${queueSubmitRetryCount + 1})...`
         );
         await sleep(delay);
         queueSubmitRetryCount++;
         continue;
+      }
+      if (submitError?.payload && submitError.payload.transportOnly !== true) {
+        return normalizeEditorCommandResult(submitError.payload);
       }
       break;
     }
@@ -748,8 +861,7 @@ export async function getQueueInfo() {
     });
 
     if (!response.ok) {
-      const text = await response.text();
-      return { success: false, error: `HTTP ${response.status}: ${text}` };
+      return normalizeEditorCommandResult(await readHttpErrorPayload(response));
     }
 
     const data = await response.json();
@@ -776,8 +888,7 @@ export async function getTicketStatus(ticketId) {
     });
 
     if (!response.ok) {
-      const text = await response.text();
-      return { success: false, error: `HTTP ${response.status}: ${text}` };
+      return normalizeEditorCommandResult(await readHttpErrorPayload(response));
     }
 
     const data = await response.json();
@@ -799,8 +910,10 @@ export async function cancelTicket(ticketId) {
       body: JSON.stringify({ ticketId }),
       signal: AbortSignal.timeout(CONFIG.editorBridgeTimeout),
     });
-    const data = await response.json();
-    return response.ok ? { success: true, data } : { success: false, data };
+    if (!response.ok) {
+      return normalizeEditorCommandResult(await readHttpErrorPayload(response));
+    }
+    return { success: true, data: await response.json() };
   } catch (error) {
     return { success: false, error: `Failed to cancel ticket: ${error.message}` };
   }

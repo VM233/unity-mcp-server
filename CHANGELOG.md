@@ -2,6 +2,20 @@
 
 All notable changes to this package will be documented in this file.
 
+## [4.1.0] - 2026-07-30
+
+### Changed
+- Bound the direct plugin catalog to a release-managed set of common routes and keep specialized or project-defined routes behind the advanced and three-stage discovery contracts.
+- Replace five overlapping scene-search tools with one paginated `unity_search_scene` surface while preserving compatibility routes lazily.
+- Remove repeated instance/context blocks and successful bridge envelopes from ordinary tool replies; large replies now produce one structured, byte-accurate error.
+- Return stable structured errors for discovery, selection, advanced dispatch, bridge transport, and queue control without leaking implementation stacks.
+- Validate schemas, array item contracts, numeric configuration, ports, and project binding metadata before publishing a tool.
+
+### Fixed
+- Re-discover an Editor in the same call after a stale persisted selection is invalidated.
+- Keep queue polling timeouts non-replayable for mutations and point callers to the existing ticket instead of risking duplicate work.
+- Generate the MCP manifest version and tool list from package sources so release metadata cannot drift.
+
 ## [4.0.0] - 2026-07-30
 
 ### Changed

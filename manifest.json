@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "unity-mcp",
   "display_name": "AnkleBreaker Unity MCP",
-  "version": "4.0.0",
+  "version": "4.1.0",
   "description": "Multi-agent MCP server for Unity Editor - exposes core and plugin-declared first-class tools, with fallback advanced routes for rare or stale metadata cases.",
   "long_description": "AnkleBreaker Unity MCP connects Claude to your Unity Editor with a direct core tool surface, plugin-declared first-class tools, and fallback advanced routes for rare metadata cases. Built for Claude Cowork's multi-agent architecture, where multiple AI agents collaborate on the same Unity project in parallel.\n\n**Key features:**\n- Core tools and plugin-declared first-class tools are exposed directly with visible schemas\n- Fallback advanced route remains available for rare routes without concrete tool metadata\n- Multi-instance support: run multiple Unity Editors simultaneously, auto-port selection (7890-7899), shared instance registry\n- ParrelSync clone detection for multiplayer development workflows\n- Multi-agent async queue with fair round-robin scheduling\n- Read batching (up to 5/frame) and write serialization (1/frame)\n- Agent session tracking and action logging\n- Project Context auto-injection for project-aware AI assistance\n\n**Requires the companion Unity Editor plugin:** Install via Unity Package Manager -> Add package from git URL -> `https://github.com/VM233/VMUnityMCP.git`\n\nAfter installing the plugin, open Window -> VM Unity MCP in Unity and verify the bridge is running.",
   "author": {
@@ -84,143 +84,258 @@
   },
   "tools_generated": true,
   "tools": [
-    { "name": "unity_list_instances", "description": "List all running Unity Editor instances with project info" },
-    { "name": "unity_select_instance", "description": "Select which Unity Editor instance to target" },
-    { "name": "unity_hub_list_editors", "description": "List installed Unity Editor versions" },
-    { "name": "unity_hub_install_editor", "description": "Install a Unity Editor version via Unity Hub" },
-    { "name": "unity_hub_available_releases", "description": "List Unity versions available for download" },
-    { "name": "unity_hub_install_modules", "description": "Install platform modules for a Unity version" },
-    { "name": "unity_hub_get_install_path", "description": "Get default Unity install path" },
-    { "name": "unity_hub_set_install_path", "description": "Set default Unity install path" },
-    { "name": "unity_editor_ping", "description": "Ping the Unity Editor to check connection status" },
-    { "name": "unity_editor_state", "description": "Get current Unity Editor state (play mode, scene, project)" },
-    { "name": "unity_project_info", "description": "Get project information (name, version, packages, settings)" },
-    { "name": "unity_scene_info", "description": "Get information about the current scene" },
-    { "name": "unity_scene_hierarchy", "description": "Get the full scene hierarchy tree" },
-    { "name": "unity_scene_open", "description": "Open a scene by asset path" },
-    { "name": "unity_scene_save", "description": "Save the current scene" },
-    { "name": "unity_scene_new", "description": "Create a new empty scene" },
-    { "name": "unity_scene_stats", "description": "Get comprehensive scene statistics" },
-    { "name": "unity_gameobject_create", "description": "Create a new GameObject in the scene" },
-    { "name": "unity_gameobject_delete", "description": "Delete a GameObject from the scene" },
-    { "name": "unity_gameobject_info", "description": "Get detailed info about a GameObject" },
-    { "name": "unity_gameobject_set_transform", "description": "Set position, rotation, scale of a GameObject" },
-    { "name": "unity_gameobject_duplicate", "description": "Duplicate a GameObject with all children" },
-    { "name": "unity_gameobject_set_active", "description": "Set a GameObject active or inactive" },
-    { "name": "unity_gameobject_reparent", "description": "Move a GameObject under a new parent" },
-    { "name": "unity_component_add", "description": "Add a component to a GameObject" },
-    { "name": "unity_component_remove", "description": "Remove a component from a GameObject" },
-    { "name": "unity_component_get_properties", "description": "Get serialized properties of a component" },
-    { "name": "unity_component_set_property", "description": "Set a property value on a component" },
-    { "name": "unity_component_set_reference", "description": "Assign one or more component object references with configurable execution" },
-    { "name": "unity_component_get_referenceable", "description": "Discover assignable objects for a property" },
-    { "name": "unity_asset_list", "description": "List assets in the project" },
-    { "name": "unity_asset_import", "description": "Import a file as an asset" },
-    { "name": "unity_asset_refresh", "description": "Refresh AssetDatabase or import specific asset paths" },
-    { "name": "unity_asset_get_refresh_job", "description": "Poll a reload-safe AssetDatabase refresh job" },
-    { "name": "unity_asset_delete", "description": "Delete an asset from the project" },
-    { "name": "unity_asset_create_prefab", "description": "Create a prefab from a GameObject" },
-    { "name": "unity_script_create", "description": "Create a new C# script" },
-    { "name": "unity_script_read", "description": "Read a C# script's contents" },
-    { "name": "unity_script_update", "description": "Update a C# script's contents" },
-    { "name": "unity_execute_code", "description": "Execute C# code in the Unity Editor (Roslyn)" },
-    { "name": "unity_material_create", "description": "Create a new material" },
-    { "name": "unity_renderer_set_material", "description": "Assign a material to a renderer" },
-    { "name": "unity_build", "description": "Build the project for a target platform" },
-    { "name": "unity_play_mode", "description": "Control play mode (play, pause, stop)" },
-    { "name": "unity_console_clear", "description": "Clear the Unity console" },
-    { "name": "unity_execute_menu_item", "description": "Execute a Unity Editor menu command" },
-    { "name": "unity_undo", "description": "Undo the last operation" },
-    { "name": "unity_redo", "description": "Redo the last undone operation" },
-    { "name": "unity_undo_history", "description": "Get current undo group info" },
-    { "name": "unity_selection_get", "description": "Get currently selected GameObjects" },
-    { "name": "unity_selection_set", "description": "Set editor selection" },
-    { "name": "unity_selection_focus_scene_view", "description": "Frame a GameObject in Scene View" },
-    { "name": "unity_search_by_component", "description": "Search scene by component type" },
-    { "name": "unity_search_by_tag", "description": "Search scene by tag" },
-    { "name": "unity_search_by_layer", "description": "Search scene by layer" },
-    { "name": "unity_search_by_name", "description": "Search scene by name pattern" },
-    { "name": "unity_search_missing_references", "description": "Find missing references in scene" },
-    { "name": "unity_screenshot_game", "description": "Capture Game View screenshot" },
-    { "name": "unity_screenshot_scene", "description": "Capture Scene View screenshot" },
-    { "name": "unity_screenshot_editor_window", "description": "Capture any Editor window (Inspector, Project, custom) to PNG - Windows only" },
-    { "name": "unity_prefab_info", "description": "Get prefab information and overrides" },
-    { "name": "unity_scene_instantiate_prefab", "description": "Instantiate a prefab asset into the current scene" },
-    { "name": "unity_serialized_object_get", "description": "Read serialized properties from scene objects, components, prefabs, or assets" },
-    { "name": "unity_serialized_object_set", "description": "Set a serialized property on scene objects, components, prefabs, or assets" },
-    { "name": "unity_prefab_asset_hierarchy", "description": "Get a prefab asset hierarchy directly from disk" },
-    { "name": "unity_prefab_asset_get_properties", "description": "Read component properties inside a prefab asset" },
-    { "name": "unity_prefab_asset_set_property", "description": "Set a component property inside a prefab asset" },
-    { "name": "unity_prefab_asset_set_reference", "description": "Set an ObjectReference property inside a prefab asset" },
-    { "name": "unity_prefab_asset_add_component", "description": "Add a component inside a prefab asset" },
-    { "name": "unity_prefab_asset_configure_component", "description": "Ensure and configure a component inside a prefab asset" },
-    { "name": "unity_prefab_asset_remove_component", "description": "Remove a component inside a prefab asset" },
-    { "name": "unity_prefab_asset_add_gameobject", "description": "Create a child GameObject inside a prefab asset" },
-    { "name": "unity_prefab_asset_remove_gameobject", "description": "Remove a child GameObject inside a prefab asset" },
-    { "name": "unity_prefab_asset_move_gameobject", "description": "Move or reorder a child GameObject inside a prefab asset" },
-    { "name": "unity_prefab_asset_instantiate_child_prefab", "description": "Instantiate a prefab asset as a child inside another prefab asset" },
-    { "name": "unity_prefab_asset_find", "description": "Find GameObjects inside a prefab asset" },
-    { "name": "unity_prefab_asset_transaction_edit", "description": "High-level prefab asset transaction edit with summary diff defaults" },
-    { "name": "unity_asset_export_unitypackage", "description": "Export selected project assets into a .unitypackage file" },
-    { "name": "unity_packages_update_git", "description": "Update a Git package to a branch, tag, or commit" },
-    { "name": "unity_mcp_health", "description": "Get Unity MCP bridge health information" },
-    { "name": "unity_mcp_set_autostart", "description": "Configure Unity MCP bridge autostart" },
-    { "name": "unity_wait_editor_idle", "description": "Wait until Unity Editor finishes compiling and importing" },
-    { "name": "unity_instance_current", "description": "Get the current Unity MCP instance information" },
-    { "name": "unity_instance_list", "description": "List Unity MCP bridge instances from the plugin registry" },
-    { "name": "unity_instance_resolve", "description": "Resolve the intended Unity MCP instance" },
-    { "name": "unity_instance_assert_project", "description": "Assert that the selected Unity instance matches the expected project" },
-    { "name": "unity_asset_rename", "description": "Rename a Unity project asset" },
-    { "name": "unity_asset_move", "description": "Move a Unity project asset" },
-    { "name": "unity_localization_upsert_entry", "description": "Create or update one or more localization entries with configurable execution" },
-    { "name": "unity_compilation_errors", "description": "Get Unity compilation errors from the plugin route" },
-    { "name": "unity_console_query", "description": "Query Unity console messages with route-specific filters" },
-    { "name": "unity_animation_transition_info", "description": "Inspect Animator transition information" },
-    { "name": "unity_animation_update_state", "description": "Update an Animator state" },
-    { "name": "unity_animation_update_transition", "description": "Update an Animator transition" },
-    { "name": "unity_animation_connect_states", "description": "Connect Animator states with a transition" },
-    { "name": "unity_uitoolkit_asset_inspect", "description": "Inspect UI Toolkit assets" },
-    { "name": "unity_uitoolkit_runtime_documents", "description": "List runtime UI Toolkit documents" },
-    { "name": "unity_uitoolkit_runtime_tree", "description": "Inspect a runtime UI Toolkit visual tree" },
-    { "name": "unity_uitoolkit_runtime_query", "description": "Query runtime UI Toolkit elements" },
-    { "name": "unity_uitoolkit_runtime_style", "description": "Inspect runtime UI Toolkit styles" },
-    { "name": "unity_uitoolkit_runtime_repaint", "description": "Request runtime UI Toolkit repaint" },
-    { "name": "unity_uitoolkit_refresh", "description": "Refresh UI Toolkit assets or views" },
-    { "name": "unity_uitoolkit_assert_layout", "description": "Assert UI Toolkit layout conditions" },
-    { "name": "unity_uitoolkit_locate_element", "description": "Locate a UI Toolkit element" },
-    { "name": "unity_uitoolkit_capture_element", "description": "Capture a UI Toolkit element" },
-    { "name": "unity_uitoolkit_compare_element", "description": "Compare a UI Toolkit element against an image" },
-    { "name": "unity_uitoolkit_generated_children", "description": "Inspect generated UI Toolkit child elements" },
-    { "name": "unity_uitoolkit_resource_audit", "description": "Audit UI Toolkit resources" },
-    { "name": "unity_uitoolkit_builder_preview", "description": "Inspect UI Builder preview state" },
-    { "name": "unity_screenshot_crop", "description": "Crop a screenshot image" },
-    { "name": "unity_graphics_image_alpha_bounds", "description": "Measure image alpha bounds" },
-    { "name": "unity_graphics_rect_gap", "description": "Measure the gap between image rectangles" },
-    { "name": "unity_graphics_annotate_rects", "description": "Annotate rectangles on an image" },
-    { "name": "unity_graphics_compare_images", "description": "Compare two images" },
-    { "name": "unity_sprite_sheet_info", "description": "Inspect sprite sheet information" },
-    { "name": "unity_sprite_replace_and_slice", "description": "Replace and slice a sprite sheet" },
-    { "name": "unity_sprite_slice_sheet", "description": "Slice a sprite sheet" },
-    { "name": "unity_sprite_update_animation_clip", "description": "Update animation clips after sprite changes" },
-    { "name": "unity_sprite_replace_slice_update_clip", "description": "Replace, slice, and update sprite animation clips" },
-    { "name": "unity_texture_apply_sprite_preset", "description": "Apply sprite import preset to a texture" },
-    { "name": "unity_texture_import_image", "description": "Import an image as a Unity texture" },
-    { "name": "unity_texture_check_ui_import_settings", "description": "Check texture import settings for UI use" },
-    { "name": "unity_build_run_test", "description": "Run a build test through the Unity plugin route" },
-    { "name": "unity_project_tools_list", "description": "List compact project-defined Unity MCP tool summaries without schemas" },
-    { "name": "unity_project_tools_get", "description": "Get one project-defined Unity MCP tool descriptor and input schema" },
-    { "name": "unity_project_tools_execute", "description": "Execute a project-defined Unity MCP tool after inspecting its schema" },
-    { "name": "unity_packages_list", "description": "List installed Unity packages" },
-    { "name": "unity_packages_add", "description": "Install a Unity package" },
-    { "name": "unity_packages_remove", "description": "Remove a Unity package" },
-    { "name": "unity_packages_search", "description": "Search Unity package registry" },
-    { "name": "unity_packages_info", "description": "Get package details" },
-    { "name": "unity_queue_info", "description": "Get multi-agent queue state" },
-    { "name": "unity_agents_list", "description": "List active agent sessions" },
-    { "name": "unity_agent_log", "description": "Get action log for an agent" },
-    { "name": "unity_list_advanced_tools", "description": "Browse fallback Unity tools by category" },
-    { "name": "unity_advanced_tool", "description": "Fallback generic Unity entrypoint when no concrete tool exists or metadata is stale" },
-    { "name": "unity_get_project_context", "description": "Get project-specific documentation context" }
+    {
+      "name": "unity_list_instances",
+      "description": "List registered Unity Editor instances, including reload status and current reachability. Returns each instance's project name, port, Unity version, and whether it's a ParrelSync clone. Use this to see which Unity projects are currently open before selecting one to work with."
+    },
+    {
+      "name": "unity_select_instance",
+      "description": "Select which Unity Editor instance to work with for this session. All subsequent unity_* commands will be routed to the selected instance. Provide a port returned by unity_list_instances. A later call may still override the target with its own port or expectedProjectPath."
+    },
+    {
+      "name": "unity_hub_list_editors",
+      "description": "List all Unity Editor versions currently installed via Unity Hub, including their installation paths."
+    },
+    {
+      "name": "unity_hub_available_releases",
+      "description": "List Unity Editor versions available for download from Unity Hub."
+    },
+    {
+      "name": "unity_hub_install_editor",
+      "description": "Install a specific Unity Editor version. Optionally include platform modules (android, ios, webgl, linux, macos, windows-il2cpp)."
+    },
+    {
+      "name": "unity_hub_install_modules",
+      "description": "Install additional platform modules to an already-installed Unity Editor version."
+    },
+    {
+      "name": "unity_hub_get_install_path",
+      "description": "Get the current default installation path for Unity Editors."
+    },
+    {
+      "name": "unity_hub_set_install_path",
+      "description": "Set the default installation directory for Unity Editors."
+    },
+    {
+      "name": "unity_editor_ping",
+      "description": "Check if the Unity Editor bridge is running and responsive. Returns editor version, project name, and connection status."
+    },
+    {
+      "name": "unity_editor_state",
+      "description": "Get the current Unity Editor state: play mode, compilation status, active scene, project path."
+    },
+    {
+      "name": "unity_scene_info",
+      "description": "Get information about the currently open scene(s), including name, path, dirty state, and root game objects."
+    },
+    {
+      "name": "unity_scene_open",
+      "description": "Open a scene by its asset path without modal dialogs. Returns a structured error when any loaded scene has unsaved changes; save explicitly and retry."
+    },
+    {
+      "name": "unity_scene_save",
+      "description": "Save the current scene without modal dialogs. Untitled scenes require an explicit asset path."
+    },
+    {
+      "name": "unity_scene_hierarchy",
+      "description": "Read the active scene hierarchy, optionally returning compact matches filtered by component type."
+    },
+    {
+      "name": "unity_gameobject_create",
+      "description": "Create a new GameObject in the scene. Can specify primitive type (Cube, Sphere, Capsule, Cylinder, Plane, Quad), parent, and initial transform."
+    },
+    {
+      "name": "unity_gameobject_delete",
+      "description": "Delete a GameObject from the scene by path or name."
+    },
+    {
+      "name": "unity_gameobject_info",
+      "description": "Get detailed info about a specific GameObject: transform, components, children, active state, tags, layer."
+    },
+    {
+      "name": "unity_gameobject_set_transform",
+      "description": "Set the transform (position, rotation, scale) of a GameObject."
+    },
+    {
+      "name": "unity_component_add",
+      "description": "Add a component to a GameObject. Supports built-in types (Rigidbody, BoxCollider, AudioSource, Light, Camera, etc.) and custom scripts."
+    },
+    {
+      "name": "unity_component_remove",
+      "description": "Remove a component from a GameObject."
+    },
+    {
+      "name": "unity_component_get_properties",
+      "description": "Get all serialized properties of a component on a GameObject."
+    },
+    {
+      "name": "unity_component_set_property",
+      "description": "Set a serialized component property, including inherited Behaviour.enabled, on a scene GameObject."
+    },
+    {
+      "name": "unity_asset_list",
+      "description": "List assets below a Unity project folder with bounded pagination and an optional type filter."
+    },
+    {
+      "name": "unity_asset_import",
+      "description": "Preflight and import one or more external assets with shared TextureImporter defaults, image-content deduplication, configurable execution, per-item results, and rollback."
+    },
+    {
+      "name": "unity_asset_refresh",
+      "description": "Start a reload-safe AssetDatabase refresh job. Poll asset/get-refresh-job until it reaches a terminal state."
+    },
+    {
+      "name": "unity_asset_delete",
+      "description": "Delete an asset from the project."
+    },
+    {
+      "name": "unity_execute_code",
+      "description": "Execute arbitrary C# code inside the Unity Editor. The code runs in the editor context with access to all Unity APIs. Recurring namespace imports can be configured in Project Settings > Unity MCP > Execute Code. Return values are serialized to JSON."
+    },
+    {
+      "name": "unity_build",
+      "description": "Start a persistent Player build job, optionally run the executable, and return immediately with a job ID. Poll build/get-job for the final BuildReport; no post-build asset refresh is required."
+    },
+    {
+      "name": "unity_console_clear",
+      "description": "Clear the Unity console log."
+    },
+    {
+      "name": "unity_get_compilation_errors",
+      "description": "Read tracked Unity compilation errors and warnings with bounded pagination and a separate obsolete-API warning summary."
+    },
+    {
+      "name": "unity_play_mode",
+      "description": "Enter, pause, resume, step one frame, or stop Play Mode and return only after Unity confirms the requested state."
+    },
+    {
+      "name": "unity_project_info",
+      "description": "Get project information: name, path, Unity version, render pipeline, packages, build settings."
+    },
+    {
+      "name": "unity_prefab_info",
+      "description": "Get detailed prefab information: overrides, variant status, added/removed components. Works on both prefab assets and scene instances."
+    },
+    {
+      "name": "unity_scene_stats",
+      "description": "Get comprehensive scene statistics: total objects, vertices, triangles, lights, cameras, colliders, and top component types."
+    },
+    {
+      "name": "unity_screenshot_game",
+      "description": "Capture the current Game View during active or paused Play Mode, suppress and restore Game View Gizmos and Stats by default or preserve them when they are the evidence subject, fail without creating an image in Edit Mode, and return only after the PNG is fully written and decodable."
+    },
+    {
+      "name": "unity_screenshot_scene",
+      "description": "Capture a screenshot of the Scene View camera. Returns immediately with the saved file path."
+    },
+    {
+      "name": "unity_queue_info",
+      "description": "Inspect queue capacity, active work, and per-agent depth."
+    },
+    {
+      "name": "unity_list_advanced_tools",
+      "description": "List fallback Unity tools organized by category. Prefer directly exposed unity_* tools first; use unity_advanced_tool only when no concrete tool exists or metadata is stale. Categories include: animation, prefab, physics, lighting, audio, shadergraph, terrain, particle, navmesh, ui, texture, profiler, memory, settings, input, asmdef, scriptableobject, constraint, lod, editorprefs, playerprefs, vfx, graphics, sceneview, and more."
+    },
+    {
+      "name": "unity_advanced_tool",
+      "description": "Fallback generic Unity entrypoint. Prefer directly exposed unity_* tools first. Use this only when no concrete tool exists, a route is new, or metadata is stale."
+    },
+    {
+      "name": "unity_get_project_context",
+      "description": "Get project-specific context and documentation that the team has prepared for AI agents. This includes project guidelines, architecture docs, game design documents, networking rules, and any other project knowledge stored in Assets/MCP/Context/. Call this without arguments to get ALL context, or specify a category for a specific document. IMPORTANT: Call this early in your session to understand the project's conventions and architecture."
+    },
+    {
+      "name": "unity_packages_list",
+      "description": "List installed Unity packages with bounded pagination."
+    },
+    {
+      "name": "unity_packages_update_git",
+      "description": "Update a Git-based Unity package and return the resolved packages-lock hash."
+    },
+    {
+      "name": "unity_wait_editor_idle",
+      "description": "Wait until the Unity Editor is idle after compilation, domain reload, package refresh, or asset import."
+    },
+    {
+      "name": "unity_search_scene",
+      "description": "Search loaded scene GameObjects with composable name, component, tag, layer, and shader filters plus stable pagination."
+    },
+    {
+      "name": "unity_build_get_job",
+      "description": "Poll the current or latest persistent Player build job and return its final BuildReport and optional run result."
+    },
+    {
+      "name": "unity_scene_instantiate_prefab",
+      "description": "Instantiate a prefab asset into the currently open scene."
+    },
+    {
+      "name": "unity_serialized_object_get",
+      "description": "Read serialized properties from a scene object, component, or asset via SerializedObject."
+    },
+    {
+      "name": "unity_serialized_object_set",
+      "description": "Set one serialized property on a scene object, component, or asset via SerializedObject. SerializeReference values use '$managedReferenceType' when their concrete type cannot be inferred."
+    },
+    {
+      "name": "unity_prefab_asset_configure_component",
+      "description": "Ensure and configure one component on a prefab asset GameObject, including serialized properties and ObjectReferences, in one atomic save."
+    },
+    {
+      "name": "unity_component_set_reference",
+      "description": "Assign one or more component ObjectReference properties with configurable immediate or frame-batched execution."
+    },
+    {
+      "name": "unity_asset_get_refresh_job",
+      "description": "Poll the current or latest reload-safe AssetDatabase refresh job."
+    },
+    {
+      "name": "unity_asset_rename",
+      "description": "Safely rename a Unity asset using AssetDatabase while preserving its .meta GUID and synchronizing Single Sprite internal names."
+    },
+    {
+      "name": "unity_asset_move",
+      "description": "Preflight and move one or more Unity assets with configurable execution, GUID preservation, Single Sprite internal-name synchronization when filenames change, and rollback."
+    },
+    {
+      "name": "unity_console_query",
+      "description": "Query recent Unity Console entries with time, source, message, stack, and last-Play filters."
+    },
+    {
+      "name": "unity_uitoolkit_runtime_query",
+      "description": "Query runtime UIDocument UI Toolkit elements by VisualElementPath, name, class, type, or text."
+    },
+    {
+      "name": "unity_uitoolkit_refresh",
+      "description": "Refresh UI Toolkit assets, repaint runtime and Editor panels, and return after stable Editor frames."
+    },
+    {
+      "name": "unity_uitoolkit_edit_uxml",
+      "description": "Structurally edit UXML elements by VisualElementPath or authored name, then synchronously reimport the asset."
+    },
+    {
+      "name": "unity_uitoolkit_edit_uss",
+      "description": "Add, remove, or update USS selectors and declarations, then synchronously reimport the asset."
+    },
+    {
+      "name": "unity_testing_run_tests",
+      "description": "Start a Unity Test Runner job and return a job ID for polling."
+    },
+    {
+      "name": "unity_testing_get_job",
+      "description": "Poll a Unity Test Runner job, including progress, failures, and optional result details. EditMode tests can delay main-thread queue polling while they execute."
+    },
+    {
+      "name": "unity_project_tools_list",
+      "description": "List compact project-defined MCP tool summaries without parameter schemas."
+    },
+    {
+      "name": "unity_project_tools_get",
+      "description": "Get the complete descriptor and input schema for one project-defined MCP tool."
+    },
+    {
+      "name": "unity_project_tools_execute",
+      "description": "Execute a project-defined MCP tool after discovering it with project-tools/list and inspecting it with project-tools/get."
+    }
   ],
   "prompts": [
     {

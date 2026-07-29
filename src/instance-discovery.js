@@ -65,6 +65,10 @@ export async function validateSelectedInstance() {
     const info = await getInstanceInfo(savedPort);
     if (info && info.projectPath &&
         normalizeProjectPath(info.projectPath) === normalizeProjectPath(savedPath)) {
+      Object.assign(currentInstance, info, {
+        queueReady: info.queueReady !== false,
+        status: info.queueReady === false ? "warming_up" : "ready",
+      });
       return currentInstance;
     }
 
@@ -336,6 +340,7 @@ export async function discoverInstances() {
 
           const info = await getInstanceInfo(port);
           if (info) {
+            const queueReady = info.queueReady !== false;
             return {
               ...entry,
               ...info,
@@ -343,7 +348,8 @@ export async function discoverInstances() {
               alive: true,
               isReachable: true,
               isReloading: false,
-              status: "ready",
+              queueReady,
+              status: queueReady ? "ready" : "warming_up",
               source: "registry+live",
             };
           }
@@ -393,7 +399,8 @@ export async function discoverInstances() {
             alive: true,
             isReachable: true,
             isReloading: false,
-            status: "ready",
+            queueReady: info?.queueReady !== false,
+            status: info?.queueReady === false ? "warming_up" : "ready",
             source: "portscan",
           };
         }
@@ -433,6 +440,10 @@ export async function autoSelectInstance() {
         isClone: false,
         cloneIndex: -1,
         alive: true,
+        isReachable: true,
+        isReloading: false,
+        queueReady: info?.queueReady !== false,
+        status: info?.queueReady === false ? "warming_up" : "ready",
         source: "default",
       };
       _agentInstances.set(agentId, defaultInstance);
@@ -579,6 +590,8 @@ async function getInstanceInfo(port) {
       unityVersion: data.unityVersion || null,
       isClone: data.isClone || false,
       cloneIndex: data.cloneIndex ?? -1,
+      queueReady: data.queueReady !== false,
+      busyReason: typeof data.busyReason === "string" ? data.busyReason : null,
     };
   } catch {
     return null;
