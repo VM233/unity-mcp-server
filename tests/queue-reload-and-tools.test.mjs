@@ -28,7 +28,6 @@ import { hubTools } from "../src/tools/hub-tools.js";
 import { instanceTools } from "../src/tools/instance-tools.js";
 import { contextTools } from "../src/tools/context-tools.js";
 import { staticFirstClassPluginTools } from "../src/tools/plugin-first-class-tools.js";
-import { umaTools } from "../src/tools/uma-tools.js";
 import {
   createAdvertisedToolRegistry,
   invokeFirstClassPluginRoute,
@@ -525,7 +524,7 @@ test("advertised project tools remain callable across volatile instance catalog 
 });
 
 test("default tool surface stays bounded and exposes only canonical consolidated tools", () => {
-  const { coreTools, metaTools } = splitToolTiers([...editorTools, ...umaTools]);
+  const { coreTools, metaTools } = splitToolTiers(editorTools);
   const exposedByName = new Map(
     [...instanceTools, ...hubTools, ...coreTools, ...metaTools, ...contextTools]
       .map((tool) => [tool.name, tool])
@@ -550,6 +549,15 @@ test("default tool surface stays bounded and exposes only canonical consolidated
   assert.equal(exposedByName.has("unity_localization_upsert_entries"), false);
   assert.equal(exposedByName.has("unity_console_log"), false);
   assert.equal(exposedByName.has("unity_console_query"), true);
+  assert.equal(exposedByName.has("unity_project_tools_list"), true);
+  assert.equal(exposedByName.has("unity_project_tools_get"), true);
+  assert.equal(exposedByName.has("unity_project_tools_execute"), true);
+  assert.equal([...exposedByName.keys()].some((name) => name.startsWith("unity_uma_")), false);
+
+  const projectToolList = exposedByName.get("unity_project_tools_list");
+  const projectToolGet = exposedByName.get("unity_project_tools_get");
+  assert.equal("includeSchema" in projectToolList.inputSchema.properties, false);
+  assert.deepEqual(projectToolGet.inputSchema.required, ["toolName"]);
 
   const retiredToolNames = [
     "unity_asset_instantiate_prefab",

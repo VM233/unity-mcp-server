@@ -510,6 +510,7 @@ const firstClassPluginRoutes = [
   "testing/run-package-tests",
   "testing/get-package-job",
   "project-tools/list",
+  "project-tools/get",
   "project-tools/execute",
 ];
 
@@ -523,11 +524,48 @@ function routeToDescription(route) {
 
 const detailedStaticFirstClassPluginTools = [
   {
+    toolName: "unity_project_tools_list",
+    route: "project-tools/list",
+    category: "project-tools",
+    description:
+      "List compact project-defined Unity MCP tool summaries without parameter schemas.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        offset: {
+          type: "number",
+          description: "Result offset. Defaults to 0.",
+        },
+        limit: {
+          type: "number",
+          description: "Maximum project tools. Defaults to 100; capped at 200.",
+        },
+      },
+    },
+  },
+  {
+    toolName: "unity_project_tools_get",
+    route: "project-tools/get",
+    category: "project-tools",
+    description:
+      "Get the complete descriptor and input schema for one project-defined Unity MCP tool.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        toolName: {
+          type: "string",
+          description: "Exact project tool name returned by unity_project_tools_list.",
+        },
+      },
+      required: ["toolName"],
+    },
+  },
+  {
     toolName: "unity_project_tools_execute",
     route: "project-tools/execute",
     category: "project-tools",
     description:
-      "Execute a project-defined Unity MCP tool by toolName with args. Prefer direct unity_pt_* tools when they are available.",
+      "Execute a project-defined Unity MCP tool after listing it and inspecting its schema. Prefer direct unity_pt_* tools when available.",
     inputSchema: {
       type: "object",
       properties: {

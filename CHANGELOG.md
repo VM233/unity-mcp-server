@@ -2,6 +2,16 @@
 
 All notable changes to this package will be documented in this file.
 
+## [4.0.0] - 2026-07-30
+
+### Changed
+- Replace project-tool discovery with `unity_project_tools_list`, `unity_project_tools_get`, and `unity_project_tools_execute`; list results no longer contain parameter schemas.
+- Remove the generic `project-tool:<name>` execution shortcut so lazy project tools use the canonical three-stage contract.
+- Invalidate persisted plugin metadata caches for the breaking catalog contract.
+
+### Removed
+- Remove all UMA tools, bridge code, catalog categories, documentation, and test registration.
+
 ## [3.3.8] - 2026-07-30
 
 ### Fixed

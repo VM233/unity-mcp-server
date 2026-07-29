@@ -9,8 +9,8 @@
 // larger than working servers). This keeps us under the safe limit.
 //
 // Lazy loading: Advanced tools support dynamic dispatch. If a tool
-// isn't in the cached map, callers can pass a raw Unity route directly,
-// use a project-tool:<name> shortcut, or rely on route derivation
+// isn't in the cached map, callers can pass a raw Unity route directly
+// or rely on route derivation
 // (unity_terrain_list -> terrain/list). This means new C# plugin routes
 // and project-defined tools can run before MCP client metadata refreshes.
 
@@ -25,10 +25,10 @@ import {
 } from "./unity-editor-bridge.js";
 import { staticFirstClassPluginTools } from "./tools/plugin-first-class-tools.js";
 
-const PLUGIN_TOOLS_CACHE_SCHEMA_VERSION = 1;
+const PLUGIN_TOOLS_CACHE_SCHEMA_VERSION = 2;
 const PLUGIN_TOOLS_CACHE_FILE = join(
   dirname(CONFIG.instanceRegistryPath),
-  "plugin-tools-metadata-cache-v2.json"
+  "plugin-tools-metadata-cache-v3.json"
 );
 const PLUGIN_TOOLS_LIVE_REFRESH_INTERVAL_MS = 10_000;
 
@@ -119,15 +119,6 @@ function routeToToolName(route) {
 
 function isUnityRoute(value) {
   return typeof value === "string" && value.includes("/") && !value.startsWith("/") && !value.includes("..");
-}
-
-function getProjectToolName(value) {
-  if (typeof value !== "string") return null;
-
-  const prefix = "project-tool:";
-  if (!value.startsWith(prefix)) return null;
-  const toolName = value.slice(prefix.length).trim();
-  return toolName || null;
 }
 
 function loadPluginToolsCache() {
@@ -497,7 +488,7 @@ export function splitToolTiers(allEditorTools) {
     description:
       "List fallback Unity tools organized by category. Prefer directly exposed unity_* tools first; " +
       "use unity_advanced_tool only when no concrete tool exists or metadata is stale. " +
-      "Categories include: uma, animation, prefab, physics, lighting, audio, shadergraph, " +
+      "Categories include: animation, prefab, physics, lighting, audio, shadergraph, " +
       "terrain, particle, navmesh, ui, texture, profiler, memory, settings, " +
       "input, asmdef, scriptableobject, constraint, lod, editorprefs, playerprefs, " +
       "vfx, graphics, sceneview, and more.",
@@ -634,12 +625,12 @@ export function splitToolTiers(allEditorTools) {
         tool: {
           type: "string",
           description:
-            'Fallback tool name, raw route, or project tool shortcut. Examples: "unity_animation_create_controller", "packages/update-git", "project-tool:add-property".',
+            'Fallback tool name or raw route. Examples: "unity_animation_create_controller" or "packages/update-git".',
         },
         params: {
           type: "object",
           description:
-            "Parameters to pass to the tool, raw route, or project tool.",
+            "Parameters to pass to the tool or raw route.",
           additionalProperties: true,
         },
       },
@@ -648,20 +639,6 @@ export function splitToolTiers(allEditorTools) {
     handler: async ({ tool, params } = {}) => {
       if (!tool) {
         return "Error: 'tool' parameter is required. Use unity_list_advanced_tools to see available tools.";
-      }
-
-      const projectToolName = getProjectToolName(tool);
-      if (projectToolName) {
-        try {
-          console.error(`[MCP] Calling project tool "${projectToolName}" via fallback generic entry`);
-          const result = await sendCommand("project-tools/execute", {
-            toolName: projectToolName,
-            args: params || {},
-          });
-          return JSON.stringify(result);
-        } catch (err) {
-          return `Error executing project tool "${projectToolName}": ${err.message}`;
-        }
       }
 
       if (isUnityRoute(tool)) {

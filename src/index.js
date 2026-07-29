@@ -30,7 +30,6 @@ import {
 
 import { hubTools } from "./tools/hub-tools.js";
 import { editorTools } from "./tools/editor-tools.js";
-import { umaTools } from "./tools/uma-tools.js";
 import { contextTools } from "./tools/context-tools.js";
 import { instanceTools } from "./tools/instance-tools.js";
 import {
@@ -121,7 +120,7 @@ setDefaultRequestAgentId(PROCESS_AGENT_ID);
 // This keeps the tool count under ~70, preventing MCP client rejection caused by
 // oversized tool lists (268 tools / 125KB was ~5x beyond what clients handle).
 const { coreTools, metaTools, advancedCount, coreCount } =
-  splitToolTiers([...editorTools, ...umaTools]);
+  splitToolTiers(editorTools);
 const ALL_TOOLS = [
   ...instanceTools,
   ...hubTools,
@@ -312,7 +311,7 @@ async function performInstanceDiscovery(agentId) {
 const server = new Server(
   {
     name: "unity-mcp",
-    version: "3.3.7",
+    version: "4.0.0",
   },
   {
     capabilities: {
@@ -604,7 +603,7 @@ async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   startPluginToolMetadataRefresh();
-  debugLog(`=== SERVER START === v3.3.7, agent=${PROCESS_AGENT_ID}, discoveryDone=${_discoveryDonePerAgent.get(PROCESS_AGENT_ID) || false}, selectedPort=${getSelectedInstance()?.port || 'null'}`);
+  debugLog(`=== SERVER START === v4.0.0, agent=${PROCESS_AGENT_ID}, discoveryDone=${_discoveryDonePerAgent.get(PROCESS_AGENT_ID) || false}, selectedPort=${getSelectedInstance()?.port || 'null'}`);
   console.error(
     `Unity MCP Server running on stdio (agent: ${PROCESS_AGENT_ID})`
   );

@@ -79,7 +79,6 @@
 | **Multi-Instance** | Discover and switch between multiple running Unity Editor instances |
 | **Multi-Agent** | List active agents, get agent action logs, queue monitoring |
 | **SpriteAtlas** | Create, inspect, add/remove sprites, configure settings, delete, list SpriteAtlases |
-| **UMA (Unity Multipurpose Avatar)** | Create slots, overlays, wardrobe recipes from FBX; equip/unequip items on DCA; browse/rebuild Global Library |
 | **Project Context** | Auto-inject project-specific docs and guidelines for AI agents |
 
 ## Architecture
@@ -112,9 +111,14 @@ This keeps the tool count manageable while preserving access to every Unity feat
 `unity_advanced_tool` is also the stable generic fallback when tool metadata is stale. Its `tool` field accepts:
 - A registered MCP tool name, such as `unity_animation_create_controller`
 - A raw Unity route, such as `packages/update-git`
-- A project tool shortcut, such as `project-tool:add-property`
 
-Use `params` for the route or project tool arguments. This lets new Unity plugin routes and project-defined tools run before the MCP client's tool list has refreshed.
+Use `params` for the tool or route arguments. This lets new Unity plugin routes run before the MCP client's tool list has refreshed.
+
+Project-defined tools use a separate three-stage contract:
+
+1. `unity_project_tools_list` returns compact names, descriptions, and behavior flags without schemas.
+2. `unity_project_tools_get` returns the complete descriptor and input schema for one selected tool.
+3. `unity_project_tools_execute` executes that tool with validated arguments.
 
 The server advertises MCP tool-list change notifications and refreshes live plugin metadata in the background. When a package update adds or changes a first-class Unity route, compatible MCP clients automatically request the updated tool list without reconnecting.
 Metadata refresh requests compact schema-bearing first-class pages only; they do not transfer the full plugin route catalog.
@@ -214,7 +218,6 @@ Some tools activate automatically when their packages are detected in the Unity 
 | `com.unity.visualeffectgraph` | VFX Graph listing and opening |
 | `com.unity.inputsystem` | Input Action map and binding inspection |
 | `com.unity.multiplayer.playmode` | MPPM scenario listing, activation, start/stop, player info |
-| UMA 2 (Asset Store) | UMA SlotDataAsset/OverlayDataAsset creation, WardrobeRecipe pipeline, Global Library management, DCA wardrobe equip/unequip |
 
 Features for uninstalled packages return helpful messages explaining what to install.
 
@@ -317,10 +320,6 @@ If Unity MCP helps your workflow, consider supporting its development! Your supp
 - **npm package renamed** — Package renamed from `unity-mcp-server` to `anklebreaker-unity-mcp` to avoid name conflict on npm. Install via `npx anklebreaker-unity-mcp@latest`.
 - **SpriteAtlas tools** — 7 new tools for Unity SpriteAtlas management: create, inspect, add/remove sprites, configure packing & texture settings, delete, and list SpriteAtlases. Contributed by [@zaferdace](https://github.com/zaferdace). Registered as advanced tools accessible via `unity_advanced_tool`.
 - **UTF-8 encoding fix** — Fixed corrupted characters in `unity-editor-bridge.js` comments and section headers.
-
-## What's New in v2.27.0
-
-- **UMA (Unity Multipurpose Avatar) integration** — 13 new tools for the complete UMA asset pipeline. Create SlotDataAssets, OverlayDataAssets, and WardrobeRecipes directly from FBX files, equip/unequip wardrobe items on DynamicCharacterAvatar, browse and manage the UMA Global Library, verify recipes for missing references, and more. Requires UMA 2 (available on the Asset Store). Registered as advanced tools accessible via `unity_advanced_tool`.
 
 ## What's New in v2.26.0
 
