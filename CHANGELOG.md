@@ -2,6 +2,12 @@
 
 All notable changes to this package will be documented in this file.
 
+## [3.3.6] - 2026-07-29
+
+### Fixed
+- Give transient queue-poll disconnects their own bounded reload-recovery budget, so Editor downtime no longer consumes the active operation timeout for `unity_wait_editor_idle` or test/job polling.
+- Keep fresh heartbeat-backed registry leases in `unity_list_instances` while their Editor bridge is temporarily unreachable; results now expose `status`, `isReloading`, and `isReachable`.
+
 ## [3.3.5] - 2026-07-28
 
 ### Fixed

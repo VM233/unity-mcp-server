@@ -411,7 +411,10 @@ function getQueuePollTimeoutMs(command, params = {}) {
 
 export function getReloadReconnectBudgetMs(command, params = {}) {
   return canReplayAfterLostTicket(command)
-    ? getQueuePollTimeoutMs(command, params)
+    ? Math.max(
+      getQueuePollTimeoutMs(command, params),
+      CONFIG.queueReloadRecoveryTimeoutMs || 0
+    )
     : 0;
 }
 
@@ -450,7 +453,8 @@ function buildConnectionFailure(command, params, startedAt, retryCount, lastErro
   };
 }
 
-export async function buildQueuePollTimeoutResult(ticketId, command, timeoutMs, elapsedMs) {
+export async function buildQueuePollTimeoutResult(ticketId, command, timeoutMs, elapsedMs,
+  timing = {}) {
   const finalStatus = await fetchQueueStatusRaw(ticketId).catch((error) => ({
     success: false,
     error: error.message,
@@ -479,6 +483,8 @@ export async function buildQueuePollTimeoutResult(ticketId, command, timeoutMs, 
     pollTimedOut: true,
     pollTimeoutMs: timeoutMs,
     elapsedMs,
+    wallElapsedMs: timing.wallElapsedMs ?? elapsedMs,
+    reloadRecoveryElapsedMs: timing.reloadRecoveryElapsedMs ?? 0,
     finalTicketStatus: finalStatus,
     finalQueueInfo: queueInfo,
     finalEditorState: editorState,
@@ -489,34 +495,84 @@ export async function buildQueuePollTimeoutResult(ticketId, command, timeoutMs, 
  * Poll the queue status for a ticket until completion.
  * GET /api/queue/status?ticketId=X
  */
-async function pollQueueStatus(ticketId, command, params = {}) {
+export async function pollQueueStatus(ticketId, command, params = {}) {
   let pollIntervalMs = CONFIG.queuePollIntervalMs;
   const maxIntervalMs = Math.min(1000, CONFIG.queuePollMaxMs);
   const startTime = Date.now();
   // Use dedicated poll timeout (longer than bridge timeout to handle slow operations like execute_code)
   const timeoutMs = getQueuePollTimeoutMs(command, params);
+  const reloadRecoveryTimeoutMs = canReplayAfterLostTicket(command)
+    ? Math.max(0, CONFIG.queueReloadRecoveryTimeoutMs || 0)
+    : 0;
   let consecutive404s = 0;
   let sawTransientPollError = false;
   let transientRetryCount = 0;
-  const max404Grace = 5; // Allow a few 404s during the dequeueâ†'execute race window
+  let recoveredTransientMs = 0;
+  let transientStartedAt = null;
+  const max404Grace = 5; // Allow a few 404s during the dequeueâ†’execute race window
+
+  const getReloadRecoveryElapsedMs = (now) =>
+    recoveredTransientMs + (transientStartedAt === null ? 0 : now - transientStartedAt);
+  const beginTransient = (startedAt) => {
+    if (reloadRecoveryTimeoutMs > 0 && transientStartedAt === null)
+      transientStartedAt = startedAt;
+  };
+  const finishTransient = (endedAt) => {
+    if (transientStartedAt === null) return;
+    recoveredTransientMs += endedAt - transientStartedAt;
+    transientStartedAt = null;
+  };
+  const capTransientDelay = (delay) => {
+    if (transientStartedAt === null || reloadRecoveryTimeoutMs <= 0)
+      return delay;
+    const remaining = reloadRecoveryTimeoutMs - getReloadRecoveryElapsedMs(Date.now());
+    return Math.max(1, Math.min(delay, remaining));
+  };
 
   while (true) {
-    // Check timeout
-    if (Date.now() - startTime > timeoutMs) {
-      return buildQueuePollTimeoutResult(ticketId, command, timeoutMs, Date.now() - startTime);
+    const now = Date.now();
+    const wallElapsedMs = now - startTime;
+    const reloadRecoveryElapsedMs = getReloadRecoveryElapsedMs(now);
+    if (transientStartedAt !== null && reloadRecoveryElapsedMs >= reloadRecoveryTimeoutMs) {
+      return {
+        success: false,
+        retryable: true,
+        errorCode: "queue_reload_recovery_timeout",
+        error:
+          `Queue polling could not reconnect to Unity within ${reloadRecoveryTimeoutMs}ms ` +
+          `for ticket ${ticketId}.`,
+        ticketId,
+        command,
+        reloadRecoveryTimedOut: true,
+        reloadRecoveryTimeoutMs,
+        reloadRecoveryElapsedMs,
+        wallElapsedMs,
+      };
+    }
+
+    // Domain reload downtime has its own bounded budget and does not consume the
+    // operation's active Editor processing time.
+    const activeElapsedMs = wallElapsedMs - reloadRecoveryElapsedMs;
+    if (activeElapsedMs > timeoutMs) {
+      return buildQueuePollTimeoutResult(ticketId, command, timeoutMs, activeElapsedMs, {
+        wallElapsedMs,
+        reloadRecoveryElapsedMs,
+      });
     }
 
     // Poll status
+    const pollAttemptStartedAt = Date.now();
     try {
       const statusResult = await fetchQueueStatusRaw(ticketId);
 
       if (!statusResult.success) {
         if (statusResult.retryable) {
+          beginTransient(pollAttemptStartedAt);
           sawTransientPollError = true;
-          const delay = Math.min(
+          const delay = capTransientDelay(Math.min(
             POLL_TRANSIENT_RETRY_BASE_MS * Math.pow(1.5, transientRetryCount++),
             maxIntervalMs
-          );
+          ));
           console.error(
             `[MCP Bridge] Queue poll ${statusResult.error} for ticket ${ticketId}; retrying in ${delay}ms...`
           );
@@ -524,6 +580,7 @@ async function pollQueueStatus(ticketId, command, params = {}) {
           continue;
         }
 
+        finishTransient(Date.now());
         // Grace period for 404 â€" ticket may be between dequeue and execution tracking
         if (statusResult.statusCode === 404) {
           consecutive404s++;
@@ -547,6 +604,7 @@ async function pollQueueStatus(ticketId, command, params = {}) {
         };
       }
 
+      finishTransient(Date.now());
       // Reset 404 counter on successful poll
       consecutive404s = 0;
       transientRetryCount = 0;
@@ -566,11 +624,12 @@ async function pollQueueStatus(ticketId, command, params = {}) {
       );
     } catch (error) {
       if (isTransientError(error, null)) {
+        beginTransient(pollAttemptStartedAt);
         sawTransientPollError = true;
-        const delay = Math.min(
+        const delay = capTransientDelay(Math.min(
           POLL_TRANSIENT_RETRY_BASE_MS * Math.pow(1.5, transientRetryCount++),
           maxIntervalMs
-        );
+        ));
         console.error(
           `[MCP Bridge] Queue poll transient error for ticket ${ticketId}: ${error.message}; retrying in ${delay}ms...`
         );

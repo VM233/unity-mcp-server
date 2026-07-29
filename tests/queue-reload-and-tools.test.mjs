@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 
+import { CONFIG } from "../src/config.js";
 import {
   buildQueuePollTimeoutResult,
   canReplayAfterLostTicket,
@@ -12,11 +15,12 @@ import {
   normalizeEditorCommandResult,
   normalizeRecoveredAssetRefreshJob,
   normalizeTerminalQueueStatus,
+  pollQueueStatus,
   sendCommand,
 } from "../src/unity-editor-bridge.js";
 import { runWithRequestContext } from "../src/request-context.js";
 import { injectEditorBindingSchema } from "../src/tool-schema.js";
-import { normalizeProjectPath } from "../src/instance-discovery.js";
+import { discoverInstances, normalizeProjectPath } from "../src/instance-discovery.js";
 import { editorTools } from "../src/tools/editor-tools.js";
 import { hubTools } from "../src/tools/hub-tools.js";
 import { instanceTools } from "../src/tools/instance-tools.js";
@@ -107,6 +111,128 @@ test("reload-safe waits use their full command timeout instead of a fixed retry 
   assert.ok(getReloadReconnectBudgetMs("asset/get-refresh-job", {}) >= 300_000);
   assert.ok(getReloadReconnectBudgetMs("asset/get-refresh-job", { timeoutMs: 420_000 }) >= 420_000);
   assert.equal(getReloadReconnectBudgetMs("prefab-asset/remove-gameobject", {}), 0);
+});
+
+test("queue polling pauses operation time during a bounded reload outage", async () => {
+  const originalFetch = globalThis.fetch;
+  const originalPollTimeout = CONFIG.queuePollTimeoutMs;
+  const originalRecoveryTimeout = CONFIG.queueReloadRecoveryTimeoutMs;
+  const originalPollInterval = CONFIG.queuePollIntervalMs;
+  const originalPollMax = CONFIG.queuePollMaxMs;
+  const unavailableUntil = Date.now() + 80;
+  globalThis.fetch = async (url) => {
+    if (!String(url).includes("/api/queue/status?ticketId=reload-ticket"))
+      throw new Error(`unexpected fetch ${url}`);
+    if (Date.now() < unavailableUntil) {
+      const error = new Error("fetch failed: ECONNRESET");
+      error.code = "ECONNRESET";
+      throw error;
+    }
+    return Response.json({
+      ticketId: "reload-ticket",
+      actionName: "testing/get-package-job",
+      status: "Completed",
+      result: { success: true, workflowId: "workflow-survived" },
+    });
+  };
+  CONFIG.queuePollTimeoutMs = 30;
+  CONFIG.queueReloadRecoveryTimeoutMs = 200;
+  CONFIG.queuePollIntervalMs = 5;
+  CONFIG.queuePollMaxMs = 10;
+
+  try {
+    const result = await pollQueueStatus(
+      "reload-ticket", "testing/get-package-job", {});
+    assert.equal(result.success, true);
+    assert.equal(result.data.workflowId, "workflow-survived");
+  } finally {
+    globalThis.fetch = originalFetch;
+    CONFIG.queuePollTimeoutMs = originalPollTimeout;
+    CONFIG.queueReloadRecoveryTimeoutMs = originalRecoveryTimeout;
+    CONFIG.queuePollIntervalMs = originalPollInterval;
+    CONFIG.queuePollMaxMs = originalPollMax;
+  }
+});
+
+test("queue reload recovery returns a finite timeout when the bridge never returns", async () => {
+  const originalFetch = globalThis.fetch;
+  const originalPollTimeout = CONFIG.queuePollTimeoutMs;
+  const originalRecoveryTimeout = CONFIG.queueReloadRecoveryTimeoutMs;
+  const originalPollMax = CONFIG.queuePollMaxMs;
+  globalThis.fetch = async () => {
+    const error = new Error("fetch failed: ECONNREFUSED");
+    error.code = "ECONNREFUSED";
+    throw error;
+  };
+  CONFIG.queuePollTimeoutMs = 500;
+  CONFIG.queueReloadRecoveryTimeoutMs = 30;
+  CONFIG.queuePollMaxMs = 10;
+
+  try {
+    const startedAt = Date.now();
+    const result = await pollQueueStatus(
+      "missing-bridge-ticket", "testing/get-package-job", {});
+    assert.equal(result.success, false);
+    assert.equal(result.errorCode, "queue_reload_recovery_timeout");
+    assert.equal(result.reloadRecoveryTimedOut, true);
+    assert.ok(Date.now() - startedAt < 250);
+  } finally {
+    globalThis.fetch = originalFetch;
+    CONFIG.queuePollTimeoutMs = originalPollTimeout;
+    CONFIG.queueReloadRecoveryTimeoutMs = originalRecoveryTimeout;
+    CONFIG.queuePollMaxMs = originalPollMax;
+  }
+});
+
+test("fresh reload registry leases remain discoverable while ping is unavailable", async () => {
+  const originalFetch = globalThis.fetch;
+  const originalRegistryPath = CONFIG.instanceRegistryPath;
+  const originalPortStart = CONFIG.portRangeStart;
+  const originalPortEnd = CONFIG.portRangeEnd;
+  const originalStaleness = CONFIG.registryStalenessTimeoutMs;
+  const registryPath = join(
+    mkdtempSync(join(tmpdir(), "unity-mcp-reload-discovery-")), "instances.json");
+  const port = 32123;
+  const baseEntry = {
+    port,
+    projectName: "ReloadingProject",
+    projectPath: "D:/UnityProjects/ReloadingProject",
+    processId: process.pid,
+    registeredAt: new Date().toISOString(),
+    lastSeen: new Date().toISOString(),
+    isReloading: true,
+    reloadStartedAt: new Date().toISOString(),
+  };
+  globalThis.fetch = async () => {
+    const error = new Error("fetch failed: ECONNREFUSED");
+    error.code = "ECONNREFUSED";
+    throw error;
+  };
+  CONFIG.instanceRegistryPath = registryPath;
+  CONFIG.portRangeStart = port;
+  CONFIG.portRangeEnd = port;
+  CONFIG.registryStalenessTimeoutMs = 100;
+
+  try {
+    writeFileSync(registryPath, JSON.stringify([baseEntry]));
+    const duringReload = await discoverInstances();
+    assert.equal(duringReload.length, 1);
+    assert.equal(duringReload[0].projectName, "ReloadingProject");
+    assert.equal(duringReload[0].status, "reloading");
+    assert.equal(duringReload[0].isReachable, false);
+
+    writeFileSync(registryPath, JSON.stringify([{
+      ...baseEntry,
+      lastSeen: new Date(Date.now() - 1000).toISOString(),
+    }]));
+    assert.deepEqual(await discoverInstances(), []);
+  } finally {
+    globalThis.fetch = originalFetch;
+    CONFIG.instanceRegistryPath = originalRegistryPath;
+    CONFIG.portRangeStart = originalPortStart;
+    CONFIG.portRangeEnd = originalPortEnd;
+    CONFIG.registryStalenessTimeoutMs = originalStaleness;
+  }
 });
 
 test("idle editor state cannot turn a non-terminal queue ticket into success", async () => {

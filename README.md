@@ -130,6 +130,7 @@ The server automatically discovers all running Unity Editor instances on startup
 - **Bound Mutations** — Every mutating request carries the selected instance's expected project path/name; the Editor rejects unbound or misrouted writes.
 - **Idempotent Queue Control** — Stable request keys survive retries, and `unity_queue_cancel` cancels queued work owned by the current agent without preempting an executing Unity API call.
 - **Compile-Time Resilience** — During long Unity compiles (when the editor is unresponsive), the server checks the shared instance registry. If the registry entry is fresh (updated within the last 5 minutes via heartbeat), the connection is preserved instead of dropped.
+- **Reload Discovery Lease** — A fresh registered Editor remains listed with `status: "reloading"` and `isReachable: false` while its HTTP bridge restarts.
 - **Crash Detection** — The plugin sends a heartbeat every 30 seconds to the instance registry. If Unity crashes and the heartbeat stops, the server detects the stale registry entry (>5 minutes old) and clears it, allowing proper re-discovery.
 - **Port Affinity** — The plugin remembers its last-used port via EditorPrefs and reclaims it on restart, minimizing port swaps across editor restarts.
 
@@ -191,6 +192,8 @@ Restart Claude Desktop. Done!
 | `UNITY_BRIDGE_HOST` | `127.0.0.1` | Editor bridge host |
 | `UNITY_BRIDGE_PORT` | `7890` | Editor bridge port (auto-discovered when using multi-instance) |
 | `UNITY_BRIDGE_TIMEOUT` | `30000` | Request timeout in ms |
+| `UNITY_QUEUE_POLL_TIMEOUT` | `120000` | Active Editor processing-time budget for a queued request |
+| `UNITY_QUEUE_RELOAD_RECOVERY_TIMEOUT` | `120000` | Separate bounded budget for transient bridge outages during reload |
 | `UNITY_PORT_RANGE_START` | `7890` | Start of port scan range for multi-instance discovery |
 | `UNITY_PORT_RANGE_END` | `7899` | End of port scan range |
 | `UNITY_REGISTRY_STALENESS_TIMEOUT` | `300000` | Registry entry staleness timeout in ms (crash detection) |

@@ -12,7 +12,7 @@ export const instanceTools = [
   {
     name: "unity_list_instances",
     description:
-      "List all running Unity Editor instances that the MCP can connect to. " +
+      "List registered Unity Editor instances, including reload status and current reachability. " +
       "Returns each instance's project name, port, Unity version, and whether it's a ParrelSync clone. " +
       "Use this to see which Unity projects are currently open before selecting one to work with. " +
       "IMPORTANT: When multiple instances are detected, always call this first and then use " +
@@ -39,6 +39,9 @@ export const instanceTools = [
           unityVersion: inst.unityVersion,
           isClone: inst.isClone,
           cloneIndex: inst.cloneIndex,
+          status: inst.status || (inst.alive ? "ready" : "temporarily_unreachable"),
+          isReloading: inst.isReloading === true,
+          isReachable: inst.isReachable !== false,
           source: inst.source,
           isSelected: selected ? selected.port === inst.port : false,
         })),

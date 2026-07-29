@@ -335,9 +335,32 @@ export async function discoverInstances() {
           if (!port) return null;
 
           const info = await getInstanceInfo(port);
-          return info
-            ? { ...entry, ...info, port, alive: true, source: "registry+live" }
-            : null;
+          if (info) {
+            return {
+              ...entry,
+              ...info,
+              port,
+              alive: true,
+              isReachable: true,
+              isReloading: false,
+              status: "ready",
+              source: "registry+live",
+            };
+          }
+          if (isRegistryEntryStale(entry))
+            return null;
+
+          // The registry is a heartbeat-backed discovery lease. A fresh Editor process
+          // must stay visible while compilation/domain reload temporarily removes its HTTP listener.
+          return {
+            ...entry,
+            port,
+            alive: false,
+            isReachable: false,
+            isReloading: entry.isReloading === true,
+            status: entry.isReloading === true ? "reloading" : "temporarily_unreachable",
+            source: "registry",
+          };
         })
       );
 
@@ -368,6 +391,9 @@ export async function discoverInstances() {
             isClone: info?.isClone || false,
             cloneIndex: info?.cloneIndex ?? -1,
             alive: true,
+            isReachable: true,
+            isReloading: false,
+            status: "ready",
             source: "portscan",
           };
         }
