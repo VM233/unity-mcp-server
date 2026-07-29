@@ -525,7 +525,11 @@ function isRegistryEntryStale(entry) {
  */
 function readRegistryFile() {
   try {
-    const raw = readFileSync(CONFIG.instanceRegistryPath, "utf-8");
+    // Unity's .NET runtime can emit a UTF-8 BOM. JSON.parse rejects the
+    // resulting leading U+FEFF, which previously made the whole registry look
+    // empty and silently degraded discovery to port scanning.
+    const raw = readFileSync(CONFIG.instanceRegistryPath, "utf-8")
+      .replace(/^\uFEFF/, "");
     const data = JSON.parse(raw);
     if (Array.isArray(data)) return data;
     return [];

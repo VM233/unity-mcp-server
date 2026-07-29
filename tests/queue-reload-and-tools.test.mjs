@@ -184,7 +184,7 @@ test("queue reload recovery returns a finite timeout when the bridge never retur
   }
 });
 
-test("fresh reload registry leases remain discoverable while ping is unavailable", async () => {
+test("fresh Unity BOM registry leases remain discoverable while ping is unavailable", async () => {
   const originalFetch = globalThis.fetch;
   const originalRegistryPath = CONFIG.instanceRegistryPath;
   const originalPortStart = CONFIG.portRangeStart;
@@ -214,7 +214,7 @@ test("fresh reload registry leases remain discoverable while ping is unavailable
   CONFIG.registryStalenessTimeoutMs = 100;
 
   try {
-    writeFileSync(registryPath, JSON.stringify([baseEntry]));
+    writeFileSync(registryPath, `\uFEFF${JSON.stringify([baseEntry])}`);
     const duringReload = await discoverInstances();
     assert.equal(duringReload.length, 1);
     assert.equal(duringReload[0].projectName, "ReloadingProject");

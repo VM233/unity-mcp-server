@@ -2,6 +2,11 @@
 
 All notable changes to this package will be documented in this file.
 
+## [3.3.7] - 2026-07-29
+
+### Fixed
+- Parse Unity's UTF-8 BOM-prefixed instance registry instead of silently treating it as empty, so fresh reload leases remain available to `unity_list_instances`.
+
 ## [3.3.6] - 2026-07-29
 
 ### Fixed

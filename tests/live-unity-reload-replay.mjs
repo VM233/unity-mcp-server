@@ -6,6 +6,8 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 
 const serverRoot = resolve(new URL("..", import.meta.url).pathname.replace(/^\/(.:)/, "$1"));
 const bridgePort = Number(process.env.UNITY_BRIDGE_PORT || "7890");
+const waitTimeoutMs = Number(process.env.UNITY_RELOAD_WAIT_TIMEOUT_MS || "90000");
+const clientTimeoutMs = waitTimeoutMs + 120000;
 const client = new Client({ name: "unity-mcp-reload-replay-test", version: "1.0.0" },
   { capabilities: {} });
 const transport = new StdioClientTransport({
@@ -65,20 +67,23 @@ return new { scheduled = true, reloadAt };
     name: "unity_wait_editor_idle",
     arguments: {
       port: bridgePort,
-      timeoutMs: 90000,
+      timeoutMs: waitTimeoutMs,
       stableFrames: 200,
       stableMs: 20000,
     },
-  }, undefined, { timeout: 180000 });
+  }, undefined, { timeout: clientTimeoutMs });
 
-  const waitResult = await withTimeout(waitPromise, 180000, "reload replay timed out");
+  const waitResult = await withTimeout(waitPromise, clientTimeoutMs, "reload replay timed out");
   const waitData = parseToolResult(waitResult);
 
+  if (waitData?.success !== true)
+    console.error(`Reload wait failure: ${JSON.stringify(waitData)}`);
   assert.equal(waitData?.success, true);
   if (waitData?.replayedAfterLostTicket) {
     assert.ok(waitData?.replayCount >= 1);
   }
-  assert.equal(waitData?.data?.success, true);
+  assert.equal(waitData?.data?.timedOut, false);
+  assert.equal(waitData?.data?.isIdle, true);
   console.log(waitData?.replayedAfterLostTicket
     ? `Reload-lost wait replayed successfully (${waitData.replayCount} replay).`
     : "Reload wait completed on its persistent queue ticket.");
