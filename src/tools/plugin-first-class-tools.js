@@ -527,7 +527,7 @@ const detailedStaticFirstClassPluginTools = [
     route: "project-tools/execute",
     category: "project-tools",
     description:
-      "Execute a project-defined Unity MCP tool by toolName with args. Prefer direct unity_project_tool_* tools when they are available.",
+      "Execute a project-defined Unity MCP tool by toolName with args. Prefer direct unity_pt_* tools when they are available.",
     inputSchema: {
       type: "object",
       properties: {

@@ -23,11 +23,13 @@ import {
   getTicketStatus,
   sendCommand,
 } from "./unity-editor-bridge.js";
-import { loadState, persistState } from "./state-persistence.js";
 import { staticFirstClassPluginTools } from "./tools/plugin-first-class-tools.js";
 
-const PLUGIN_TOOLS_CACHE_KEY = "pluginToolsMetadata";
-const PLUGIN_TOOLS_CACHE_FILE = join(dirname(CONFIG.instanceRegistryPath), "plugin-tools-metadata-cache.json");
+const PLUGIN_TOOLS_CACHE_SCHEMA_VERSION = 1;
+const PLUGIN_TOOLS_CACHE_FILE = join(
+  dirname(CONFIG.instanceRegistryPath),
+  "plugin-tools-metadata-cache-v2.json"
+);
 const PLUGIN_TOOLS_LIVE_REFRESH_INTERVAL_MS = 10_000;
 
 let livePluginToolsCache = null;
@@ -122,30 +124,25 @@ function isUnityRoute(value) {
 function getProjectToolName(value) {
   if (typeof value !== "string") return null;
 
-  const prefixes = ["project-tool:", "project:"];
-  for (const prefix of prefixes) {
-    if (value.startsWith(prefix)) {
-      const toolName = value.slice(prefix.length).trim();
-      return toolName || null;
-    }
-  }
-
-  return null;
+  const prefix = "project-tool:";
+  if (!value.startsWith(prefix)) return null;
+  const toolName = value.slice(prefix.length).trim();
+  return toolName || null;
 }
 
 function loadPluginToolsCache() {
   try {
     if (existsSync(PLUGIN_TOOLS_CACHE_FILE)) {
       const data = JSON.parse(readFileSync(PLUGIN_TOOLS_CACHE_FILE, "utf-8"));
-      if (Array.isArray(data?.tools)) return data.tools;
-      if (Array.isArray(data)) return data;
+      if (data?.schemaVersion === PLUGIN_TOOLS_CACHE_SCHEMA_VERSION &&
+          Array.isArray(data.tools)) {
+        return data.tools;
+      }
     }
   } catch {
-    // Fall through to legacy session cache.
+    return [];
   }
-
-  const cached = loadState(PLUGIN_TOOLS_CACHE_KEY);
-  return Array.isArray(cached) ? cached : [];
+  return [];
 }
 
 function savePluginToolsCache(tools) {
@@ -154,12 +151,15 @@ function savePluginToolsCache(tools) {
       mkdirSync(dirname(PLUGIN_TOOLS_CACHE_FILE), { recursive: true });
       writeFileSync(
         PLUGIN_TOOLS_CACHE_FILE,
-        JSON.stringify({ updatedAt: Date.now(), tools })
+        JSON.stringify({
+          schemaVersion: PLUGIN_TOOLS_CACHE_SCHEMA_VERSION,
+          updatedAt: Date.now(),
+          tools,
+        })
       );
     } catch {
-      // Keep the legacy cache as a fallback if the long-lived cache cannot be written.
+      // Live metadata remains usable even when the disk cache cannot be written.
     }
-    persistState(PLUGIN_TOOLS_CACHE_KEY, tools);
   }
 }
 
@@ -200,33 +200,7 @@ async function fetchPluginToolsLive(firstClassOnly = true, {
       return tools;
     }
   } catch (_) {
-    // Older plugin builds only support _meta/routes.
-  }
-
-  try {
-    let dynamicRoutes = await sendCommand("_meta/routes", {});
-    dynamicRoutes = dynamicRoutes?.data ?? dynamicRoutes;
-    if (Array.isArray(dynamicRoutes?.routes)) {
-      const tools = dynamicRoutes.routes.map((route) => ({
-        route,
-        toolName: routeToToolName(route),
-        category: route.split("/")[0],
-        description: `Lazy Unity route: ${route}`,
-        inputSchema: {
-          type: "object",
-          properties: {},
-          additionalProperties: true,
-        },
-      }));
-      if (cache) {
-        savePluginToolsCache(tools);
-        livePluginToolsCache = tools;
-        livePluginToolsFetchedAt = Date.now();
-      }
-      return tools;
-    }
-  } catch (_) {
-    // Plugin might not support dynamic metadata yet.
+    // The live plugin may be temporarily unavailable during a domain reload.
   }
 
   return [];
@@ -471,7 +445,6 @@ const CORE_TOOLS = new Set([
 
   // Prefab basics
   "unity_prefab_info",
-  "unity_set_object_reference",
 
   // Packages
   "unity_packages_list",
@@ -525,7 +498,7 @@ export function splitToolTiers(allEditorTools) {
       "List fallback Unity tools organized by category. Prefer directly exposed unity_* tools first; " +
       "use unity_advanced_tool only when no concrete tool exists or metadata is stale. " +
       "Categories include: uma, animation, prefab, physics, lighting, audio, shadergraph, " +
-      "amplify, terrain, particle, navmesh, ui, texture, profiler, memory, settings, " +
+      "terrain, particle, navmesh, ui, texture, profiler, memory, settings, " +
       "input, asmdef, scriptableobject, constraint, lod, editorprefs, playerprefs, " +
       "vfx, graphics, sceneview, and more.",
     inputSchema: {

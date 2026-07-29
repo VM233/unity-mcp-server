@@ -10,9 +10,10 @@ import { ToolListChangedNotificationSchema } from "@modelcontextprotocol/sdk/typ
 const serverRoot = resolve(new URL("..", import.meta.url).pathname.replace(/^\/(.:)/, "$1"));
 const tempRoot = mkdtempSync(join(tmpdir(), "unity-mcp-live-refresh-"));
 const registryPath = join(tempRoot, "instances.json");
-const cachePath = join(tempRoot, "plugin-tools-metadata-cache.json");
+const cachePath = join(tempRoot, "plugin-tools-metadata-cache-v2.json");
 
 writeFileSync(cachePath, JSON.stringify({
+  schemaVersion: 1,
   updatedAt: 0,
   tools: [{
     route: "mcp/health",

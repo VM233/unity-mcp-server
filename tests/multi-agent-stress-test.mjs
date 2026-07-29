@@ -153,12 +153,12 @@ function startMockBridge() {
           return;
         }
 
-        // ── Fallback: simulate legacy endpoints ──
-        const delay = 30 + Math.random() * 100;
-        setTimeout(() => {
-          res.writeHead(200, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({ success: true, mock: true, path, data: {} }));
-        }, delay);
+        res.writeHead(404, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({
+          success: false,
+          errorCode: "queue_submit_required",
+          error: "Commands must be submitted through /api/queue/submit.",
+        }));
       });
     });
 
@@ -182,12 +182,12 @@ async function simulateAgent(agentIdx, agentId) {
     "scene/hierarchy",        // read
     "gameobject/info",        // read
     "gameobject/create",      // write
-    "component/set_property", // write
+    "component/set-property", // write
     "scene/info",             // read
     "asset/list",             // read
     "script/create",          // write
     "material/create",        // write
-    "editor/ping",            // read
+    "ping",                   // read
   ];
 
   log(color, prefix, `Starting — will submit ${REQUESTS_PER_AGENT} requests (id: ${agentId})`);

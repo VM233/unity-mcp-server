@@ -2,6 +2,13 @@
 
 All notable changes to this package will be documented in this file.
 
+## [3.3.8] - 2026-07-30
+
+### Fixed
+- Keep the Editor transport queue-only: a failed queue submission never enables or caches a legacy direct-command mode that the current VM Unity MCP plugin rejects.
+- Treat HTTP 404 from `queue/submit` as a transient package/domain-reload response and retry it with the same idempotency key for a bounded reconnect budget.
+- Separate safe pre-ticket queue submission retries from post-ticket replay policy, preserving strict replay controls once Unity may already have executed a command.
+
 ## [3.3.7] - 2026-07-29
 
 ### Fixed

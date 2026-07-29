@@ -122,8 +122,7 @@ export const umaTools = [
           type: "array",
           description:
             "Array of slot objects. Each slot has a slotName (the SlotDataAsset name) and an overlays array. " +
-            "Each overlay has overlayName and optional channelCount (default 3). " +
-            "For backward compatibility, a single overlayName at slot level is also accepted but overlays array is preferred.",
+            "Each overlay has overlayName and optional channelCount (default 3).",
           items: {
             type: "object",
             properties: {
@@ -149,16 +148,8 @@ export const umaTools = [
                   required: ["overlayName"],
                 },
               },
-              overlayName: {
-                type: "string",
-                description: "DEPRECATED: use overlays array instead. Single overlay name for backward compat.",
-              },
-              channelCount: {
-                type: "number",
-                description: "DEPRECATED: use overlays[].channelCount instead. Channel count when using single overlayName.",
-              },
             },
-            required: ["slotName"],
+            required: ["slotName", "overlays"],
           },
         },
         hides: {

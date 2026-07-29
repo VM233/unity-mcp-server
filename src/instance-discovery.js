@@ -309,7 +309,7 @@ function newestRegistryEntry(entries) {
 }
 
 function registryTimestamp(entry) {
-  const value = Date.parse(entry?.lastSeen || entry?.registeredAt || "");
+  const value = Date.parse(entry?.lastSeen || "");
   return Number.isFinite(value) ? value : 0;
 }
 
@@ -488,14 +488,14 @@ export async function autoSelectInstance() {
  * lastSeen timestamp is older than the staleness timeout, Unity likely crashed
  * without calling OnDisable (which would have cleaned up the entry).
  *
- * If the entry has no `lastSeen` field (old plugin version), we fall back to
- * `registeredAt`. If neither is present, we treat it as stale (no way to verify).
+ * Entries without a heartbeat timestamp are stale because their liveness cannot
+ * be established.
  *
  * @param {object} entry - A registry entry object.
  * @returns {boolean} True if the entry is considered stale.
  */
 function isRegistryEntryStale(entry) {
-  const timestamp = entry.lastSeen || entry.registeredAt;
+  const timestamp = entry.lastSeen;
   if (!timestamp) {
     // No timestamp at all — can't verify freshness, assume stale
     return true;
@@ -574,9 +574,9 @@ async function getInstanceInfo(port) {
 
     const data = await response.json();
     return {
-      projectName: data.projectName || data.project || null,
+      projectName: data.projectName || null,
       projectPath: data.projectPath || null,
-      unityVersion: data.unityVersion || data.version || null,
+      unityVersion: data.unityVersion || null,
       isClone: data.isClone || false,
       cloneIndex: data.cloneIndex ?? -1,
     };

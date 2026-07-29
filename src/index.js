@@ -380,7 +380,7 @@ const reloadSafeCommandByToolName = {
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
   const meta = request.params._meta || {};
-  const agentId = meta.agentId || meta.agent_id || PROCESS_AGENT_ID;
+  const agentId = meta.agentId || PROCESS_AGENT_ID;
   let portOverride = (args && typeof args.port === "number" && args.port)
     || (typeof meta.port === "number" && meta.port)
     || null;

@@ -1,6 +1,6 @@
 // Unity Editor HTTP Bridge Client
 // Communicates with the C# plugin running inside Unity Editor
-// Supports both queue mode (async ticket-based) and legacy sync mode
+// Uses the async ticket queue exposed by the Unity Editor plugin.
 import { CONFIG } from "./config.js";
 import { getActiveBridgeUrl, getActiveInstanceContext } from "./instance-discovery.js";
 import {
@@ -40,19 +40,11 @@ export function createRequestId(command) {
   return `${getRequestAgentId()}-${command}-${Date.now()}-${_requestSequence}`;
 }
 
-// Legacy constant kept for backward compat in places that don't need dynamic routing
-const BRIDGE_URL = `http://${CONFIG.editorBridgeHost}:${CONFIG.editorBridgePort}`;
-
-// Mode detection â€" cached to avoid repeated 404 checks
-let _useQueueMode = true;
-let _queueModeDetermined = false;
-
 // Retry settings â€" handles Unity domain reloads (1-3 sec server downtime)
 const MAX_RETRIES = 4;
 const RETRY_BASE_DELAY_MS = 800; // 800ms, 1600ms, 3200ms, 6400ms
 const POLL_TRANSIENT_RETRY_BASE_MS = 500;
 const RELOAD_RETRY_MAX_DELAY_MS = 2000;
-const ASSET_REFRESH_RECOVERY_BUDGET_MS = 15000;
 const ASSET_REFRESH_POLL_RECONNECT_BUDGET_MS = 300000;
 
 /**
@@ -134,7 +126,9 @@ async function submitToQueue(apiPath, bodyString, requestId) {
 
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(`HTTP ${response.status}: ${text}`);
+    const error = new Error(`HTTP ${response.status}: ${text}`);
+    error.status = response.status;
+    throw error;
   }
 
   const data = await response.json();
@@ -178,54 +172,6 @@ async function fetchQueueInfoRaw(timeoutMs = 5000) {
     return {
       success: false,
       statusCode: response.status,
-      error: `HTTP ${response.status}: ${text}`,
-    };
-  }
-
-  return {
-    success: true,
-    data: await response.json(),
-  };
-}
-
-async function fetchEditorStateRaw(timeoutMs = 5000) {
-  const url = `${getBridgeUrl()}/api/editor/state`;
-  const response = await fetch(url, {
-    method: "POST",
-    headers: buildBridgeHeaders({ "Content-Type": "application/json" }),
-    body: "{}",
-    signal: AbortSignal.timeout(timeoutMs),
-  });
-
-  if (!response.ok) {
-    const text = await response.text();
-    return {
-      success: false,
-      statusCode: response.status,
-      error: `HTTP ${response.status}: ${text}`,
-    };
-  }
-
-  return {
-    success: true,
-    data: await response.json(),
-  };
-}
-
-async function fetchAssetRefreshJobRaw(refreshRequestId, timeoutMs = 5000) {
-  const response = await fetch(`${getBridgeUrl()}/api/asset/get-refresh-job`, {
-    method: "POST",
-    headers: buildBridgeHeaders({ "Content-Type": "application/json" }),
-    body: JSON.stringify({ refreshRequestId }),
-    signal: AbortSignal.timeout(timeoutMs),
-  });
-
-  if (!response.ok) {
-    const text = await response.text();
-    return {
-      success: false,
-      statusCode: response.status,
-      retryable: isTransientError(null, response),
       error: `HTTP ${response.status}: ${text}`,
     };
   }
@@ -289,44 +235,18 @@ export function normalizeRecoveredAssetRefreshJob(job, originalFailure, refreshR
 }
 
 async function recoverAssetRefreshJob(refreshRequestId, originalFailure) {
-  const startedAt = Date.now();
-  let attempt = 0;
-  do {
-    try {
-      const response = await fetchAssetRefreshJobRaw(refreshRequestId);
-      if (response.success) {
-        const recovered = normalizeRecoveredAssetRefreshJob(
-          response.data,
-          originalFailure,
-          refreshRequestId
-        );
-        if (recovered) return recovered;
-      } else if (response.statusCode === 409) {
-        return null;
-      }
-    } catch (error) {
-      if (!isTransientError(error, null)) return null;
-    }
-
-    const delay = Math.min(500 * Math.pow(1.5, attempt++), 2000);
-    await sleep(delay);
-  } while (Date.now() - startedAt < ASSET_REFRESH_RECOVERY_BUDGET_MS);
-
-  return null;
+  const response = await sendCommand("asset/get-refresh-job", { refreshRequestId });
+  if (!response.success) return null;
+  return normalizeRecoveredAssetRefreshJob(
+    response.data,
+    originalFailure,
+    refreshRequestId
+  );
 }
 
 async function recoverReloadSafeCommand(command, requestId, originalFailure) {
   if (command !== "asset/refresh") return null;
   return recoverAssetRefreshJob(requestId, originalFailure);
-}
-
-function extractEditorState(rawState) {
-  if (!rawState || !rawState.success) return null;
-  const data = rawState.data;
-  if (data && typeof data === "object" && data.success === true && data.data) {
-    return data.data;
-  }
-  return data;
 }
 
 export function normalizeTerminalQueueStatus(statusData) {
@@ -418,8 +338,37 @@ export function getReloadReconnectBudgetMs(command, params = {}) {
     : 0;
 }
 
+export function getQueueSubmitReconnectBudgetMs(command, params = {}, error = null) {
+  const status = Number(error?.status);
+  const confirmedReloadResponse =
+    status === 404 || status === 500 || status === 503;
+  const replayBudgetMs = getReloadReconnectBudgetMs(command, params);
+  return confirmedReloadResponse || replayBudgetMs > 0
+    ? Math.max(
+      Math.max(0, CONFIG.queueReloadRecoveryTimeoutMs || 0),
+      replayBudgetMs
+    )
+    : 0;
+}
+
+export function isTransientQueueSubmitError(error) {
+  const status = Number(error?.status);
+  return status === 404 || status === 500 || status === 503 ||
+    isTransientError(error, null);
+}
+
 function shouldRetryTransientConnection(command, params, startedAt, retryCount) {
   const reconnectBudgetMs = getReloadReconnectBudgetMs(command, params);
+  if (reconnectBudgetMs > 0) {
+    return Date.now() - startedAt < reconnectBudgetMs;
+  }
+
+  return retryCount < MAX_RETRIES;
+}
+
+function shouldRetryQueueSubmission(command, params, startedAt, retryCount, error) {
+  const reconnectBudgetMs =
+    getQueueSubmitReconnectBudgetMs(command, params, error);
   if (reconnectBudgetMs > 0) {
     return Date.now() - startedAt < reconnectBudgetMs;
   }
@@ -434,6 +383,18 @@ function getTransientRetryDelayMs(command, params, startedAt, retryCount) {
 
   const remainingMs = Math.max(0, reconnectBudgetMs - (Date.now() - startedAt));
   return Math.min(exponentialDelay, RELOAD_RETRY_MAX_DELAY_MS, remainingMs);
+}
+
+function getQueueSubmitRetryDelayMs(command, params, startedAt, retryCount, error) {
+  const reconnectBudgetMs =
+    getQueueSubmitReconnectBudgetMs(command, params, error);
+  const exponentialDelay = RETRY_BASE_DELAY_MS *
+    Math.pow(2, Math.min(retryCount, MAX_RETRIES));
+  if (reconnectBudgetMs <= 0) return exponentialDelay;
+
+  const remainingMs = Math.max(0, reconnectBudgetMs - (Date.now() - startedAt));
+  return Math.max(1,
+    Math.min(exponentialDelay, RELOAD_RETRY_MAX_DELAY_MS, remainingMs));
 }
 
 function buildConnectionFailure(command, params, startedAt, retryCount, lastError) {
@@ -453,6 +414,32 @@ function buildConnectionFailure(command, params, startedAt, retryCount, lastErro
   };
 }
 
+function buildQueueSubmissionFailure(command, params, startedAt, retryCount, lastError) {
+  const elapsedMs = Date.now() - startedAt;
+  const reconnectBudgetMs =
+    getQueueSubmitReconnectBudgetMs(command, params, lastError);
+  const transient = isTransientQueueSubmitError(lastError);
+  const timedOut = transient && reconnectBudgetMs > 0 &&
+    elapsedMs >= reconnectBudgetMs;
+  return {
+    success: false,
+    retryable: transient,
+    errorCode: timedOut
+      ? "queue_submit_recovery_timeout"
+      : "queue_submit_failed",
+    error: timedOut
+      ? `Unity queue submission endpoint did not recover within ${reconnectBudgetMs}ms ` +
+        `for ${command}: ${lastError?.message}`
+      : `Unity queue submission failed for ${command}: ${lastError?.message}`,
+    command,
+    retryCount,
+    elapsedMs,
+    reconnectBudgetMs,
+    queueEndpoint: "queue/submit",
+    ticketReceived: false,
+  };
+}
+
 export async function buildQueuePollTimeoutResult(ticketId, command, timeoutMs, elapsedMs,
   timing = {}) {
   const finalStatus = await fetchQueueStatusRaw(ticketId).catch((error) => ({
@@ -466,12 +453,8 @@ export async function buildQueuePollTimeoutResult(ticketId, command, timeoutMs, 
     if (terminalResult) return terminalResult;
   }
 
-  const [queueInfo, editorStateRaw] = await Promise.all([
-    fetchQueueInfoRaw().catch((error) => ({ success: false, error: error.message })),
-    fetchEditorStateRaw().catch((error) => ({ success: false, error: error.message })),
-  ]);
-
-  const editorState = extractEditorState(editorStateRaw);
+  const queueInfo = await fetchQueueInfoRaw()
+    .catch((error) => ({ success: false, error: error.message }));
 
   return {
     success: false,
@@ -487,7 +470,6 @@ export async function buildQueuePollTimeoutResult(ticketId, command, timeoutMs, 
     reloadRecoveryElapsedMs: timing.reloadRecoveryElapsedMs ?? 0,
     finalTicketStatus: finalStatus,
     finalQueueInfo: queueInfo,
-    finalEditorState: editorState,
   };
 }
 
@@ -676,94 +658,8 @@ function normalizeFailedQueueStatus(statusData) {
 }
 
 /**
- * Send command via legacy sync mode (direct POST).
- * Falls back to the original implementation.
- */
-async function sendCommandLegacyMode(command, params = {}, requestId = createRequestId(command)) {
-  const url = `${getBridgeUrl()}/api/${command}`;
-  let lastError = null;
-  const startedAt = Date.now();
-  let retryCount = 0;
-
-  while (true) {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), CONFIG.editorBridgeTimeout);
-
-    try {
-      const response = await fetch(url, {
-        method: "POST",
-        headers: buildBridgeHeaders({
-          "Content-Type": "application/json",
-          "Idempotency-Key": requestId,
-        }),
-        body: JSON.stringify(params),
-        signal: controller.signal,
-      });
-      clearTimeout(timeout);
-
-      // Transient server error â€" retry
-      if (isTransientError(null, response) &&
-          shouldRetryTransientConnection(command, params, startedAt, retryCount)) {
-        const delay = getTransientRetryDelayMs(command, params, startedAt, retryCount);
-        console.error(
-          `[MCP Bridge] HTTP ${response.status} on ${command}, retrying in ${delay}ms (retry ${retryCount + 1})...`
-        );
-        await sleep(delay);
-        retryCount++;
-        continue;
-      }
-
-      if (!response.ok) {
-        const text = await response.text();
-        return { success: false, error: `HTTP ${response.status}: ${text}` };
-      }
-
-      const data = await response.json();
-
-      // If we retried, log that we recovered
-      if (retryCount > 0) {
-        console.error(
-          `[MCP Bridge] Recovered after ${retryCount} retries for ${command}`
-        );
-      }
-
-      return normalizeEditorCommandResult(data);
-    } catch (error) {
-      clearTimeout(timeout);
-      lastError = error;
-
-      // Transient connection error â€" retry with backoff
-      if (isTransientError(error, null) &&
-          shouldRetryTransientConnection(command, params, startedAt, retryCount)) {
-        const delay = getTransientRetryDelayMs(command, params, startedAt, retryCount);
-        console.error(
-          `[MCP Bridge] ${error.code || error.name || "Error"} on ${command}, retrying in ${delay}ms (retry ${retryCount + 1})...`
-        );
-        await sleep(delay);
-        retryCount++;
-        continue;
-      }
-
-      break;
-    }
-  }
-
-  // All retries exhausted
-  const failure = lastError?.name === "AbortError"
-    ? {
-      success: false,
-      retryable: true,
-      errorCode: "legacy_request_timeout",
-      error:
-        "Request timed out after retries. Unity Editor may be in a long domain reload or not running.",
-    }
-    : buildConnectionFailure(command, params, startedAt, retryCount, lastError);
-  return (await recoverReloadSafeCommand(command, requestId, failure)) || failure;
-}
-
-/**
  * Send a command to the Unity Editor bridge.
- * Tries queue mode first (async ticket-based), falls back to legacy sync mode if 404.
+ * Submits through the async ticket queue and polls for completion.
  * Automatically retries on transient failures (e.g. Unity domain reload)
  * with exponential backoff so multi-agent workflows stay resilient.
  */
@@ -771,117 +667,71 @@ export async function sendCommand(command, params = {}) {
   const bodyString = JSON.stringify(params);
   const requestId = createRequestId(command);
   let lostTicketReplayCount = 0;
-  let submitRetryCount = 0;
+  let queueSubmitRetryCount = 0;
+  let queueSubmitStartedAt = Date.now();
   const startedAt = Date.now();
+  let submitLastError = null;
 
-  // If we've determined the plugin doesn't support queue mode, use legacy
-  if (_queueModeDetermined && !_useQueueMode) {
-    return sendCommandLegacyMode(command, params, requestId);
-  }
-
-  // Try queue mode (if not yet determined it's unavailable)
-  if (!_queueModeDetermined || _useQueueMode) {
+  while (true) {
     try {
-      // Submit to queue with retry logic
-      let submitLastError = null;
-      while (true) {
-        try {
-          const ticketData = await submitToQueue(command, bodyString, requestId);
-          const ticketId = ticketData.ticketId;
+      const ticketData = await submitToQueue(command, bodyString, requestId);
+      const ticketId = ticketData.ticketId;
 
-          // Log to stderr, not stdout — stdout is reserved for the MCP JSON-RPC
-          // transport and any non-JSON data there closes strict clients (e.g. Codex).
-          console.error(`[MCP Bridge] Submitted ${command} to queue, ticket: ${ticketId}`);
+      // Log to stderr, not stdout — stdout is reserved for the MCP JSON-RPC
+      // transport and any non-JSON data there closes strict clients (e.g. Codex).
+      console.error(`[MCP Bridge] Submitted ${command} to queue, ticket: ${ticketId}`);
 
-          // Poll for completion
-          const result = await pollQueueStatus(ticketId, command, params);
-
-          // Queue submission succeeded (we got a ticket), so queue mode is confirmed
-          _queueModeDetermined = true;
-          _useQueueMode = true;
-          if (!result.success) {
-            const recovered = await recoverReloadSafeCommand(command, requestId, result);
-            if (recovered) return recovered;
-          }
-          if (!result.success && result.retryable && canReplayAfterLostTicket(command) &&
-              shouldRetryTransientConnection(command, params, startedAt, submitRetryCount)) {
-            lostTicketReplayCount++;
-            const delay = getTransientRetryDelayMs(command, params, startedAt, submitRetryCount);
-            console.error(
-              `[MCP Bridge] Replaying "${command}" after lost queue ticket ${ticketId} in ${delay}ms (retry ${submitRetryCount + 1})...`
-            );
-            await sleep(delay);
-            submitRetryCount++;
-            continue;
-          }
-
-          return lostTicketReplayCount > 0
-            ? { ...result, replayedAfterLostTicket: true, replayCount: lostTicketReplayCount }
-            : result;
-        } catch (submitError) {
-          submitLastError = submitError;
-
-          // Check if it's a transient error worth retrying
-          if (isTransientError(submitError, null) &&
-              shouldRetryTransientConnection(command, params, startedAt, submitRetryCount)) {
-            const delay = getTransientRetryDelayMs(command, params, startedAt, submitRetryCount);
-            console.error(
-              `[MCP Bridge] Error submitting to queue: ${submitError.message}, retrying in ${delay}ms (retry ${submitRetryCount + 1})...`
-            );
-            await sleep(delay);
-            submitRetryCount++;
-            continue;
-          }
-
-          // Check if it's a 404 (queue not supported) â€" match "HTTP 404" or raw status code
-          if (submitError.status === 404 || (submitError.message && /HTTP\s*404/.test(submitError.message))) {
-            console.warn(
-              `[MCP Bridge] Queue mode not supported (HTTP 404), falling back to legacy sync mode`
-            );
-            _queueModeDetermined = true;
-            _useQueueMode = false;
-            return sendCommandLegacyMode(command, params, requestId);
-          }
-
-          // Other errors â€" don't retry, mark mode as undetermined and try legacy
-          break;
-        }
-      }
-
-      // If we get here, queue submit failed after retries
-      if (submitLastError) {
-        const failure = buildConnectionFailure(
-          command,
-          params,
-          startedAt,
-          submitRetryCount,
-          submitLastError
-        );
-        const recovered = await recoverReloadSafeCommand(command, requestId, failure);
+      const result = await pollQueueStatus(ticketId, command, params);
+      if (!result.success) {
+        const recovered = await recoverReloadSafeCommand(command, requestId, result);
         if (recovered) return recovered;
-        if (getReloadReconnectBudgetMs(command, params) > 0) {
-          return failure;
-        }
-
-        console.warn(
-          `[MCP Bridge] Queue mode failed after retries, falling back to legacy sync mode: ${submitLastError.message}`
-        );
-        _queueModeDetermined = true;
-        _useQueueMode = false;
-        return sendCommandLegacyMode(command, params, requestId);
       }
-    } catch (error) {
-      console.warn(
-        `[MCP Bridge] Unexpected error in queue mode, falling back to legacy: ${error.message}`
-      );
-      _queueModeDetermined = true;
-      _useQueueMode = false;
-      return sendCommandLegacyMode(command, params, requestId);
+      if (!result.success && result.retryable && canReplayAfterLostTicket(command) &&
+          shouldRetryTransientConnection(
+            command, params, startedAt, lostTicketReplayCount)) {
+        lostTicketReplayCount++;
+        const delay = getTransientRetryDelayMs(
+          command, params, startedAt, lostTicketReplayCount - 1);
+        console.error(
+          `[MCP Bridge] Replaying "${command}" after lost queue ticket ${ticketId} in ${delay}ms (retry ${lostTicketReplayCount})...`
+        );
+        await sleep(delay);
+        queueSubmitStartedAt = Date.now();
+        queueSubmitRetryCount = 0;
+        continue;
+      }
+
+      return lostTicketReplayCount > 0
+        ? { ...result, replayedAfterLostTicket: true, replayCount: lostTicketReplayCount }
+        : result;
+    } catch (submitError) {
+      submitLastError = submitError;
+      if (isTransientQueueSubmitError(submitError) &&
+          shouldRetryQueueSubmission(
+            command, params, queueSubmitStartedAt, queueSubmitRetryCount,
+            submitError)) {
+        const delay = getQueueSubmitRetryDelayMs(
+          command, params, queueSubmitStartedAt, queueSubmitRetryCount,
+          submitError);
+        console.error(
+          `[MCP Bridge] Error submitting to queue: ${submitError.message}, retrying in ${delay}ms (retry ${queueSubmitRetryCount + 1})...`
+        );
+        await sleep(delay);
+        queueSubmitRetryCount++;
+        continue;
+      }
+      break;
     }
   }
 
-  // Fallback (should not reach here, but just in case)
-  return sendCommandLegacyMode(command, params, requestId);
+  const failure = buildQueueSubmissionFailure(
+    command,
+    params,
+    queueSubmitStartedAt,
+    queueSubmitRetryCount,
+    submitLastError
+  );
+  return (await recoverReloadSafeCommand(command, requestId, failure)) || failure;
 }
 
 /**
@@ -1229,20 +1079,16 @@ export async function unpackPrefab(params) {
   return sendCommand("prefab/unpack", params);
 }
 
-export async function setObjectReference(params) {
-  return sendCommand("prefab/set-object-reference", params);
-}
-
 export async function duplicateGameObject(params) {
-  return sendCommand("prefab/duplicate", params);
+  return sendCommand("gameobject/duplicate", params);
 }
 
 export async function setGameObjectActive(params) {
-  return sendCommand("prefab/set-active", params);
+  return sendCommand("gameobject/set-active", params);
 }
 
 export async function reparentGameObject(params) {
-  return sendCommand("prefab/reparent", params);
+  return sendCommand("gameobject/reparent", params);
 }
 
 // â"€â"€â"€ Prefab Asset (Direct Editing) â"€â"€â"€
@@ -1593,100 +1439,6 @@ export async function setShaderGraphNodeProperty(params) {
 
 export async function getShaderGraphNodeTypes(params) {
   return sendCommand("shadergraph/get-node-types", params);
-}
-
-// â"€â"€â"€ Amplify Shader Editor â"€â"€â"€
-
-export async function getAmplifyStatus(params) {
-  return sendCommand("amplify/status", params);
-}
-
-export async function listAmplifyShaders(params) {
-  return sendCommand("amplify/list", params);
-}
-
-export async function getAmplifyShaderInfo(params) {
-  return sendCommand("amplify/info", params);
-}
-
-export async function openAmplifyShader(params) {
-  return sendCommand("amplify/open", params);
-}
-
-export async function listAmplifyFunctions(params) {
-  return sendCommand("amplify/list-functions", params);
-}
-
-export async function getAmplifyNodeTypes(params) {
-  return sendCommand("amplify/get-node-types", params);
-}
-
-export async function getAmplifyGraphNodes(params) {
-  return sendCommand("amplify/get-nodes", params);
-}
-
-export async function getAmplifyGraphConnections(params) {
-  return sendCommand("amplify/get-connections", params);
-}
-
-export async function createAmplifyShader(params) {
-  return sendCommand("amplify/create-shader", params);
-}
-
-export async function addAmplifyNode(params) {
-  return sendCommand("amplify/add-node", params);
-}
-
-export async function removeAmplifyNode(params) {
-  return sendCommand("amplify/remove-node", params);
-}
-
-export async function connectAmplifyNodes(params) {
-  return sendCommand("amplify/connect", params);
-}
-
-export async function disconnectAmplifyNodes(params) {
-  return sendCommand("amplify/disconnect", params);
-}
-
-export async function getAmplifyNodeInfo(params) {
-  return sendCommand("amplify/node-info", params);
-}
-
-export async function setAmplifyNodeProperty(params) {
-  return sendCommand("amplify/set-node-property", params);
-}
-
-export async function moveAmplifyNode(params) {
-  return sendCommand("amplify/move-node", params);
-}
-
-export async function saveAmplifyGraph(params) {
-  return sendCommand("amplify/save", params);
-}
-
-export async function closeAmplifyEditor(params) {
-  return sendCommand("amplify/close", params);
-}
-
-export async function createAmplifyFromTemplate(params) {
-  return sendCommand("amplify/create-from-template", params);
-}
-
-export async function focusAmplifyNode(params) {
-  return sendCommand("amplify/focus-node", params);
-}
-
-export async function getAmplifyMasterNodeInfo(params) {
-  return sendCommand("amplify/master-node-info", params);
-}
-
-export async function disconnectAllAmplifyNode(params) {
-  return sendCommand("amplify/disconnect-all", params);
-}
-
-export async function duplicateAmplifyNode(params) {
-  return sendCommand("amplify/duplicate-node", params);
 }
 
 // â"€â"€â"€ Agent Management â"€â"€â"€
@@ -2193,29 +1945,22 @@ export async function deleteAllPlayerPrefs(params) {
   return sendCommand("playerprefs/delete-all", params);
 }
 
-// â"€â"€â"€ Project Context (direct HTTP, no queue) â"€â"€â"€
+// â"€â"€â"€ Project Context â"€â"€â"€
 
 /**
- * Get project context files. Bypasses the command queue since it's read-only file I/O.
+ * Get project context files through the Editor command queue.
  * @param {string} [category] - Optional specific category to fetch. Omit for all.
  * @returns {object} Context data with categories and content.
  */
 export async function getProjectContext(category = null) {
-  const url = category
-    ? `${getBridgeUrl()}/api/context/${encodeURIComponent(category)}`
-    : `${getBridgeUrl()}/api/context`;
-
-  const response = await fetch(url, {
-    method: "GET",
-    headers: buildBridgeHeaders(),
-    signal: AbortSignal.timeout(5000),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Context request failed: HTTP ${response.status}`);
+  const route = category
+    ? `context/${encodeURIComponent(category)}`
+    : "context";
+  const response = await sendCommand(route, {});
+  if (!response.success) {
+    throw new Error(response.error || "Project context request failed.");
   }
-
-  return response.json();
+  return response.data;
 }
 
 // ─── Testing ───

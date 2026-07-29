@@ -10,8 +10,10 @@ import {
   canReplayAfterLostTicket,
   buildTargetHeaders,
   createRequestId,
+  getQueueSubmitReconnectBudgetMs,
   getReloadReconnectBudgetMs,
   isTransientError,
+  isTransientQueueSubmitError,
   normalizeEditorCommandResult,
   normalizeRecoveredAssetRefreshJob,
   normalizeTerminalQueueStatus,
@@ -77,7 +79,7 @@ test("completed queue tickets propagate nested Editor failures", () => {
   assert.equal(result.actionName, "packages/update-git");
 });
 
-test("legacy Editor responses propagate error-only payloads", () => {
+test("Editor command failures propagate error-only payloads", () => {
   const result = normalizeEditorCommandResult({ error: "Package Manager rejected the ref." });
   assert.equal(result.success, false);
   assert.equal(result.error, "Package Manager rejected the ref.");
@@ -89,6 +91,79 @@ test("incomplete reload JSON is a transient transport failure", () => {
   assert.equal(isTransientError(new Error("other side closed"), null), true);
   assert.equal(isTransientError(new SyntaxError("Unexpected token at position 4"), null), false);
 });
+
+test("queue submit 404 is transient under the current queue-only plugin contract", () => {
+  const error = new Error("HTTP 404: bridge is reloading");
+  error.status = 404;
+  assert.equal(isTransientQueueSubmitError(error), true);
+  assert.ok(getQueueSubmitReconnectBudgetMs(
+    "prefab-asset/remove-gameobject", {}, error) >=
+    CONFIG.queueReloadRecoveryTimeoutMs);
+});
+
+test("a transient queue-submit 404 retries the queue without poisoning later commands",
+  async () => {
+    const originalFetch = globalThis.fetch;
+    const originalRecoveryTimeout = CONFIG.queueReloadRecoveryTimeoutMs;
+    const calls = [];
+    const requestIds = [];
+    let submitCount = 0;
+
+    globalThis.fetch = async (url, options = {}) => {
+      const target = String(url);
+      calls.push(target);
+      if (target.endsWith("/api/queue/submit")) {
+        const body = JSON.parse(options.body);
+        requestIds.push(body.requestId);
+        submitCount++;
+        if (submitCount === 1) {
+          return new Response("bridge is reloading", { status: 404 });
+        }
+        return Response.json({ ticketId: submitCount });
+      }
+      if (target.includes("/api/queue/status?ticketId=")) {
+        return Response.json({
+          ticketId: submitCount,
+          actionName: "scene/info",
+          status: "Completed",
+          result: { success: true, data: { sequence: submitCount } },
+        });
+      }
+      throw new Error(`unexpected fetch ${target}`);
+    };
+    CONFIG.queueReloadRecoveryTimeoutMs = 2_000;
+
+    try {
+      const context = {
+        agentId: "agent-queue-404",
+        portOverride: 7891,
+        targetInstance: {
+          port: 7891,
+          projectPath: "D:/UnityProjects/BattleIdle/apps/game-client-unity",
+          projectName: "BattleIdle",
+        },
+        expectedProjectPath:
+          "D:/UnityProjects/BattleIdle/apps/game-client-unity",
+      };
+      const recovered = await runWithRequestContext(
+        context, () => sendCommand("scene/info", {}));
+      const next = await runWithRequestContext(
+        context, () => sendCommand("scene/info", {}));
+
+      assert.equal(recovered.success, true);
+      assert.equal(next.success, true);
+      assert.equal(submitCount, 3);
+      assert.equal(requestIds[0], requestIds[1]);
+      assert.notEqual(requestIds[1], requestIds[2]);
+      assert.equal(calls.some((target) =>
+        target.endsWith("/api/scene/info")), false);
+      assert.equal(calls.filter((target) =>
+        target.endsWith("/api/queue/submit")).length, 3);
+    } finally {
+      globalThis.fetch = originalFetch;
+      CONFIG.queueReloadRecoveryTimeoutMs = originalRecoveryTimeout;
+    }
+  });
 
 test("only explicitly replayable reload-safe routes are retried", () => {
   assert.equal(canReplayAfterLostTicket("wait/editor-idle"), true);
@@ -235,7 +310,7 @@ test("fresh Unity BOM registry leases remain discoverable while ping is unavaila
   }
 });
 
-test("idle editor state cannot turn a non-terminal queue ticket into success", async () => {
+test("a non-terminal queue ticket remains a timeout failure", async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async (url) => {
     const target = String(url);
@@ -250,16 +325,6 @@ test("idle editor state cannot turn a non-terminal queue ticket into success", a
     if (target.endsWith("/api/queue/info")) {
       return Response.json({ totalQueued: 1, executingCount: 0 });
     }
-    if (target.endsWith("/api/editor/state")) {
-      return Response.json({
-        success: true,
-        data: {
-          isCompiling: false,
-          isUpdating: false,
-          isChangingPlayMode: false,
-        },
-      });
-    }
     throw new Error(`unexpected fetch ${target}`);
   };
 
@@ -269,9 +334,31 @@ test("idle editor state cannot turn a non-terminal queue ticket into success", a
     assert.equal(result.success, false);
     assert.equal(result.errorCode, "queue_poll_timeout");
     assert.equal(result.finalTicketStatus.data.status, "Queued");
-    assert.equal(result.finalEditorState.isCompiling, false);
   } finally {
     globalThis.fetch = originalFetch;
+  }
+});
+
+test("queue submission failure never falls back to a direct command endpoint", async () => {
+  const originalFetch = globalThis.fetch;
+  const originalRecoveryTimeout = CONFIG.queueReloadRecoveryTimeoutMs;
+  const calls = [];
+  globalThis.fetch = async (url) => {
+    calls.push(String(url));
+    return new Response("queue unavailable", { status: 404 });
+  };
+  CONFIG.queueReloadRecoveryTimeoutMs = 5;
+
+  try {
+    const result = await sendCommand("scene/info", {});
+    assert.equal(result.success, false);
+    assert.equal(result.errorCode, "queue_submit_recovery_timeout");
+    assert.ok(calls.length >= 1);
+    assert.equal(calls.every((url) =>
+      new URL(url).pathname === "/api/queue/submit"), true);
+  } finally {
+    globalThis.fetch = originalFetch;
+    CONFIG.queueReloadRecoveryTimeoutMs = originalRecoveryTimeout;
   }
 });
 
@@ -357,6 +444,14 @@ test("first-class Editor schemas expose explicit project binding", () => {
   assert.equal(injectEditorBindingSchema("unity_hub_list_projects", {
     type: "object", properties: {},
   }).properties.expectedProjectPath, undefined);
+});
+
+test("execute code schema exposes one-off namespace imports and project configuration", () => {
+  const executeCode = editorTools.find((tool) => tool.name === "unity_execute_code");
+  assert.ok(executeCode);
+  assert.equal(executeCode.inputSchema.properties.usings.type, "array");
+  assert.equal(executeCode.inputSchema.properties.usings.items.type, "string");
+  assert.match(executeCode.inputSchema.properties.usings.description, /Project Settings > Unity MCP/);
 });
 
 test("asset refresh recovery returns persistent job truth instead of transport failure", () => {
@@ -570,10 +665,16 @@ test("asset refresh queue failure is reconciled by exact persistent request ID",
     const target = String(url);
     if (target.endsWith("/api/queue/submit")) {
       const body = JSON.parse(options.body);
-      submittedRequestId = body.requestId;
       assert.equal(options.headers["X-UnityMCP-Expected-Project-Path"],
         "D:/UnityProjects/BattleIdle/apps/game-client-unity");
-      return Response.json({ ticketId: 17 });
+      if (body.apiPath === "asset/refresh") {
+        submittedRequestId = body.requestId;
+        return Response.json({ ticketId: 17 });
+      }
+      if (body.apiPath === "asset/get-refresh-job") {
+        recoveryRequestId = JSON.parse(body.body).refreshRequestId;
+        return Response.json({ ticketId: 18 });
+      }
     }
     if (target.includes("/api/queue/status?ticketId=17")) {
       return Response.json({
@@ -585,12 +686,15 @@ test("asset refresh queue failure is reconciled by exact persistent request ID",
         result: { success: false, error: "outer request timed out" },
       });
     }
-    if (target.endsWith("/api/asset/get-refresh-job")) {
-      recoveryRequestId = JSON.parse(options.body).refreshRequestId;
+    if (target.includes("/api/queue/status?ticketId=18")) {
       return Response.json({
-        success: true,
-        jobId: "refresh-17",
-        status: "succeeded",
+        ticketId: 18,
+        actionName: "asset/get-refresh-job",
+        status: "Completed",
+        result: {
+          jobId: "refresh-17",
+          status: "succeeded",
+        },
       });
     }
     throw new Error(`unexpected fetch ${target}`);
