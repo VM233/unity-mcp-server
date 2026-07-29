@@ -100,6 +100,14 @@ try {
   for (const toolName of ["unity_asset_refresh", "unity_execute_code", "unity_play_mode"]) {
     assertEditorBindingSchema(initial.tools, toolName);
   }
+  for (const toolName of [
+    "unity_project_tools_list",
+    "unity_project_tools_get",
+    "unity_project_tools_execute",
+  ]) {
+    assert.equal(initial.tools.some((tool) => tool.name === toolName), true);
+  }
+  assert.equal(initial.tools.some((tool) => tool.name.startsWith("unity_uma_")), false);
 
   const refreshedMetadataTools = [
     "unity_testing_run_package_tests",
@@ -120,6 +128,8 @@ try {
   assert.equal(refreshed.tools.some((tool) => tool.name === "unity_asset_move_batch"), false);
   assert.equal(refreshed.tools.some((tool) => tool.name === "unity_component_batch_wire"), false);
   assert.equal(refreshed.tools.some((tool) => tool.name === "unity_localization_upsert_entries"), false);
+  assert.equal(refreshed.tools.some((tool) => tool.name === "unity_project_tools_get"), true);
+  assert.equal(refreshed.tools.some((tool) => tool.name.startsWith("unity_uma_")), false);
   const transaction = refreshed.tools.find((tool) => tool.name === "unity_prefab_asset_transaction_edit");
   const assetMove = refreshed.tools.find((tool) => tool.name === "unity_asset_move");
   const setReference = refreshed.tools.find((tool) => tool.name === "unity_component_set_reference");
@@ -171,6 +181,35 @@ try {
   assert.ok(catalogText.length < 10_000);
   assert.ok(Array.isArray(catalog.categories));
   assert.ok(catalog.categories.every((category) => !Array.isArray(category.tools)));
+  assert.equal(catalog.categories.some((category) => category.name === "uma"), false);
+
+  const projectListResponse = await client.callTool({
+    name: "unity_project_tools_list",
+    arguments: {
+      limit: 100,
+      port: Number(environment.UNITY_BRIDGE_PORT),
+    },
+  });
+  const projectListPayload = JSON.parse(getJsonText(projectListResponse));
+  const projectList = projectListPayload.data || projectListPayload;
+  assert.ok(Array.isArray(projectList.tools));
+  assert.equal(projectList.tools.some((tool) => "inputSchema" in tool), false);
+
+  const selectedProjectTool = projectList.tools.find(
+    (tool) => tool.toolName === "vmframework/list-game-prefab-types"
+  );
+  assert.ok(selectedProjectTool);
+  const projectGetResponse = await client.callTool({
+    name: "unity_project_tools_get",
+    arguments: {
+      toolName: selectedProjectTool.toolName,
+      port: Number(environment.UNITY_BRIDGE_PORT),
+    },
+  });
+  const projectGetPayload = JSON.parse(getJsonText(projectGetResponse));
+  const projectGet = projectGetPayload.data || projectGetPayload;
+  assert.equal(projectGet.tool.toolName, selectedProjectTool.toolName);
+  assert.ok(projectGet.tool.inputSchema);
 
   const prefabCatalogResponse = await client.callTool({
     name: "unity_list_advanced_tools",
