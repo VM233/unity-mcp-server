@@ -1080,13 +1080,18 @@ export const editorTools = [
   },
   {
     name: "unity_prefab_add_component",
-    description: "Add a component to a GameObject inside a prefab asset â€” no scene instance needed. Supports built-in types (Rigidbody, BoxCollider, etc.) and custom scripts.",
+    description: "Add and optionally initialize a component inside a prefab asset, then verify its serialized state after saving.",
     inputSchema: {
       type: "object",
       properties: {
         assetPath: { type: "string", description: "Asset path of the prefab" },
         prefabPath: { type: "string", description: "Path within the prefab hierarchy. Empty = root." },
         componentType: { type: "string", description: "Full type name (e.g. 'Rigidbody', 'BoxCollider', 'MyNamespace.MyScript')" },
+        properties: {
+          type: "object",
+          description: "Optional serialized property names or paths mapped to initial JSON values. Applied before the new component is saved.",
+          additionalProperties: true,
+        },
       },
       required: ["assetPath", "componentType"],
     },

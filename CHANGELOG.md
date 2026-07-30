@@ -2,6 +2,19 @@
 
 All notable changes to this package will be documented in this file.
 
+## [4.2.3] - 2026-07-30
+
+### Fixed
+- Declare the optional initial `properties` map on the prefab add-component
+  compatibility tool so callers can configure nested serialized lists during
+  the same atomic creation request.
+
+### Changed
+- Document the verified prefab initialization workflow and replace removed
+  Dashboard instructions, stale fork installation URLs, and a manually
+  duplicated optional-package table with the current settings and live
+  capability contracts.
+
 ## [4.2.2] - 2026-07-30
 
 ### Changed

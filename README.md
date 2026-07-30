@@ -124,7 +124,17 @@ Project-defined tools are deliberately not promoted to concrete Node-server tool
 
 The server advertises MCP tool-list change notifications and refreshes live plugin metadata in the background. When a package update changes one of the release-managed concrete routes, compatible MCP clients automatically request the updated tool list without reconnecting. Metadata refresh requests compact schema-bearing first-class pages only; they do not transfer the full plugin route catalog.
 
-VM Unity MCP 5.2 adds concrete tools for persistent-job cancellation, semantic importer settings, multi-scene workspaces, and typed Material properties. Package-specific VFX Graph, Audio Mixer, Build Profile, Addressables, Timeline, and Cinemachine routes remain lazily discoverable and are published only when the Editor reports the corresponding capability.
+The current VM Unity MCP package publishes common semantic workflows directly
+and keeps package-specific VFX Graph, Audio Mixer, Build Profile, Addressables,
+Timeline, and Cinemachine routes lazily discoverable. The Editor's live
+capability metadata, rather than this README, is authoritative for availability
+and schemas.
+
+For prefab creation, `unity_prefab_asset_add_component` accepts an optional
+`properties` map. The Editor applies those serialized values before the first
+save and verifies them by readback; use
+`unity_prefab_asset_configure_component` for idempotent ensure/update work or
+ObjectReference wiring.
 
 ### Multi-Instance Support
 
@@ -153,7 +163,7 @@ https://github.com/VM233/VMUnityMCP.git
 ### 2. Install this MCP Server
 
 ```bash
-git clone https://github.com/AnkleBreaker-Studio/unity-mcp-server.git
+git clone https://github.com/VM233/unity-mcp-server.git
 cd unity-mcp-server
 npm install
 ```
@@ -204,25 +214,21 @@ Restart Claude Desktop. Done!
 | `UNITY_PORT_RANGE_START` | `7890` | Start of port scan range for multi-instance discovery |
 | `UNITY_PORT_RANGE_END` | `7899` | End of port scan range |
 | `UNITY_REGISTRY_STALENESS_TIMEOUT` | `300000` | Registry entry staleness timeout in ms (crash detection) |
-| `UNITY_RESPONSE_SOFT_LIMIT` | `2097152` | Response size soft limit in bytes (warning) |
-| `UNITY_RESPONSE_HARD_LIMIT` | `4194304` | Response size hard limit in bytes (truncation) |
+| `UNITY_RESPONSE_SOFT_LIMIT` | `2097152` | Response size threshold that emits a server-side diagnostic |
+| `UNITY_RESPONSE_HARD_LIMIT` | `4194304` | Response size limit; oversized payloads become a structured error |
 | `UNITY_MCP_DEBUG` | `false` | Enable debug logging for troubleshooting |
 
-The Unity plugin also has its own settings accessible via the Dashboard (`Window > MCP Dashboard`) for port, auto-start, and per-category feature toggles.
+The Unity package stores team defaults under **Project Settings > Unity MCP**
+and local bridge, port, response, history, and category choices under
+**Preferences > Unity MCP**.
 
 ## Optional Package Support
 
-Some tools activate automatically when their packages are detected in the Unity project:
-
-| Package / Asset | Features Unlocked |
-|----------------|-------------------|
-| `com.unity.memoryprofiler` | Memory snapshot capture via MemoryProfiler API |
-| `com.unity.shadergraph` | Shader Graph creation, inspection, opening |
-| `com.unity.visualeffectgraph` | VFX Graph listing and opening |
-| `com.unity.inputsystem` | Input Action map and binding inspection |
-| `com.unity.multiplayer.playmode` | MPPM scenario listing, activation, start/stop, player info |
-
-Features for uninstalled packages return helpful messages explaining what to install.
+Optional integrations are capability- and version-gated by the Editor package.
+Use the live `_meta/capabilities` metadata through the advanced catalog to see
+what the selected project currently supports. Keeping that response
+authoritative avoids duplicating a package table here that would drift as Unity
+packages are installed, removed, or upgraded.
 
 ## Requirements
 
@@ -236,9 +242,12 @@ Features for uninstalled packages return helpful messages explaining what to ins
 
 **"Unity Hub not found"** — Update `UNITY_HUB_PATH` in your config to match your installation.
 
-**"Category disabled" errors** — A feature category may be toggled off. Open `Window > MCP Dashboard` in Unity to check category settings.
+**"Category disabled" errors** — A feature category may be toggled off. Open
+**Preferences > Unity MCP** in Unity to check local category settings.
 
-**Port conflicts** — Change `UNITY_BRIDGE_PORT` in your Claude config and update the port in Unity's MCP Dashboard settings.
+**Port conflicts** — Change `UNITY_BRIDGE_PORT` in the MCP server environment
+or update the manual/automatic port settings under
+**Preferences > Unity MCP**.
 
 ## Why AnkleBreaker Unity MCP?
 

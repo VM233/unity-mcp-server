@@ -1,6 +1,6 @@
 # Unity MCP 插件与工具逐项设计审查
 
-生成时间：2026-07-30T06:00:33.739Z
+生成时间：2026-07-30T09:14:54.392Z
 
 ## 结论
 
@@ -47,7 +47,7 @@
 - 插件元数据：39 个内建第一类路由，质量问题 0。
 - Node：69 个默认工具，目录与 schema 自动测试通过。
 - npm：生产依赖漏洞 0。
-- 包测试：VMUnityMCP 5.2.0 主功能聚焦回归 15/15；5.2.1 最终全量 192/192 通过，manifest 精确恢复。
+- 包测试：VMUnityMCP 5.3.2 本次 Prefab 修复聚焦回归 4/4；最终全量 201/201 通过，manifest 精确恢复。
 
 ## 174 个基线唯一工具逐项审查
 
@@ -66,7 +66,7 @@
 | 11 | `unity_scene_info` | server | Node 静态 | 默认保留 | `unity_scene_info` | 唯一默认入口；描述与输入 schema 已通过自动质量门。 |
 | 12 | `unity_scene_open` | server | Node 静态 | 默认保留 | `unity_scene_open` | 唯一默认入口；描述与输入 schema 已通过自动质量门。 |
 | 13 | `unity_scene_save` | server | Node 静态 | 默认保留 | `unity_scene_save` | 唯一默认入口；描述与输入 schema 已通过自动质量门。 |
-| 14 | `unity_scene_new` | server | Node 静态 | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 14 | `unity_scene_new` | server | Node 静态 | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
 | 15 | `unity_scene_hierarchy` | plugin | `scene/hierarchy` | 默认保留 | `unity_scene_hierarchy` | 唯一默认入口；描述与输入 schema 已通过自动质量门。 |
 | 16 | `unity_gameobject_create` | server | Node 静态 | 默认保留 | `unity_gameobject_create` | 唯一默认入口；描述与输入 schema 已通过自动质量门。 |
 | 17 | `unity_gameobject_delete` | server | Node 静态 | 默认保留 | `unity_gameobject_delete` | 唯一默认入口；描述与输入 schema 已通过自动质量门。 |
@@ -76,27 +76,27 @@
 | 21 | `unity_component_remove` | server | Node 静态 | 默认保留 | `unity_component_remove` | 唯一默认入口；描述与输入 schema 已通过自动质量门。 |
 | 22 | `unity_component_get_properties` | server | Node 静态 | 默认保留 | `unity_component_get_properties` | 唯一默认入口；描述与输入 schema 已通过自动质量门。 |
 | 23 | `unity_component_set_property` | plugin | `component/set-property` | 默认保留 | `unity_component_set_property` | 唯一默认入口；描述与输入 schema 已通过自动质量门。 |
-| 24 | `unity_component_get_referenceable` | server | Node 静态 | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 24 | `unity_component_get_referenceable` | server | Node 静态 | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
 | 25 | `unity_asset_list` | plugin | `asset/list` | 默认保留 | `unity_asset_list` | 唯一默认入口；描述与输入 schema 已通过自动质量门。 |
 | 26 | `unity_asset_import` | plugin | `asset/import` | 默认保留 | `unity_asset_import` | 唯一默认入口；描述与输入 schema 已通过自动质量门。 |
 | 27 | `unity_asset_refresh` | plugin | `asset/refresh` | 默认保留 | `unity_asset_refresh` | 唯一默认入口；描述与输入 schema 已通过自动质量门。 |
 | 28 | `unity_asset_delete` | server | Node 静态 | 默认保留 | `unity_asset_delete` | 唯一默认入口；描述与输入 schema 已通过自动质量门。 |
-| 29 | `unity_asset_create_prefab` | server | Node 静态 | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 30 | `unity_script_create` | server | Node 静态 | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 31 | `unity_script_read` | server | Node 静态 | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 32 | `unity_script_update` | server | Node 静态 | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 29 | `unity_asset_create_prefab` | server | Node 静态 | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 30 | `unity_script_create` | server | Node 静态 | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 31 | `unity_script_read` | server | Node 静态 | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 32 | `unity_script_update` | server | Node 静态 | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
 | 33 | `unity_execute_code` | server | Node 静态 | 默认保留 | `unity_execute_code` | 唯一默认入口；描述与输入 schema 已通过自动质量门。 |
 | 34 | `unity_console_clear` | server | Node 静态 | 默认保留 | `unity_console_clear` | 唯一默认入口；描述与输入 schema 已通过自动质量门。 |
 | 35 | `unity_get_compilation_errors` | server | Node 静态 | 默认保留 | `unity_get_compilation_errors` | 唯一默认入口；描述与输入 schema 已通过自动质量门。 |
 | 36 | `unity_play_mode` | server | Node 静态 | 默认保留 | `unity_play_mode` | 唯一默认入口；描述与输入 schema 已通过自动质量门。 |
-| 37 | `unity_execute_menu_item` | server | Node 静态 | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 37 | `unity_execute_menu_item` | server | Node 静态 | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
 | 38 | `unity_project_info` | server | Node 静态 | 默认保留 | `unity_project_info` | 唯一默认入口；描述与输入 schema 已通过自动质量门。 |
 | 39 | `unity_prefab_info` | server | Node 静态 | 默认保留 | `unity_prefab_info` | 唯一默认入口；描述与输入 schema 已通过自动质量门。 |
-| 40 | `unity_gameobject_duplicate` | server | Node 静态 | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 41 | `unity_gameobject_set_active` | server | Node 静态 | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 42 | `unity_gameobject_reparent` | server | Node 静态 | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 43 | `unity_selection_get` | server | Node 静态 | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 44 | `unity_selection_set` | server | Node 静态 | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 40 | `unity_gameobject_duplicate` | server | Node 静态 | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 41 | `unity_gameobject_set_active` | server | Node 静态 | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 42 | `unity_gameobject_reparent` | server | Node 静态 | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 43 | `unity_selection_get` | server | Node 静态 | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 44 | `unity_selection_set` | server | Node 静态 | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
 | 45 | `unity_search_by_component` | server | Node 静态 | 合并 | `unity_search_scene` | 与同域工具高度重合，统一到 unity_search_scene。 |
 | 46 | `unity_search_by_name` | server | Node 静态 | 合并 | `unity_search_scene` | 与同域工具高度重合，统一到 unity_search_scene。 |
 | 47 | `unity_scene_stats` | server | Node 静态 | 默认保留 | `unity_scene_stats` | 唯一默认入口；描述与输入 schema 已通过自动质量门。 |
@@ -104,7 +104,7 @@
 | 49 | `unity_screenshot_scene` | server | Node 静态 | 默认保留 | `unity_screenshot_scene` | 唯一默认入口；描述与输入 schema 已通过自动质量门。 |
 | 50 | `unity_packages_list` | plugin | `packages/list` | 默认保留 | `unity_packages_list` | 唯一默认入口；描述与输入 schema 已通过自动质量门。 |
 | 51 | `unity_packages_update_git` | plugin | `packages/update-git` | 默认保留 | `unity_packages_update_git` | 唯一默认入口；描述与输入 schema 已通过自动质量门。 |
-| 52 | `unity_packages_lint_metas` | plugin | `packages/lint-metas` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 52 | `unity_packages_lint_metas` | plugin | `packages/lint-metas` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
 | 53 | `unity_queue_info` | plugin | `queue/info` | 默认保留 | `unity_queue_info` | 唯一默认入口；描述与输入 schema 已通过自动质量门。 |
 | 54 | `unity_queue_ticket_status` | server | Node 静态 | 内部化 | `Node 队列控制面` | 票据轮询与取消由传输层自动处理，不占用用户工具面。 |
 | 55 | `unity_queue_cancel` | plugin | `queue/cancel` | 内部化 | `Node 队列控制面` | 票据轮询与取消由传输层自动处理，不占用用户工具面。 |
@@ -113,70 +113,70 @@
 | 58 | `unity_get_project_context` | server | Node 静态 | 默认保留 | `unity_get_project_context` | 唯一默认入口；描述与输入 schema 已通过自动质量门。 |
 | 59 | `unity__meta_capabilities` | plugin | `_meta/capabilities` | 内部化 | `发布层元数据同步` | 内部发现协议不再作为普通用户工具显示。 |
 | 60 | `unity__meta_tools` | plugin | `_meta/tools` | 内部化 | `发布层元数据同步` | 内部发现协议不再作为普通用户工具显示。 |
-| 61 | `unity_animation_connect_states` | plugin | `animation/connect-states` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 62 | `unity_animation_transition_info` | plugin | `animation/transition-info` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 63 | `unity_animation_update_state` | plugin | `animation/update-state` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 64 | `unity_animation_update_transition` | plugin | `animation/update-transition` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 65 | `unity_asset_copy` | plugin | `asset/copy` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 66 | `unity_asset_create_folder` | plugin | `asset/create-folder` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 67 | `unity_asset_dependencies` | plugin | `asset/dependencies` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 68 | `unity_asset_export_unitypackage` | plugin | `asset/export-unitypackage` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 61 | `unity_animation_connect_states` | plugin | `animation/connect-states` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 62 | `unity_animation_transition_info` | plugin | `animation/transition-info` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 63 | `unity_animation_update_state` | plugin | `animation/update-state` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 64 | `unity_animation_update_transition` | plugin | `animation/update-transition` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 65 | `unity_asset_copy` | plugin | `asset/copy` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 66 | `unity_asset_create_folder` | plugin | `asset/create-folder` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 67 | `unity_asset_dependencies` | plugin | `asset/dependencies` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 68 | `unity_asset_export_unitypackage` | plugin | `asset/export-unitypackage` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
 | 69 | `unity_asset_get_refresh_job` | plugin | `asset/get-refresh-job` | 默认保留 | `unity_asset_get_refresh_job` | 唯一默认入口；描述与输入 schema 已通过自动质量门。 |
-| 70 | `unity_asset_import_unitypackage` | plugin | `asset/import-unitypackage` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 70 | `unity_asset_import_unitypackage` | plugin | `asset/import-unitypackage` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
 | 71 | `unity_asset_move` | plugin | `asset/move` | 默认保留 | `unity_asset_move` | 唯一默认入口；描述与输入 schema 已通过自动质量门。 |
 | 72 | `unity_asset_rename` | plugin | `asset/rename` | 默认保留 | `unity_asset_rename` | 唯一默认入口；描述与输入 schema 已通过自动质量门。 |
-| 73 | `unity_asset_transaction` | plugin | `asset/transaction` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 73 | `unity_asset_transaction` | plugin | `asset/transaction` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
 | 74 | `unity_build_get_job` | plugin | `build/get-job` | 默认保留 | `unity_build_get_job` | 唯一默认入口；描述与输入 schema 已通过自动质量门。 |
 | 75 | `unity_build_start` | plugin | `build/start` | 合并 | `unity_build` | 与同域工具高度重合，统一到 unity_build。 |
 | 76 | `unity_component_set_reference` | plugin | `component/set-reference` | 默认保留 | `unity_component_set_reference` | 唯一默认入口；描述与输入 schema 已通过自动质量门。 |
 | 77 | `unity_console_query` | plugin | `console/query` | 默认保留 | `unity_console_query` | 唯一默认入口；描述与输入 schema 已通过自动质量门。 |
 | 78 | `unity_editor_play_mode` | plugin | `editor/play-mode` | 合并 | `unity_play_mode` | 与同域工具高度重合，统一到 unity_play_mode。 |
-| 79 | `unity_jobs_get` | plugin | `jobs/get` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 80 | `unity_jobs_list` | plugin | `jobs/list` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 81 | `unity_localization_collections` | plugin | `localization/collections` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 82 | `unity_localization_create_collection` | plugin | `localization/create-collection` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 83 | `unity_localization_create_locale` | plugin | `localization/create-locale` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 84 | `unity_localization_entries` | plugin | `localization/entries` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 85 | `unity_localization_locales` | plugin | `localization/locales` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 86 | `unity_localization_remove_entry` | plugin | `localization/remove-entry` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 87 | `unity_localization_remove_variable` | plugin | `localization/remove-variable` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 88 | `unity_localization_set_selected_locale` | plugin | `localization/set-selected-locale` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 89 | `unity_localization_settings` | plugin | `localization/settings` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 90 | `unity_localization_status` | plugin | `localization/status` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 91 | `unity_localization_upsert_entry` | plugin | `localization/upsert-entry` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 92 | `unity_localization_upsert_variable` | plugin | `localization/upsert-variable` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 93 | `unity_localization_validate` | plugin | `localization/validate` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 94 | `unity_localization_variables` | plugin | `localization/variables` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 95 | `unity_packages_add` | plugin | `packages/add` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 96 | `unity_packages_info` | plugin | `packages/info` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 97 | `unity_packages_remove` | plugin | `packages/remove` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 98 | `unity_packages_search` | plugin | `packages/search` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 99 | `unity_packages_status` | plugin | `packages/status` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 100 | `unity_prefab_asset_add_component` | plugin | `prefab-asset/add-component` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 101 | `unity_prefab_asset_add_gameobject` | plugin | `prefab-asset/add-gameobject` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 102 | `unity_prefab_asset_cleanup_missing_overrides` | plugin | `prefab-asset/cleanup-missing-overrides` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 79 | `unity_jobs_get` | plugin | `jobs/get` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 80 | `unity_jobs_list` | plugin | `jobs/list` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 81 | `unity_localization_collections` | plugin | `localization/collections` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 82 | `unity_localization_create_collection` | plugin | `localization/create-collection` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 83 | `unity_localization_create_locale` | plugin | `localization/create-locale` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 84 | `unity_localization_entries` | plugin | `localization/entries` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 85 | `unity_localization_locales` | plugin | `localization/locales` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 86 | `unity_localization_remove_entry` | plugin | `localization/remove-entry` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 87 | `unity_localization_remove_variable` | plugin | `localization/remove-variable` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 88 | `unity_localization_set_selected_locale` | plugin | `localization/set-selected-locale` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 89 | `unity_localization_settings` | plugin | `localization/settings` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 90 | `unity_localization_status` | plugin | `localization/status` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 91 | `unity_localization_upsert_entry` | plugin | `localization/upsert-entry` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 92 | `unity_localization_upsert_variable` | plugin | `localization/upsert-variable` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 93 | `unity_localization_validate` | plugin | `localization/validate` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 94 | `unity_localization_variables` | plugin | `localization/variables` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 95 | `unity_packages_add` | plugin | `packages/add` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 96 | `unity_packages_info` | plugin | `packages/info` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 97 | `unity_packages_remove` | plugin | `packages/remove` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 98 | `unity_packages_search` | plugin | `packages/search` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 99 | `unity_packages_status` | plugin | `packages/status` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 100 | `unity_prefab_asset_add_component` | plugin | `prefab-asset/add-component` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 101 | `unity_prefab_asset_add_gameobject` | plugin | `prefab-asset/add-gameobject` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 102 | `unity_prefab_asset_cleanup_missing_overrides` | plugin | `prefab-asset/cleanup-missing-overrides` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
 | 103 | `unity_prefab_asset_configure_component` | plugin | `prefab-asset/configure-component` | 默认保留 | `unity_prefab_asset_configure_component` | 唯一默认入口；描述与输入 schema 已通过自动质量门。 |
-| 104 | `unity_prefab_asset_find` | plugin | `prefab-asset/find` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 105 | `unity_prefab_asset_get_properties` | plugin | `prefab-asset/get-properties` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 106 | `unity_prefab_asset_hierarchy` | plugin | `prefab-asset/hierarchy` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 107 | `unity_prefab_asset_instantiate_child_prefab` | plugin | `prefab-asset/instantiate-child-prefab` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 108 | `unity_prefab_asset_move_component` | plugin | `prefab-asset/move-component` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 109 | `unity_prefab_asset_move_gameobject` | plugin | `prefab-asset/move-gameobject` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 110 | `unity_prefab_asset_remove_component` | plugin | `prefab-asset/remove-component` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 111 | `unity_prefab_asset_remove_gameobject` | plugin | `prefab-asset/remove-gameobject` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 112 | `unity_prefab_asset_set_property` | plugin | `prefab-asset/set-property` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 113 | `unity_prefab_asset_set_reference` | plugin | `prefab-asset/set-reference` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 114 | `unity_prefab_asset_transaction_edit` | plugin | `prefab-asset/transaction-edit` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 115 | `unity_profiler_analyze` | plugin | `profiler/analyze` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 116 | `unity_profiler_enable` | plugin | `profiler/enable` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 117 | `unity_profiler_frame_data` | plugin | `profiler/frame-data` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 118 | `unity_profiler_memory` | plugin | `profiler/memory` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 119 | `unity_profiler_memory_breakdown` | plugin | `profiler/memory-breakdown` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 120 | `unity_profiler_memory_snapshot` | plugin | `profiler/memory-snapshot` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 121 | `unity_profiler_memory_snapshot_status` | plugin | `profiler/memory-snapshot-status` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 122 | `unity_profiler_memory_status` | plugin | `profiler/memory-status` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 123 | `unity_profiler_memory_top_assets` | plugin | `profiler/memory-top-assets` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 124 | `unity_profiler_stats` | plugin | `profiler/stats` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 104 | `unity_prefab_asset_find` | plugin | `prefab-asset/find` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 105 | `unity_prefab_asset_get_properties` | plugin | `prefab-asset/get-properties` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 106 | `unity_prefab_asset_hierarchy` | plugin | `prefab-asset/hierarchy` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 107 | `unity_prefab_asset_instantiate_child_prefab` | plugin | `prefab-asset/instantiate-child-prefab` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 108 | `unity_prefab_asset_move_component` | plugin | `prefab-asset/move-component` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 109 | `unity_prefab_asset_move_gameobject` | plugin | `prefab-asset/move-gameobject` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 110 | `unity_prefab_asset_remove_component` | plugin | `prefab-asset/remove-component` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 111 | `unity_prefab_asset_remove_gameobject` | plugin | `prefab-asset/remove-gameobject` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 112 | `unity_prefab_asset_set_property` | plugin | `prefab-asset/set-property` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 113 | `unity_prefab_asset_set_reference` | plugin | `prefab-asset/set-reference` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 114 | `unity_prefab_asset_transaction_edit` | plugin | `prefab-asset/transaction-edit` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 115 | `unity_profiler_analyze` | plugin | `profiler/analyze` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 116 | `unity_profiler_enable` | plugin | `profiler/enable` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 117 | `unity_profiler_frame_data` | plugin | `profiler/frame-data` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 118 | `unity_profiler_memory` | plugin | `profiler/memory` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 119 | `unity_profiler_memory_breakdown` | plugin | `profiler/memory-breakdown` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 120 | `unity_profiler_memory_snapshot` | plugin | `profiler/memory-snapshot` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 121 | `unity_profiler_memory_snapshot_status` | plugin | `profiler/memory-snapshot-status` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 122 | `unity_profiler_memory_status` | plugin | `profiler/memory-status` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 123 | `unity_profiler_memory_top_assets` | plugin | `profiler/memory-top-assets` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 124 | `unity_profiler_stats` | plugin | `profiler/stats` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
 | 125 | `unity_pt_battle_apply_knockback` | project | `project-tools/call/battleidle/apply-knockback` | 三段式 | `unity_project_tools_list/get/execute` | 项目动作不再永久展开；先发现、再取 schema、最后执行。 |
 | 126 | `unity_pt_battle_generate_level_range` | project | `project-tools/call/battleidle/generate-level-range` | 三段式 | `unity_project_tools_list/get/execute` | 项目动作不再永久展开；先发现、再取 schema、最后执行。 |
 | 127 | `unity_pt_battle_get_battle_state` | project | `project-tools/call/battleidle/get-battle-state` | 三段式 | `unity_project_tools_list/get/execute` | 项目动作不再永久展开；先发现、再取 schema、最后执行。 |
@@ -202,30 +202,30 @@
 | 147 | `unity_serialized_object_get` | plugin | `serialized-object/get` | 默认保留 | `unity_serialized_object_get` | 唯一默认入口；描述与输入 schema 已通过自动质量门。 |
 | 148 | `unity_serialized_object_set` | plugin | `serialized-object/set` | 默认保留 | `unity_serialized_object_set` | 唯一默认入口；描述与输入 schema 已通过自动质量门。 |
 | 149 | `unity_testing_get_job` | plugin | `testing/get-job` | 默认保留 | `unity_testing_get_job` | 唯一默认入口；描述与输入 schema 已通过自动质量门。 |
-| 150 | `unity_testing_get_package_job` | plugin | `testing/get-package-job` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 151 | `unity_testing_list_tests` | plugin | `testing/list-tests` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 152 | `unity_testing_run_package_tests` | plugin | `testing/run-package-tests` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 150 | `unity_testing_get_package_job` | plugin | `testing/get-package-job` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 151 | `unity_testing_list_tests` | plugin | `testing/list-tests` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 152 | `unity_testing_run_package_tests` | plugin | `testing/run-package-tests` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
 | 153 | `unity_testing_run_tests` | plugin | `testing/run-tests` | 默认保留 | `unity_testing_run_tests` | 唯一默认入口；描述与输入 schema 已通过自动质量门。 |
-| 154 | `unity_texture_apply_sprite_preset` | plugin | `texture/apply-sprite-preset` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 155 | `unity_texture_find_duplicates` | plugin | `texture/find-duplicates` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 156 | `unity_texture_info` | plugin | `texture/info` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 157 | `unity_uitoolkit_assert_layout` | plugin | `uitoolkit/assert-layout` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 158 | `unity_uitoolkit_asset_inspect` | plugin | `uitoolkit/asset-inspect` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 159 | `unity_uitoolkit_audit_uss_styles` | plugin | `uitoolkit/audit-uss-styles` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 160 | `unity_uitoolkit_audit_uxml_layout` | plugin | `uitoolkit/audit-uxml-layout` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 161 | `unity_uitoolkit_authoring_transaction` | plugin | `uitoolkit/authoring-transaction` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 162 | `unity_uitoolkit_builder_preview` | plugin | `uitoolkit/builder-preview` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 163 | `unity_uitoolkit_capture_element` | plugin | `uitoolkit/capture-element` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 164 | `unity_uitoolkit_compare_element` | plugin | `uitoolkit/compare-element` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 154 | `unity_texture_apply_sprite_preset` | plugin | `texture/apply-sprite-preset` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 155 | `unity_texture_find_duplicates` | plugin | `texture/find-duplicates` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 156 | `unity_texture_info` | plugin | `texture/info` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 157 | `unity_uitoolkit_assert_layout` | plugin | `uitoolkit/assert-layout` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 158 | `unity_uitoolkit_asset_inspect` | plugin | `uitoolkit/asset-inspect` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 159 | `unity_uitoolkit_audit_uss_styles` | plugin | `uitoolkit/audit-uss-styles` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 160 | `unity_uitoolkit_audit_uxml_layout` | plugin | `uitoolkit/audit-uxml-layout` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 161 | `unity_uitoolkit_authoring_transaction` | plugin | `uitoolkit/authoring-transaction` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 162 | `unity_uitoolkit_builder_preview` | plugin | `uitoolkit/builder-preview` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 163 | `unity_uitoolkit_capture_element` | plugin | `uitoolkit/capture-element` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 164 | `unity_uitoolkit_compare_element` | plugin | `uitoolkit/compare-element` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
 | 165 | `unity_uitoolkit_edit_uss` | plugin | `uitoolkit/edit-uss` | 默认保留 | `unity_uitoolkit_edit_uss` | 唯一默认入口；描述与输入 schema 已通过自动质量门。 |
 | 166 | `unity_uitoolkit_edit_uxml` | plugin | `uitoolkit/edit-uxml` | 默认保留 | `unity_uitoolkit_edit_uxml` | 唯一默认入口；描述与输入 schema 已通过自动质量门。 |
-| 167 | `unity_uitoolkit_locate_element` | plugin | `uitoolkit/locate-element` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 167 | `unity_uitoolkit_locate_element` | plugin | `uitoolkit/locate-element` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
 | 168 | `unity_uitoolkit_refresh` | plugin | `uitoolkit/refresh` | 默认保留 | `unity_uitoolkit_refresh` | 唯一默认入口；描述与输入 schema 已通过自动质量门。 |
-| 169 | `unity_uitoolkit_runtime_documents` | plugin | `uitoolkit/runtime-documents` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 169 | `unity_uitoolkit_runtime_documents` | plugin | `uitoolkit/runtime-documents` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
 | 170 | `unity_uitoolkit_runtime_query` | plugin | `uitoolkit/runtime-query` | 默认保留 | `unity_uitoolkit_runtime_query` | 唯一默认入口；描述与输入 schema 已通过自动质量门。 |
-| 171 | `unity_uitoolkit_runtime_repaint` | plugin | `uitoolkit/runtime-repaint` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 172 | `unity_uitoolkit_runtime_style` | plugin | `uitoolkit/runtime-style` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 173 | `unity_uitoolkit_runtime_tree` | plugin | `uitoolkit/runtime-tree` | 懒加载 | `unity_advanced_execute` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 171 | `unity_uitoolkit_runtime_repaint` | plugin | `uitoolkit/runtime-repaint` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 172 | `unity_uitoolkit_runtime_style` | plugin | `uitoolkit/runtime-style` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 173 | `unity_uitoolkit_runtime_tree` | plugin | `uitoolkit/runtime-tree` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
 | 174 | `unity_wait_editor_idle` | plugin | `wait/editor-idle` | 默认保留 | `unity_wait_editor_idle` | 唯一默认入口；描述与输入 schema 已通过自动质量门。 |
 
 ## 审查边界

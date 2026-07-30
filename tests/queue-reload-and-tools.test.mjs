@@ -745,6 +745,21 @@ test("scene tools advertise modal-free explicit save behavior", () => {
   assert.match(saveScene.description, /explicit asset path/i);
 });
 
+test("prefab add component exposes atomic initial serialized properties", () => {
+  const addComponent = editorTools.find(
+    (tool) => tool.name === "unity_prefab_add_component"
+  );
+
+  assert.ok(addComponent);
+  assert.match(addComponent.description, /optionally initialize/i);
+  assert.deepEqual(addComponent.inputSchema.required,
+    ["assetPath", "componentType"]);
+  const properties = addComponent.inputSchema.properties.properties;
+  assert.equal(properties.type, "object");
+  assert.equal(properties.additionalProperties, true);
+  assert.match(properties.description, /before the new component is saved/i);
+});
+
 test("asset refresh queue failure is reconciled by exact persistent request ID", async () => {
   const originalFetch = globalThis.fetch;
   let submittedRequestId = "";
