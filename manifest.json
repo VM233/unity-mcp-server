@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "unity-mcp",
   "display_name": "AnkleBreaker Unity MCP",
-  "version": "4.2.3",
+  "version": "4.3.0",
   "description": "Multi-agent MCP server for Unity Editor - exposes core and plugin-declared first-class tools, with fallback advanced routes for rare or stale metadata cases.",
   "long_description": "AnkleBreaker Unity MCP connects Claude to your Unity Editor with a direct core tool surface, plugin-declared first-class tools, and fallback advanced routes for rare metadata cases. Built for Claude Cowork's multi-agent architecture, where multiple AI agents collaborate on the same Unity project in parallel.\n\n**Key features:**\n- Core tools and plugin-declared first-class tools are exposed directly with visible schemas\n- Fallback advanced route remains available for rare routes without concrete tool metadata\n- Multi-instance support: run multiple Unity Editors simultaneously, auto-port selection (7890-7899), shared instance registry\n- ParrelSync clone detection for multiplayer development workflows\n- Multi-agent async queue with fair round-robin scheduling\n- Read batching (up to 5/frame) and write serialization (1/frame)\n- Agent session tracking and action logging\n- Project Context auto-injection for project-aware AI assistance\n\n**Requires the companion Unity Editor plugin:** Install via Unity Package Manager -> Add package from git URL -> `https://github.com/VM233/VMUnityMCP.git`\n\nAfter installing the package, configure local bridge and port settings under Preferences -> Unity MCP, then use `unity_list_instances` to confirm the Editor is reachable.",
   "author": {
@@ -190,7 +190,7 @@
     },
     {
       "name": "unity_execute_code",
-      "description": "Execute arbitrary C# code inside the Unity Editor. The code runs in the editor context with access to all Unity APIs. Recurring namespace imports can be configured in Project Settings > Unity MCP > Execute Code. Return values are serialized to JSON."
+      "description": "Start persistent arbitrary C# execution inside the Unity Editor. Returns a job for status, cancellation-before-start, idempotent reuse, and optional explicit cleanup. Recurring namespace imports can be configured in Project Settings > Unity MCP > Execute Code."
     },
     {
       "name": "unity_build",
@@ -243,6 +243,10 @@
     {
       "name": "unity_get_project_context",
       "description": "Get project-specific context and documentation that the team has prepared for AI agents. This includes project guidelines, architecture docs, game design documents, networking rules, and any other project knowledge stored in Assets/MCP/Context/. Call this without arguments to get ALL context, or specify a category for a specific document. IMPORTANT: Call this early in your session to understand the project's conventions and architecture."
+    },
+    {
+      "name": "unity_editor_execute_code",
+      "description": "Start an owner-scoped persistent Job that compiles and executes a C# method body in the Unity Editor, with exact-argument idempotency, bounded result serialization, optional typed Unity structs, cancellation, and explicit cleanup code."
     },
     {
       "name": "unity_packages_list",
@@ -337,8 +341,16 @@
       "description": "Execute a project-defined MCP tool after discovering it with project-tools/list and inspecting it with project-tools/get."
     },
     {
+      "name": "unity_jobs_get",
+      "description": "Get one persistent Unity MCP job snapshot with owner enforcement."
+    },
+    {
       "name": "unity_jobs_cancel",
-      "description": "Request owner-checked cancellation of a persistent build, test, package-test, memory-snapshot, or Addressables build job and report the actual cancellation mode."
+      "description": "Request owner- or capability-token-checked cancellation of a persistent Unity MCP job and report the actual cancellation mode."
+    },
+    {
+      "name": "unity_jobs_cleanup",
+      "description": "Run the explicit persisted cleanup contract of a terminal execute-code or project-tool job. Cleanup is itself durable and status is read through jobs/get."
     },
     {
       "name": "unity_asset_import_settings_get",

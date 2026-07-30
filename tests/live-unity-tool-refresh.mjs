@@ -10,10 +10,10 @@ import { ToolListChangedNotificationSchema } from "@modelcontextprotocol/sdk/typ
 const serverRoot = resolve(new URL("..", import.meta.url).pathname.replace(/^\/(.:)/, "$1"));
 const tempRoot = mkdtempSync(join(tmpdir(), "unity-mcp-live-refresh-"));
 const registryPath = join(tempRoot, "instances.json");
-const cachePath = join(tempRoot, "plugin-tools-metadata-cache-v3.json");
+const cachePath = join(tempRoot, "plugin-tools-metadata-cache-v4.json");
 
 writeFileSync(cachePath, JSON.stringify({
-  schemaVersion: 3,
+  schemaVersion: 4,
   updatedAt: 0,
   tools: [{
     route: "asset/import",
@@ -63,11 +63,24 @@ async function withTimeout(promise, timeoutMs, message) {
   }
 }
 
-function getJsonText(response) {
-  return [...response.content]
-    .reverse()
-    .find((block) => block.type === "text" && block.text.trimStart().startsWith("{"))
-    ?.text || "";
+function getStructuredEnvelope(response, { expectSuccess = true } = {}) {
+  assert.ok(response.structuredContent &&
+    typeof response.structuredContent === "object" &&
+    !Array.isArray(response.structuredContent),
+  `response did not contain structuredContent: ${JSON.stringify(response)}`);
+  if (expectSuccess) {
+    assert.equal(response.structuredContent.success, true,
+      `tool returned a structured failure: ${JSON.stringify(response.structuredContent)}`);
+  }
+  const text = response.content?.find((block) => block.type === "text")?.text || "";
+  assert.ok(text, "response did not contain a human-readable text summary");
+  assert.equal(text.trimStart().startsWith("{"), false,
+    "public text content must not duplicate the JSON structured payload");
+  return response.structuredContent;
+}
+
+function getStructuredResult(response) {
+  return getStructuredEnvelope(response).result;
 }
 
 function assertEditorBindingSchema(tools, toolName) {
@@ -161,25 +174,31 @@ try {
     name: "unity_editor_ping",
     arguments: { port: Number(environment.UNITY_BRIDGE_PORT) },
   });
-  const pingText = getJsonText(pingResponse);
-  assert.equal(pingText.includes("\n"), false);
+  const pingResult = getStructuredResult(pingResponse);
+  assert.ok(pingResult && typeof pingResult === "object");
 
   const refreshJobResponse = await client.callTool({
     name: "unity_asset_get_refresh_job",
     arguments: { port: Number(environment.UNITY_BRIDGE_PORT) },
   });
-  const refreshJobText = getJsonText(refreshJobResponse);
-  assert.doesNotThrow(() => JSON.parse(refreshJobText));
-  assert.equal(refreshJobText.includes("Unknown route"), false);
+  const refreshJobEnvelope = getStructuredEnvelope(refreshJobResponse, {
+    expectSuccess: false,
+  });
+  if (refreshJobEnvelope.success) {
+    assert.ok(refreshJobEnvelope.result && typeof refreshJobEnvelope.result === "object");
+  } else {
+    assert.ok(["job_owner_mismatch", "job_not_found"].includes(refreshJobEnvelope.errorCode),
+      `unexpected refresh-job failure: ${JSON.stringify(refreshJobEnvelope)}`);
+  }
+  assert.equal(JSON.stringify(refreshJobEnvelope).includes("Unknown route"), false);
 
   const catalogResponse = await client.callTool({
     name: "unity_list_advanced_tools",
     arguments: { port: Number(environment.UNITY_BRIDGE_PORT) },
   });
-  const catalogText = getJsonText(catalogResponse);
-  assert.ok(catalogText, `advanced catalog response did not contain JSON: ${JSON.stringify(catalogResponse)}`);
-  const catalog = JSON.parse(catalogText);
-  assert.ok(catalogText.length < 10_000);
+  const catalog = getStructuredResult(catalogResponse);
+  const catalogChars = JSON.stringify(catalog).length;
+  assert.ok(catalogChars < 10_000);
   assert.ok(Array.isArray(catalog.categories));
   assert.ok(catalog.categories.every((category) => !Array.isArray(category.tools)));
   assert.equal(catalog.categories.some((category) => category.name === "uma"), false);
@@ -191,8 +210,7 @@ try {
       port: Number(environment.UNITY_BRIDGE_PORT),
     },
   });
-  const projectListPayload = JSON.parse(getJsonText(projectListResponse));
-  const projectList = projectListPayload.data || projectListPayload;
+  const projectList = getStructuredResult(projectListResponse);
   assert.ok(Array.isArray(projectList.tools));
   assert.equal(projectList.tools.some((tool) => "inputSchema" in tool), false);
 
@@ -207,10 +225,10 @@ try {
       port: Number(environment.UNITY_BRIDGE_PORT),
     },
   });
-  const projectGetPayload = JSON.parse(getJsonText(projectGetResponse));
-  const projectGet = projectGetPayload.data || projectGetPayload;
+  const projectGet = getStructuredResult(projectGetResponse);
   assert.equal(projectGet.tool.toolName, selectedProjectTool.toolName);
   assert.ok(projectGet.tool.inputSchema);
+  assert.ok(projectGet.tool.outputSchema);
 
   const prefabCatalogResponse = await client.callTool({
     name: "unity_list_advanced_tools",
@@ -221,16 +239,16 @@ try {
       port: Number(environment.UNITY_BRIDGE_PORT),
     },
   });
-  const prefabCatalogText = getJsonText(prefabCatalogResponse);
-  const prefabCatalog = JSON.parse(prefabCatalogText);
-  assert.ok(prefabCatalogText.length < 50_000);
+  const prefabCatalog = getStructuredResult(prefabCatalogResponse);
+  const prefabCatalogChars = JSON.stringify(prefabCatalog).length;
+  assert.ok(prefabCatalogChars < 50_000);
   assert.ok(prefabCatalog.tools.length <= 25);
   assert.equal(prefabCatalog.tools.some((tool) =>
     tool.route === "prefab-asset/transaction-edit"), true);
   console.log(`tools/list: ${initial.tools.length} tools / ${initialChars} chars initially; ` +
     `${refreshed.tools.length} tools / ${refreshedChars} chars after refresh.`);
-  console.log(`advanced catalog: ${catalogText.length} chars summary; ` +
-    `${prefabCatalogText.length} chars for prefab-asset schemas.`);
+  console.log(`advanced catalog: ${catalogChars} chars summary; ` +
+    `${prefabCatalogChars} chars for prefab-asset schemas.`);
   console.log("Live Unity tool metadata refreshed without reconnecting.");
 } finally {
   await transport.close().catch(() => {});

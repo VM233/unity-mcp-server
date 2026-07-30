@@ -295,6 +295,10 @@
         "imports"
       ]
     },
+    "outputSchema": {
+      "type": "object",
+      "additionalProperties": true
+    },
     "annotations": {}
   },
   {
@@ -332,6 +336,10 @@
           "x-unityMcpExplicitValueWins": true
         }
       }
+    },
+    "outputSchema": {
+      "type": "object",
+      "additionalProperties": true
     },
     "annotations": {
       "readOnlyHint": true,
@@ -374,6 +382,10 @@
           "description": "Optional expected Unity project name used with expectedProjectPath as an additional target-binding check."
         }
       }
+    },
+    "outputSchema": {
+      "type": "object",
+      "additionalProperties": true
     },
     "annotations": {}
   },
@@ -453,6 +465,10 @@
         "outputPath"
       ]
     },
+    "outputSchema": {
+      "type": "object",
+      "additionalProperties": true
+    },
     "annotations": {}
   },
   {
@@ -461,6 +477,10 @@
     "category": "compilation",
     "description": "Read tracked Unity compilation errors and warnings with bounded pagination and a separate obsolete-API warning summary.",
     "inputSchema": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "outputSchema": {
       "type": "object",
       "additionalProperties": true
     },
@@ -511,7 +531,227 @@
         "value"
       ]
     },
+    "outputSchema": {
+      "type": "object",
+      "additionalProperties": true
+    },
     "annotations": {}
+  },
+  {
+    "toolName": "unity_editor_execute_code",
+    "route": "editor/execute-code",
+    "category": "editor",
+    "description": "Start an owner-scoped persistent Job that compiles and executes a C# method body in the Unity Editor, with exact-argument idempotency, bounded result serialization, optional typed Unity structs, cancellation, and explicit cleanup code.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string",
+          "description": "C# method body to execute. Return a value to serialize it."
+        },
+        "usings": {
+          "type": "array",
+          "description": "Additional namespace imports for this call. Recurring imports can be configured in Project Settings > Unity MCP > Execute Code. UnityEngine.UIElements is included by default.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "maxResultItems": {
+          "type": "number",
+          "description": "Maximum serialized collection/object entries across the result. Defaults to 200; capped at 2000.",
+          "x-unityMcpDefaultSource": "Preferences/Unity MCP > Tool Responses > Default Result Limit (when override is enabled)",
+          "x-unityMcpExplicitValueWins": true
+        },
+        "maxResultDepth": {
+          "type": "number",
+          "description": "Maximum serialized result depth. Defaults to 8; capped at 16."
+        },
+        "maxResultStringLength": {
+          "type": "number",
+          "description": "Maximum characters per returned string. Defaults to 20000; capped at 200000."
+        },
+        "unityStructFormat": {
+          "type": "string",
+          "description": "Unity value structs in the result: compact strings or structured typed objects. Defaults to compact.",
+          "enum": [
+            "compact",
+            "structured"
+          ]
+        },
+        "includeStackTrace": {
+          "type": "boolean",
+          "description": "Include a full managed stack trace when executed code throws. Defaults to false."
+        },
+        "idempotencyKey": {
+          "type": "string",
+          "description": "Optional project-scoped key. Repeating the same key returns the existing persistent job instead of executing code again."
+        },
+        "cleanupCode": {
+          "type": "string",
+          "description": "Optional C# method body used only by jobs/cleanup to reverse temporary state created by this job."
+        },
+        "expectedProjectPath": {
+          "type": "string",
+          "description": "Expected Unity project root path. The request is rejected before mutation if it reaches another project."
+        },
+        "expectedProjectName": {
+          "type": "string",
+          "description": "Optional expected Unity project name used with expectedProjectPath as an additional target-binding check."
+        }
+      },
+      "required": [
+        "code"
+      ]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "jobId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "jobAccessToken": {
+          "type": "string"
+        },
+        "jobType": {
+          "type": "string"
+        },
+        "operation": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "queued",
+            "running",
+            "succeeded",
+            "failed",
+            "canceled",
+            "interrupted"
+          ]
+        },
+        "cleanupStatus": {
+          "type": "string",
+          "enum": [
+            "none",
+            "available",
+            "queued",
+            "running",
+            "succeeded",
+            "failed",
+            "canceled",
+            "interrupted"
+          ]
+        },
+        "cleanupAvailable": {
+          "type": "boolean"
+        },
+        "cleanupDeclared": {
+          "type": "boolean"
+        },
+        "cleanupToken": {
+          "type": "string"
+        },
+        "cancellationRequested": {
+          "type": "boolean"
+        },
+        "cancelMode": {
+          "type": "string",
+          "enum": [
+            "beforeStart",
+            "betweenSteps"
+          ]
+        },
+        "incremental": {
+          "type": "boolean"
+        },
+        "progress": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "statusMessage": {
+          "type": "string"
+        },
+        "stepCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "nextRunAt": {
+          "type": "string"
+        },
+        "idempotencyKey": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "startedAt": {
+          "type": "string"
+        },
+        "completedAt": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "type": "string"
+        },
+        "sideEffects": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "statusRoute": {
+          "const": "jobs/get"
+        },
+        "cancelRoute": {
+          "const": "jobs/cancel"
+        },
+        "cleanupRoute": {
+          "const": "jobs/cleanup"
+        },
+        "reused": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "jobId",
+        "jobType",
+        "operation",
+        "status",
+        "cleanupStatus",
+        "cleanupAvailable",
+        "cleanupDeclared",
+        "cleanupToken",
+        "cancellationRequested",
+        "cancelMode",
+        "incremental",
+        "progress",
+        "statusMessage",
+        "stepCount",
+        "nextRunAt",
+        "idempotencyKey",
+        "createdAt",
+        "startedAt",
+        "completedAt",
+        "updatedAt",
+        "sideEffects",
+        "result",
+        "error",
+        "cleanupResult",
+        "cleanupError",
+        "statusRoute",
+        "cancelRoute",
+        "cleanupRoute"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "destructiveHint": true
+    }
   },
   {
     "toolName": "unity_play_mode",
@@ -543,6 +783,10 @@
         }
       }
     },
+    "outputSchema": {
+      "type": "object",
+      "additionalProperties": true
+    },
     "annotations": {}
   },
   {
@@ -552,6 +796,10 @@
     "description": "Inspect queue capacity, active work, and per-agent depth.",
     "inputSchema": {
       "type": "object"
+    },
+    "outputSchema": {
+      "type": "object",
+      "additionalProperties": true
     },
     "annotations": {
       "readOnlyHint": true,
@@ -602,6 +850,10 @@
         }
       }
     },
+    "outputSchema": {
+      "type": "object",
+      "additionalProperties": true
+    },
     "annotations": {
       "readOnlyHint": true,
       "idempotentHint": true
@@ -643,6 +895,10 @@
         }
       }
     },
+    "outputSchema": {
+      "type": "object",
+      "additionalProperties": true
+    },
     "annotations": {
       "readOnlyHint": true,
       "idempotentHint": true
@@ -667,6 +923,10 @@
           "x-unityMcpExplicitValueWins": true
         }
       }
+    },
+    "outputSchema": {
+      "type": "object",
+      "additionalProperties": true
     },
     "annotations": {
       "readOnlyHint": true,
@@ -714,6 +974,10 @@
         "name"
       ]
     },
+    "outputSchema": {
+      "type": "object",
+      "additionalProperties": true
+    },
     "annotations": {}
   },
   {
@@ -737,6 +1001,10 @@
           "description": "Minimum continuous idle time in milliseconds. Defaults to 500."
         }
       }
+    },
+    "outputSchema": {
+      "type": "object",
+      "additionalProperties": true
     },
     "annotations": {
       "readOnlyHint": true,
@@ -791,6 +1059,10 @@
         }
       }
     },
+    "outputSchema": {
+      "type": "object",
+      "additionalProperties": true
+    },
     "annotations": {
       "readOnlyHint": true,
       "idempotentHint": true
@@ -813,6 +1085,10 @@
           "description": "Clear the persisted job after a terminal result is read. Defaults to false."
         }
       }
+    },
+    "outputSchema": {
+      "type": "object",
+      "additionalProperties": true
     },
     "annotations": {
       "readOnlyHint": true,
@@ -859,6 +1135,10 @@
       "required": [
         "prefabPath"
       ]
+    },
+    "outputSchema": {
+      "type": "object",
+      "additionalProperties": true
     },
     "annotations": {}
   },
@@ -922,6 +1202,10 @@
         }
       }
     },
+    "outputSchema": {
+      "type": "object",
+      "additionalProperties": true
+    },
     "annotations": {
       "readOnlyHint": true,
       "idempotentHint": true
@@ -980,6 +1264,10 @@
         "value"
       ]
     },
+    "outputSchema": {
+      "type": "object",
+      "additionalProperties": true
+    },
     "annotations": {}
   },
   {
@@ -1012,7 +1300,8 @@
         },
         "properties": {
           "type": "object",
-          "description": "Serialized property names/paths mapped to JSON values."
+          "description": "Serialized property names/paths mapped to JSON values.",
+          "additionalProperties": true
         },
         "waitForTypes": {
           "type": "boolean",
@@ -1089,6 +1378,10 @@
         "assetPath",
         "componentType"
       ]
+    },
+    "outputSchema": {
+      "type": "object",
+      "additionalProperties": true
     },
     "annotations": {}
   },
@@ -1204,6 +1497,10 @@
         "references"
       ]
     },
+    "outputSchema": {
+      "type": "object",
+      "additionalProperties": true
+    },
     "annotations": {}
   },
   {
@@ -1231,6 +1528,10 @@
           "description": "Maximum reload reconnection wait consumed by the MCP transport. Defaults to 300000ms."
         }
       }
+    },
+    "outputSchema": {
+      "type": "object",
+      "additionalProperties": true
     },
     "annotations": {
       "readOnlyHint": true,
@@ -1266,6 +1567,10 @@
           "description": "Optional expected Unity project name used with expectedProjectPath as an additional target-binding check."
         }
       }
+    },
+    "outputSchema": {
+      "type": "object",
+      "additionalProperties": true
     },
     "annotations": {}
   },
@@ -1346,6 +1651,10 @@
         "moves"
       ]
     },
+    "outputSchema": {
+      "type": "object",
+      "additionalProperties": true
+    },
     "annotations": {}
   },
   {
@@ -1407,6 +1716,10 @@
           "description": "Return newest entries first. Defaults to false."
         }
       }
+    },
+    "outputSchema": {
+      "type": "object",
+      "additionalProperties": true
     },
     "annotations": {
       "readOnlyHint": true,
@@ -1484,6 +1797,10 @@
         }
       }
     },
+    "outputSchema": {
+      "type": "object",
+      "additionalProperties": true
+    },
     "annotations": {
       "readOnlyHint": true,
       "idempotentHint": true
@@ -1522,6 +1839,10 @@
           "description": "Optional expected Unity project name used with expectedProjectPath as an additional target-binding check."
         }
       }
+    },
+    "outputSchema": {
+      "type": "object",
+      "additionalProperties": true
     },
     "annotations": {}
   },
@@ -1562,6 +1883,10 @@
         "operations"
       ]
     },
+    "outputSchema": {
+      "type": "object",
+      "additionalProperties": true
+    },
     "annotations": {}
   },
   {
@@ -1600,6 +1925,10 @@
         "assetPath",
         "operations"
       ]
+    },
+    "outputSchema": {
+      "type": "object",
+      "additionalProperties": true
     },
     "annotations": {}
   },
@@ -1657,6 +1986,10 @@
         }
       }
     },
+    "outputSchema": {
+      "type": "object",
+      "additionalProperties": true
+    },
     "annotations": {}
   },
   {
@@ -1699,6 +2032,10 @@
         }
       }
     },
+    "outputSchema": {
+      "type": "object",
+      "additionalProperties": true
+    },
     "annotations": {
       "readOnlyHint": true,
       "idempotentHint": true
@@ -1724,6 +2061,10 @@
         }
       }
     },
+    "outputSchema": {
+      "type": "object",
+      "additionalProperties": true
+    },
     "annotations": {
       "readOnlyHint": true,
       "idempotentHint": true
@@ -1746,6 +2087,10 @@
         "toolName"
       ]
     },
+    "outputSchema": {
+      "type": "object",
+      "additionalProperties": true
+    },
     "annotations": {
       "readOnlyHint": true,
       "idempotentHint": true
@@ -1767,6 +2112,14 @@
           "type": "object",
           "description": "Arguments passed to the project tool as Dictionary<string, object>."
         },
+        "runAsJob": {
+          "type": "boolean",
+          "description": "Run a normally synchronous project tool through the persistent job owner. Long-running tools always use a job."
+        },
+        "idempotencyKey": {
+          "type": "string",
+          "description": "Optional project-scoped idempotency key for persistent execution."
+        },
         "expectedProjectPath": {
           "type": "string",
           "description": "Expected Unity project root path. The request is rejected before mutation if it reaches another project."
@@ -1780,15 +2133,195 @@
         "toolName"
       ]
     },
+    "outputSchema": {
+      "type": "object",
+      "additionalProperties": true
+    },
     "annotations": {
       "destructiveHint": true
+    }
+  },
+  {
+    "toolName": "unity_jobs_get",
+    "route": "jobs/get",
+    "category": "jobs",
+    "description": "Get one persistent Unity MCP job snapshot with owner enforcement.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "jobId": {
+          "type": "string",
+          "description": "Job identifier."
+        },
+        "jobType": {
+          "type": "string",
+          "description": "Optional job type disambiguator."
+        },
+        "jobAccessToken": {
+          "type": "string",
+          "description": "Capability token returned when a persistent job starts. Required after the originating MCP agent disconnects."
+        }
+      },
+      "required": [
+        "jobId"
+      ]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "jobId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "jobAccessToken": {
+          "type": "string"
+        },
+        "jobType": {
+          "type": "string"
+        },
+        "operation": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "queued",
+            "running",
+            "succeeded",
+            "failed",
+            "canceled",
+            "interrupted"
+          ]
+        },
+        "cleanupStatus": {
+          "type": "string",
+          "enum": [
+            "none",
+            "available",
+            "queued",
+            "running",
+            "succeeded",
+            "failed",
+            "canceled",
+            "interrupted"
+          ]
+        },
+        "cleanupAvailable": {
+          "type": "boolean"
+        },
+        "cleanupDeclared": {
+          "type": "boolean"
+        },
+        "cleanupToken": {
+          "type": "string"
+        },
+        "cancellationRequested": {
+          "type": "boolean"
+        },
+        "cancelMode": {
+          "type": "string",
+          "enum": [
+            "beforeStart",
+            "betweenSteps"
+          ]
+        },
+        "incremental": {
+          "type": "boolean"
+        },
+        "progress": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "statusMessage": {
+          "type": "string"
+        },
+        "stepCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "nextRunAt": {
+          "type": "string"
+        },
+        "idempotencyKey": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "startedAt": {
+          "type": "string"
+        },
+        "completedAt": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "type": "string"
+        },
+        "sideEffects": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "statusRoute": {
+          "const": "jobs/get"
+        },
+        "cancelRoute": {
+          "const": "jobs/cancel"
+        },
+        "cleanupRoute": {
+          "const": "jobs/cleanup"
+        },
+        "reused": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "jobId",
+        "jobType",
+        "operation",
+        "status",
+        "cleanupStatus",
+        "cleanupAvailable",
+        "cleanupDeclared",
+        "cleanupToken",
+        "cancellationRequested",
+        "cancelMode",
+        "incremental",
+        "progress",
+        "statusMessage",
+        "stepCount",
+        "nextRunAt",
+        "idempotencyKey",
+        "createdAt",
+        "startedAt",
+        "completedAt",
+        "updatedAt",
+        "sideEffects",
+        "result",
+        "error",
+        "cleanupResult",
+        "cleanupError",
+        "statusRoute",
+        "cancelRoute",
+        "cleanupRoute"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true
     }
   },
   {
     "toolName": "unity_jobs_cancel",
     "route": "jobs/cancel",
     "category": "jobs",
-    "description": "Request owner-checked cancellation of a persistent build, test, package-test, memory-snapshot, or Addressables build job and report the actual cancellation mode.",
+    "description": "Request owner- or capability-token-checked cancellation of a persistent Unity MCP job and report the actual cancellation mode.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -1799,6 +2332,10 @@
         "jobType": {
           "type": "string",
           "description": "Optional job type disambiguator."
+        },
+        "jobAccessToken": {
+          "type": "string",
+          "description": "Capability token returned when a persistent job starts. Required after the originating MCP agent disconnects."
         },
         "expectedProjectPath": {
           "type": "string",
@@ -1813,7 +2350,332 @@
         "jobId"
       ]
     },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "jobId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "jobAccessToken": {
+          "type": "string"
+        },
+        "jobType": {
+          "type": "string"
+        },
+        "operation": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "queued",
+            "running",
+            "succeeded",
+            "failed",
+            "canceled",
+            "interrupted"
+          ]
+        },
+        "cleanupStatus": {
+          "type": "string",
+          "enum": [
+            "none",
+            "available",
+            "queued",
+            "running",
+            "succeeded",
+            "failed",
+            "canceled",
+            "interrupted"
+          ]
+        },
+        "cleanupAvailable": {
+          "type": "boolean"
+        },
+        "cleanupDeclared": {
+          "type": "boolean"
+        },
+        "cleanupToken": {
+          "type": "string"
+        },
+        "cancellationRequested": {
+          "type": "boolean"
+        },
+        "cancelMode": {
+          "type": "string",
+          "enum": [
+            "beforeStart",
+            "betweenSteps"
+          ]
+        },
+        "incremental": {
+          "type": "boolean"
+        },
+        "progress": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "statusMessage": {
+          "type": "string"
+        },
+        "stepCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "nextRunAt": {
+          "type": "string"
+        },
+        "idempotencyKey": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "startedAt": {
+          "type": "string"
+        },
+        "completedAt": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "type": "string"
+        },
+        "sideEffects": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "statusRoute": {
+          "const": "jobs/get"
+        },
+        "cancelRoute": {
+          "const": "jobs/cancel"
+        },
+        "cleanupRoute": {
+          "const": "jobs/cleanup"
+        },
+        "reused": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "jobId",
+        "jobType",
+        "operation",
+        "status",
+        "cleanupStatus",
+        "cleanupAvailable",
+        "cleanupDeclared",
+        "cleanupToken",
+        "cancellationRequested",
+        "cancelMode",
+        "incremental",
+        "progress",
+        "statusMessage",
+        "stepCount",
+        "nextRunAt",
+        "idempotencyKey",
+        "createdAt",
+        "startedAt",
+        "completedAt",
+        "updatedAt",
+        "sideEffects",
+        "result",
+        "error",
+        "cleanupResult",
+        "cleanupError",
+        "statusRoute",
+        "cancelRoute",
+        "cleanupRoute"
+      ],
+      "additionalProperties": false
+    },
     "annotations": {}
+  },
+  {
+    "toolName": "unity_jobs_cleanup",
+    "route": "jobs/cleanup",
+    "category": "jobs",
+    "description": "Run the explicit persisted cleanup contract of a terminal execute-code or project-tool job. Cleanup is itself durable and status is read through jobs/get.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "jobId": {
+          "type": "string",
+          "description": "Terminal persistent job identifier whose explicit cleanup contract should run."
+        },
+        "jobAccessToken": {
+          "type": "string",
+          "description": "Capability token returned when the persistent job started."
+        },
+        "expectedProjectPath": {
+          "type": "string",
+          "description": "Expected Unity project root path. The request is rejected before mutation if it reaches another project."
+        },
+        "expectedProjectName": {
+          "type": "string",
+          "description": "Optional expected Unity project name used with expectedProjectPath as an additional target-binding check."
+        }
+      },
+      "required": [
+        "jobId"
+      ]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "jobId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "jobAccessToken": {
+          "type": "string"
+        },
+        "jobType": {
+          "type": "string"
+        },
+        "operation": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "queued",
+            "running",
+            "succeeded",
+            "failed",
+            "canceled",
+            "interrupted"
+          ]
+        },
+        "cleanupStatus": {
+          "type": "string",
+          "enum": [
+            "none",
+            "available",
+            "queued",
+            "running",
+            "succeeded",
+            "failed",
+            "canceled",
+            "interrupted"
+          ]
+        },
+        "cleanupAvailable": {
+          "type": "boolean"
+        },
+        "cleanupDeclared": {
+          "type": "boolean"
+        },
+        "cleanupToken": {
+          "type": "string"
+        },
+        "cancellationRequested": {
+          "type": "boolean"
+        },
+        "cancelMode": {
+          "type": "string",
+          "enum": [
+            "beforeStart",
+            "betweenSteps"
+          ]
+        },
+        "incremental": {
+          "type": "boolean"
+        },
+        "progress": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "statusMessage": {
+          "type": "string"
+        },
+        "stepCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "nextRunAt": {
+          "type": "string"
+        },
+        "idempotencyKey": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "startedAt": {
+          "type": "string"
+        },
+        "completedAt": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "type": "string"
+        },
+        "sideEffects": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "statusRoute": {
+          "const": "jobs/get"
+        },
+        "cancelRoute": {
+          "const": "jobs/cancel"
+        },
+        "cleanupRoute": {
+          "const": "jobs/cleanup"
+        },
+        "reused": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "jobId",
+        "jobType",
+        "operation",
+        "status",
+        "cleanupStatus",
+        "cleanupAvailable",
+        "cleanupDeclared",
+        "cleanupToken",
+        "cancellationRequested",
+        "cancelMode",
+        "incremental",
+        "progress",
+        "statusMessage",
+        "stepCount",
+        "nextRunAt",
+        "idempotencyKey",
+        "createdAt",
+        "startedAt",
+        "completedAt",
+        "updatedAt",
+        "sideEffects",
+        "result",
+        "error",
+        "cleanupResult",
+        "cleanupError",
+        "statusRoute",
+        "cancelRoute",
+        "cleanupRoute"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "destructiveHint": true
+    }
   },
   {
     "toolName": "unity_asset_import_settings_get",
@@ -1835,6 +2697,10 @@
       "required": [
         "assetPath"
       ]
+    },
+    "outputSchema": {
+      "type": "object",
+      "additionalProperties": true
     },
     "annotations": {
       "readOnlyHint": true,
@@ -1886,6 +2752,10 @@
         "assetPath",
         "settings"
       ]
+    },
+    "outputSchema": {
+      "type": "object",
+      "additionalProperties": true
     },
     "annotations": {}
   },
@@ -1943,6 +2813,10 @@
         }
       }
     },
+    "outputSchema": {
+      "type": "object",
+      "additionalProperties": true
+    },
     "annotations": {
       "destructiveHint": true
     }
@@ -1980,6 +2854,10 @@
       "required": [
         "assetPath"
       ]
+    },
+    "outputSchema": {
+      "type": "object",
+      "additionalProperties": true
     },
     "annotations": {
       "readOnlyHint": true,
@@ -2042,6 +2920,10 @@
       "required": [
         "assetPath"
       ]
+    },
+    "outputSchema": {
+      "type": "object",
+      "additionalProperties": true
     },
     "annotations": {}
   }

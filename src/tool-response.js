@@ -47,6 +47,200 @@ export function toContentBlocks(result) {
   }];
 }
 
+export const GENERIC_TOOL_OUTPUT_SCHEMA = {
+  type: "object",
+  properties: {
+    success: { type: "boolean" },
+    result: {},
+    errorCode: { type: "string" },
+    error: { type: "string" },
+    retryable: { type: "boolean" },
+  },
+  required: ["success"],
+  oneOf: [
+    {
+      properties: { success: { const: true } },
+      required: ["success", "result"],
+    },
+    {
+      properties: { success: { const: false } },
+      required: ["success", "errorCode", "error", "retryable"],
+    },
+  ],
+  additionalProperties: true,
+};
+
+export function createToolOutputSchema(resultSchema) {
+  const schema = resultSchema && typeof resultSchema === "object" && !Array.isArray(resultSchema)
+    ? resultSchema
+    : {};
+  return {
+    type: "object",
+    properties: {
+      success: { type: "boolean" },
+      result: schema,
+      errorCode: { type: "string" },
+      error: { type: "string" },
+      retryable: { type: "boolean" },
+    },
+    required: ["success"],
+    oneOf: [
+      {
+        properties: { success: { const: true } },
+        required: ["success", "result"],
+      },
+      {
+        properties: { success: { const: false } },
+        required: ["success", "errorCode", "error", "retryable"],
+      },
+    ],
+    additionalProperties: true,
+  };
+}
+
+function tryParseJson(value) {
+  if (typeof value !== "string") return value;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return value;
+  }
+}
+
+function summarizeMediaBlocks(blocks) {
+  const summary = [];
+  for (const block of blocks || []) {
+    if (!block || typeof block !== "object") continue;
+    if (block.type === "image" || block.type === "audio") {
+      summary.push({
+        type: block.type,
+        mimeType: block.mimeType || "",
+      });
+    }
+  }
+  return summary;
+}
+
+export function normalizeStructuredToolResult(result) {
+  if (Array.isArray(result)) {
+    const textBlocks = result
+      .filter((block) => block?.type === "text")
+      .map((block) => tryParseJson(block.text));
+    const parsedObject = textBlocks.find((value) =>
+      value && typeof value === "object" && !Array.isArray(value));
+    if (parsedObject) {
+      const normalized = normalizeStructuredToolResult(parsedObject);
+      const media = summarizeMediaBlocks(result);
+      if (media.length > 0) normalized.media = media;
+      return normalized;
+    }
+    return {
+      success: true,
+      result: {
+        text: textBlocks.map((value) =>
+          typeof value === "string" ? value : JSON.stringify(value)),
+        media: summarizeMediaBlocks(result),
+      },
+    };
+  }
+
+  const value = tryParseJson(result);
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {
+      success: true,
+      result: value === undefined ? null : value,
+    };
+  }
+
+  if (value.success === false) {
+    return {
+      ...value,
+      success: false,
+      errorCode: value.errorCode || "operation_failed",
+      error: value.error || value.message || "Operation failed.",
+      retryable: Boolean(value.retryable),
+    };
+  }
+
+  if (value.success === true && Object.hasOwn(value, "data")) {
+    const { success: _success, data, ...metadata } = value;
+    return {
+      success: true,
+      result: data,
+      ...metadata,
+    };
+  }
+
+  if (value.success === true) {
+    if (value.jobId || value.ticketId) {
+      const { success: _success, ...operation } = value;
+      return {
+        success: true,
+        result: operation,
+      };
+    }
+    if (Object.hasOwn(value, "result")) {
+      return {
+        ...value,
+        success: true,
+      };
+    }
+    const { success: _success, ...resultValue } = value;
+    return {
+      success: true,
+      result: resultValue,
+    };
+  }
+
+  return {
+    success: true,
+    result: value,
+  };
+}
+
+export function summarizeStructuredToolResult(structuredContent) {
+  if (!structuredContent?.success) {
+    const code = structuredContent?.errorCode || "operation_failed";
+    const message = structuredContent?.error || "Operation failed.";
+    return `${code}: ${message}`;
+  }
+
+  const result = structuredContent.result;
+  const candidate = result && typeof result === "object" && !Array.isArray(result)
+    ? result
+    : structuredContent;
+  if (candidate?.jobId) {
+    const type = candidate.jobType || "persistent";
+    const status = candidate.status || "queued";
+    return `${type} job ${candidate.jobId} is ${status}.`;
+  }
+  if (candidate?.ticketId) {
+    return `Unity queue ticket ${candidate.ticketId} is ${candidate.status || "queued"}.`;
+  }
+  if (candidate?.cleanupStatus) {
+    return `Cleanup is ${candidate.cleanupStatus}.`;
+  }
+  return "Tool completed successfully.";
+}
+
+export function buildToolResponse(result) {
+  const structuredContent = normalizeStructuredToolResult(result);
+  const originalBlocks = Array.isArray(result) ? result : [];
+  const mediaBlocks = originalBlocks.filter((block) =>
+    block?.type === "image" || block?.type === "audio" || block?.type === "resource");
+  return {
+    structuredContent,
+    content: [
+      {
+        type: "text",
+        text: summarizeStructuredToolResult(structuredContent),
+      },
+      ...mediaBlocks,
+    ],
+    ...(structuredContent.success === false ? { isError: true } : {}),
+  };
+}
+
 export function compactSuccessfulToolResult(result) {
   const wasString = typeof result === "string";
   let value = result;
@@ -118,6 +312,56 @@ export function guardResponseSize(contentBlocks, {
 
   return {
     content: contentBlocks,
+    totalBytes,
+    exceedsSoftLimit: totalBytes > softLimit,
+    exceedsHardLimit: false,
+  };
+}
+
+export function guardToolResponseSize(response, {
+  softLimitBytes,
+  hardLimitBytes,
+} = {}) {
+  const structuredBytes = Buffer.byteLength(
+    JSON.stringify(response?.structuredContent ?? null),
+    "utf8"
+  );
+  const contentBytes = measureContentBytes(response?.content || []);
+  const totalBytes = structuredBytes + contentBytes;
+  const softLimit = Number.isFinite(softLimitBytes) && softLimitBytes > 0
+    ? softLimitBytes
+    : Number.POSITIVE_INFINITY;
+  const hardLimit = Number.isFinite(hardLimitBytes) && hardLimitBytes > 0
+    ? hardLimitBytes
+    : Number.POSITIVE_INFINITY;
+
+  if (totalBytes > hardLimit) {
+    const structuredContent = createToolError(
+      "response_too_large",
+      "Tool response exceeded the transport limit. Retry with pagination or narrower filters.",
+      {
+        actualBytes: totalBytes,
+        limitBytes: hardLimit,
+        suggestedParameters: ["offset", "limit", "maxNodes", "parentPath", "filters"],
+      }
+    );
+    return {
+      response: {
+        structuredContent,
+        content: [{
+          type: "text",
+          text: summarizeStructuredToolResult(structuredContent),
+        }],
+        isError: true,
+      },
+      totalBytes,
+      exceedsSoftLimit: true,
+      exceedsHardLimit: true,
+    };
+  }
+
+  return {
+    response,
     totalBytes,
     exceedsSoftLimit: totalBytes > softLimit,
     exceedsHardLimit: false,

@@ -2,6 +2,23 @@
 
 All notable changes to this package will be documented in this file.
 
+## [4.3.0] - 2026-07-31
+
+### Added
+- Publish MCP `outputSchema` for every tool and return machine-composable
+  `structuredContent` through one standard success/error envelope.
+- Expose persistent execute-code and project-tool Job status, cancellation, and
+  cleanup routes from VM Unity MCP 5.4 metadata.
+
+### Changed
+- Keep text content as a concise human summary instead of duplicating JSON that
+  is already present in `structuredContent`.
+- Include output schemas in live plugin fingerprints, generated descriptors,
+  advanced discovery, and the schema-v4 metadata cache.
+- Measure both structured and media/text response channels against the response
+  budget; oversized responses become one structured `response_too_large`
+  failure.
+
 ## [4.2.3] - 2026-07-30
 
 ### Fixed

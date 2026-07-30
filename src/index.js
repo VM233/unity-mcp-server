@@ -57,11 +57,10 @@ import {
 } from "./request-context.js";
 import { AsyncSingleFlight } from "./async-single-flight.js";
 import {
-  compactSuccessfulToolResult,
-  guardResponseSize,
-  isStructuredToolFailure,
-  serializeToolError,
-  toContentBlocks,
+  buildToolResponse,
+  createToolError,
+  createToolOutputSchema,
+  guardToolResponseSize,
 } from "./tool-response.js";
 
 const require = createRequire(import.meta.url);
@@ -191,12 +190,19 @@ const server = new Server(
 );
 
 // ─── List Tools Handler ───
-function toolWithEditorBindingSchema({ name, description, inputSchema, annotations }) {
+function toolWithEditorBindingSchema({
+  name,
+  description,
+  inputSchema,
+  outputSchema,
+  annotations,
+}) {
   const schema = injectEditorBindingSchema(name, inputSchema);
   const tool = {
     name,
     description: sanitizeToolMetadata(description),
     inputSchema: sanitizeToolMetadata(schema),
+    outputSchema: sanitizeToolMetadata(createToolOutputSchema(outputSchema)),
   };
   const cleanAnnotations = sanitizeToolMetadata(annotations || {});
   delete cleanAnnotations.title;
@@ -276,22 +282,16 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const message =
         `No running Unity Editor instance could be resolved for expectedProjectPath ` +
         `'${expectedProjectPath}' within ${projectResolveTimeoutMs}ms.`;
-      return {
-        content: [{
-          type: "text",
-          text: serializeToolError(
-            "target_project_unavailable",
-            message,
-            {
-              retryable: true,
-              expectedProjectPath,
-              ...(expectedProjectName ? { expectedProjectName } : {}),
-              resolveTimeoutMs: projectResolveTimeoutMs,
-            }
-          ),
-        }],
-        isError: true,
-      };
+      return buildToolResponse(createToolError(
+        "target_project_unavailable",
+        message,
+        {
+          retryable: true,
+          expectedProjectPath,
+          ...(expectedProjectName ? { expectedProjectName } : {}),
+          resolveTimeoutMs: projectResolveTimeoutMs,
+        }
+      ));
     }
   }
   if (portOverride && expectedProjectPath && !targetInstance) {
@@ -332,22 +332,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         name !== "unity_select_instance" &&
         name !== "unity_get_project_context"
       ) {
-        return {
-          content: [
-            {
-              type: "text",
-              text: serializeToolError(
-                "unity_instance_selection_required",
-                "Multiple Unity Editor instances are running. Select one before calling Editor tools.",
-                {
-                  availableInstances: discoveryResult?.instances || [],
-                  nextTool: "unity_select_instance",
-                }
-              ),
-            },
-          ],
-          isError: true,
-        };
+        return buildToolResponse(createToolError(
+          "unity_instance_selection_required",
+          "Multiple Unity Editor instances are running. Select one before calling Editor tools.",
+          {
+            availableInstances: discoveryResult?.instances || [],
+            nextTool: "unity_select_instance",
+          }
+        ));
       }
 
       if (
@@ -359,32 +351,20 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         name !== "unity_select_instance" &&
         name !== "unity_get_project_context"
       ) {
-        return {
-          content: [{
-            type: "text",
-            text: serializeToolError(
-              "unity_instance_unavailable",
-              "No running Unity Editor instance was detected.",
-              { nextTool: "unity_list_instances" }
-            ),
-          }],
-          isError: true,
-        };
+        return buildToolResponse(createToolError(
+          "unity_instance_unavailable",
+          "No running Unity Editor instance was detected.",
+          { nextTool: "unity_list_instances" }
+        ));
       }
 
       tool = await findExposedTool(name);
       if (!tool) {
-        return {
-          content: [{
-            type: "text",
-            text: serializeToolError(
-              "unknown_tool",
-              `Unknown tool: ${name}`,
-              { tool: name }
-            ),
-          }],
-          isError: true,
-        };
+        return buildToolResponse(createToolError(
+          "unknown_tool",
+          `Unknown tool: ${name}`,
+          { tool: name }
+        ));
       }
 
       const handlerArgs = args ? { ...args } : {};
@@ -392,8 +372,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         delete handlerArgs.port;
       }
 
-      const result = compactSuccessfulToolResult(await tool.handler(handlerArgs));
-      const sizeGuard = guardResponseSize(toContentBlocks(result), {
+      const result = await tool.handler(handlerArgs);
+      const sizeGuard = guardToolResponseSize(buildToolResponse(result), {
         softLimitBytes: CONFIG.responseSoftLimitBytes,
         hardLimitBytes: CONFIG.responseHardLimitBytes,
       });
@@ -405,26 +385,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         );
       }
 
-      return {
-        content: sizeGuard.content,
-        ...((sizeGuard.exceedsHardLimit || isStructuredToolFailure(result))
-          ? { isError: true }
-          : {}),
-      };
+      return sizeGuard.response;
     } catch (error) {
-      return {
-        content: [
-          {
-            type: "text",
-            text: serializeToolError(
-              "tool_execution_failed",
-              `Error executing ${name}: ${error.message}`,
-              { tool: name }
-            ),
-          },
-        ],
-        isError: true,
-      };
+      return buildToolResponse(createToolError(
+        "tool_execution_failed",
+        `Error executing ${name}: ${error.message}`,
+        { tool: name }
+      ));
     }
   });
 });

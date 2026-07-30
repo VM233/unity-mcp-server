@@ -2,10 +2,14 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  buildToolResponse,
   compactSuccessfulToolResult,
+  createToolOutputSchema,
+  guardToolResponseSize,
   guardResponseSize,
   isStructuredToolFailure,
   measureContentBytes,
+  normalizeStructuredToolResult,
   toContentBlocks,
 } from "../src/tool-response.js";
 import {
@@ -20,6 +24,79 @@ test("tool responses serialize objects into one stable text block", () => {
     type: "text",
     text: "{\"value\":3}",
   }]);
+});
+
+test("public MCP replies expose structuredContent and keep text human-readable", () => {
+  const response = buildToolResponse({
+    success: true,
+    data: {
+      value: 3,
+    },
+  });
+
+  assert.deepEqual(response.structuredContent, {
+    success: true,
+    result: {
+      value: 3,
+    },
+  });
+  assert.equal(response.content.length, 1);
+  assert.equal(response.content[0].type, "text");
+  assert.equal(response.content[0].text, "Tool completed successfully.");
+  assert.doesNotMatch(response.content[0].text, /^\s*[{[]/);
+});
+
+test("project-tool success envelopes remain structured without JSON text parsing by clients", () => {
+  assert.deepEqual(normalizeStructuredToolResult({
+    success: true,
+    result: {
+      sessionToken: "session-1",
+    },
+    cleanupToolName: "vmframework/runtime-game-item-session",
+  }), {
+    success: true,
+    result: {
+      sessionToken: "session-1",
+    },
+    cleanupToolName: "vmframework/runtime-game-item-session",
+  });
+});
+
+test("tool output schemas wrap the route result in the standard response envelope", () => {
+  const outputSchema = createToolOutputSchema({
+    type: "object",
+    properties: {
+      value: { type: "integer" },
+    },
+    required: ["value"],
+    additionalProperties: false,
+  });
+
+  assert.deepEqual(outputSchema.required, ["success"]);
+  assert.deepEqual(outputSchema.properties.result.required, ["value"]);
+  assert.equal(outputSchema.properties.result.properties.value.type, "integer");
+  assert.deepEqual(outputSchema.oneOf[0].required, ["success", "result"]);
+  assert.deepEqual(outputSchema.oneOf[1].required,
+    ["success", "errorCode", "error", "retryable"]);
+});
+
+test("success-only bridge envelopes normalize into the stable result field", () => {
+  const response = buildToolResponse({
+    success: true,
+    jobId: "job-1",
+    status: "queued",
+    result: null,
+  });
+
+  assert.deepEqual(response.structuredContent, {
+    success: true,
+    result: {
+      jobId: "job-1",
+      status: "queued",
+      result: null,
+    },
+  });
+  assert.match(response.content[0].text, /job-1/);
 });
 
 test("successful internal bridge envelopes are removed from public tool replies", () => {
@@ -68,6 +145,24 @@ test("oversized responses become one structured non-retryable error", () => {
   assert.equal(payload.errorCode, "response_too_large");
   assert.equal(payload.retryable, false);
   assert.equal(isStructuredToolFailure(guarded.content), true);
+});
+
+test("structured response sizing replaces both channels with one structured error", () => {
+  const guarded = guardToolResponseSize(buildToolResponse({
+    success: true,
+    data: {
+      value: "x".repeat(100),
+    },
+  }), {
+    softLimitBytes: 10,
+    hardLimitBytes: 20,
+  });
+
+  assert.equal(guarded.exceedsHardLimit, true);
+  assert.equal(guarded.response.isError, true);
+  assert.equal(guarded.response.structuredContent.success, false);
+  assert.equal(guarded.response.structuredContent.errorCode, "response_too_large");
+  assert.doesNotMatch(guarded.response.content[0].text, /^\s*[{[]/);
 });
 
 test("numeric settings are clamped and invalid log levels fall back safely", () => {

@@ -81,6 +81,10 @@ const snapshot = STATIC_FIRST_CLASS_PLUGIN_ROUTES.map((route) => {
       properties: {},
       additionalProperties: true,
     },
+    outputSchema: tool.outputSchema || {
+      type: "object",
+      additionalProperties: true,
+    },
     annotations: tool.annotations || {},
   };
 });

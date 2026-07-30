@@ -26,12 +26,12 @@ import {
 import { staticFirstClassPluginTools } from "./tools/plugin-first-class-tools.js";
 import { STATIC_FIRST_CLASS_PLUGIN_ROUTES } from "./plugin-tool-policy.js";
 import { logDebug } from "./logger.js";
-import { serializeToolError } from "./tool-response.js";
+import { createToolError } from "./tool-response.js";
 
-const PLUGIN_TOOLS_CACHE_SCHEMA_VERSION = 3;
+const PLUGIN_TOOLS_CACHE_SCHEMA_VERSION = 4;
 const PLUGIN_TOOLS_CACHE_FILE = join(
   dirname(CONFIG.instanceRegistryPath),
-  "plugin-tools-metadata-cache-v3.json"
+  "plugin-tools-metadata-cache-v4.json"
 );
 const PLUGIN_TOOLS_LIVE_REFRESH_INTERVAL_MS = 10_000;
 const STATIC_FIRST_CLASS_PLUGIN_ROUTE_SET =
@@ -227,6 +227,7 @@ export function pluginToolsFingerprint(tools) {
         exposure: tool?.exposure || "",
         description: tool?.description || "",
         inputSchema: tool?.inputSchema || null,
+        outputSchema: tool?.outputSchema || null,
         annotations: tool?.annotations || null,
       }))
       .sort((left, right) =>
@@ -348,9 +349,12 @@ export async function fetchFirstClassPluginTools() {
       description: sanitizeToolMetadata(
         tool.description || `Unity MCP route: ${tool.route}`),
       inputSchema: normalizeInputSchema(tool.inputSchema),
+      outputSchema: tool.outputSchema && typeof tool.outputSchema === "object"
+        ? sanitizeToolMetadata(tool.outputSchema)
+        : {},
       annotations: sanitizeToolMetadata(tool.annotations || {}),
       handler: async (params = {}) =>
-        JSON.stringify(await invokeFirstClassPluginRoute(tool.route, params || {})),
+        invokeFirstClassPluginRoute(tool.route, params || {}),
     });
   }
 
@@ -484,7 +488,8 @@ export function splitToolTiers(allEditorTools) {
         },
         includeSchema: {
           type: "boolean",
-          description: "Include inputSchema for dynamically discovered tools. Defaults to false.",
+          description:
+            "Include inputSchema and outputSchema for dynamically discovered tools. Defaults to false.",
         },
         offset: {
           type: "number",
@@ -552,6 +557,9 @@ export function splitToolTiers(allEditorTools) {
             if (includeSchema && meta?.inputSchema) {
               result.inputSchema = sanitizeToolMetadata(meta.inputSchema);
             }
+            if (includeSchema && meta?.outputSchema) {
+              result.outputSchema = sanitizeToolMetadata(meta.outputSchema);
+            }
             if (meta?.route) {
               result.route = meta.route;
             }
@@ -566,6 +574,7 @@ export function splitToolTiers(allEditorTools) {
             };
             if (includeSchema) {
               result.inputSchema = sanitizeToolMetadata(tool.inputSchema);
+              result.outputSchema = sanitizeToolMetadata(tool.outputSchema || {});
             }
             return result;
           }),
@@ -573,7 +582,7 @@ export function splitToolTiers(allEditorTools) {
         ];
 
         if (allTools.length === 0) {
-          return serializeToolError(
+          return createToolError(
             "advanced_category_not_found",
             `No advanced tools were found for category "${category}".`,
             { availableCategories: Object.keys(mergedCategories).sort() }
@@ -581,7 +590,7 @@ export function splitToolTiers(allEditorTools) {
         }
         const page = allTools.slice(offset, offset + limit);
         const nextOffset = offset + page.length;
-        return JSON.stringify({
+        return {
           category: cat,
           totalTools: allTools.length,
           offset,
@@ -590,20 +599,18 @@ export function splitToolTiers(allEditorTools) {
           hasMore: nextOffset < allTools.length,
           nextOffset: nextOffset < allTools.length ? nextOffset : null,
           tools: page,
-        });
+        };
       }
 
       const categorySummaries = Object.entries(mergedCategories)
         .map(([name, names]) => ({ name, toolCount: names.length }))
         .sort((left, right) => left.name.localeCompare(right.name));
-      return JSON.stringify(
-        {
-          totalAdvancedTools: advanced.length + dynamicCount,
-          dynamicTools: dynamicCount,
-          categories: categorySummaries,
-          hint: "Call again with category to list paginated tools and optional schemas.",
-        }
-      );
+      return {
+        totalAdvancedTools: advanced.length + dynamicCount,
+        dynamicTools: dynamicCount,
+        categories: categorySummaries,
+        hint: "Call again with category to list paginated tools and optional schemas.",
+      };
     },
   };
 
@@ -631,7 +638,7 @@ export function splitToolTiers(allEditorTools) {
     },
     handler: async ({ tool, params } = {}) => {
       if (!tool) {
-        return serializeToolError(
+        return createToolError(
           "advanced_tool_required",
           "tool is required. Use unity_list_advanced_tools to discover fallback tools."
         );
@@ -640,10 +647,9 @@ export function splitToolTiers(allEditorTools) {
       if (isUnityRoute(tool)) {
         try {
           logDebug(`[MCP] Calling raw Unity route "${tool}" via fallback generic entry`);
-          const result = await sendCommand(tool, params || {});
-          return JSON.stringify(result);
+          return await sendCommand(tool, params || {});
         } catch (err) {
-          return serializeToolError(
+          return createToolError(
             "advanced_route_failed",
             `Failed to execute route "${tool}": ${err.message}`,
             { route: tool }
@@ -661,10 +667,9 @@ export function splitToolTiers(allEditorTools) {
       if (dynamicTool?.route) {
         try {
           logDebug(`[MCP] Lazy-loading tool "${tool}" via plugin route "${dynamicTool.route}"`);
-          const result = await sendCommand(dynamicTool.route, params || {});
-          return JSON.stringify(result);
+          return await sendCommand(dynamicTool.route, params || {});
         } catch (err) {
-          return serializeToolError(
+          return createToolError(
             "advanced_tool_failed",
             `Failed to execute "${tool}": ${err.message}`,
             { tool, route: dynamicTool.route }
@@ -680,10 +685,9 @@ export function splitToolTiers(allEditorTools) {
         try {
           // Log to stderr, not stdout - stdout carries the MCP JSON-RPC transport.
           logDebug(`[MCP] Lazy-loading tool "${tool}" via route "${route}"`);
-          const result = await sendCommand(route, params || {});
-          return JSON.stringify(result);
+          return await sendCommand(route, params || {});
         } catch (err) {
-          return serializeToolError(
+          return createToolError(
             "advanced_tool_failed",
             `Failed to execute "${tool}": ${err.message}`,
             { tool, route }
@@ -691,7 +695,7 @@ export function splitToolTiers(allEditorTools) {
         }
       }
 
-      return serializeToolError(
+      return createToolError(
         "advanced_tool_not_found",
         `Unknown fallback tool "${tool}". Use unity_list_advanced_tools to discover available tools.`,
         { tool }

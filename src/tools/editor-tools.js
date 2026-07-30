@@ -355,7 +355,7 @@ export const editorTools = [
   },
   {
     name: "unity_execute_code",
-    description: "Execute arbitrary C# code inside the Unity Editor. The code runs in the editor context with access to all Unity APIs. Recurring namespace imports can be configured in Project Settings > Unity MCP > Execute Code. Return values are serialized to JSON.",
+    description: "Start persistent arbitrary C# execution inside the Unity Editor. Returns a job for status, cancellation-before-start, idempotent reuse, and optional explicit cleanup. Recurring namespace imports can be configured in Project Settings > Unity MCP > Execute Code.",
     inputSchema: {
       type: "object",
       properties: {
@@ -365,10 +365,23 @@ export const editorTools = [
           items: { type: "string" },
           description: "Additional namespace imports for this call. Configure recurring imports in Project Settings > Unity MCP > Execute Code.",
         },
-        maxResultItems: { type: "number", description: "Maximum serialized collection/object entries (default: 200, capped at 2000)." },
-        maxResultDepth: { type: "number", description: "Maximum serialized result depth (default: 8, capped at 16)." },
-        maxResultStringLength: { type: "number", description: "Maximum characters per returned string (default: 20000, capped at 200000)." },
+        maxResultItems: { type: "integer", description: "Maximum serialized collection/object entries (default: 200, capped at 2000)." },
+        maxResultDepth: { type: "integer", description: "Maximum serialized result depth (default: 8, capped at 16)." },
+        maxResultStringLength: { type: "integer", description: "Maximum characters per returned string (default: 20000, capped at 200000)." },
+        unityStructFormat: {
+          type: "string",
+          enum: ["compact", "structured"],
+          description: "Unity value structs in the completed result: compact strings or structured typed objects. Defaults to compact.",
+        },
         includeStackTrace: { type: "boolean", description: "Include a full managed stack trace when executed code throws. Defaults to false." },
+        idempotencyKey: {
+          type: "string",
+          description: "Optional project-scoped key. Repeating the same key and arguments reuses the existing persistent job.",
+        },
+        cleanupCode: {
+          type: "string",
+          description: "Optional C# method body run only through jobs/cleanup to reverse temporary state.",
+        },
       },
       required: ["code"],
     },

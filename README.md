@@ -120,6 +120,12 @@ Project-defined tools use a separate three-stage contract:
 2. `unity_project_tools_get` returns the complete descriptor and input schema for one selected tool.
 3. `unity_project_tools_execute` executes that tool with validated arguments.
 
+Every advertised MCP tool includes an `outputSchema`. Calls return the
+machine-readable value in `structuredContent` using one stable
+`{ success, result }` or `{ success:false, errorCode, error, retryable }`
+envelope. The text content is intentionally only a short human-readable
+summary, so clients no longer need to parse JSON out of a text block.
+
 Project-defined tools are deliberately not promoted to concrete Node-server tools, even when the Editor package marks one first-class. This prevents a tool from one open Unity project remaining advertised after the MCP session switches to another project.
 
 The server advertises MCP tool-list change notifications and refreshes live plugin metadata in the background. When a package update changes one of the release-managed concrete routes, compatible MCP clients automatically request the updated tool list without reconnecting. Metadata refresh requests compact schema-bearing first-class pages only; they do not transfer the full plugin route catalog.
@@ -145,6 +151,9 @@ The server automatically discovers all running Unity Editor instances on startup
 - **Port Identity Validation** — When restoring a saved connection, the server verifies the instance identity (project name + path) matches the expected target. If Unity restarts and a different project grabs the port, the server detects this and re-discovers the correct instance.
 - **Bound Mutations** — Every mutating request carries the selected instance's expected project path/name; the Editor rejects unbound or misrouted writes.
 - **Idempotent Queue Control** — Stable request keys survive retries, and `unity_queue_cancel` cancels queued work owned by the current agent without preempting an executing Unity API call.
+- **Persistent Code and Project Tools** — Execute-code and long project tools
+  return durable Jobs with `jobs/get`, `jobs/cancel`, exact-argument
+  `idempotencyKey` reuse, and explicit `jobs/cleanup` contracts.
 - **Queue-Only Reload Recovery** — Transient `queue/submit` 404 responses during package or domain reload retry with the same idempotency key; the server never switches later commands to unsupported direct execution endpoints.
 - **Compile-Time Resilience** — During long Unity compiles (when the editor is unresponsive), the server checks the shared instance registry. If the registry entry is fresh (updated within the last 5 minutes via heartbeat), the connection is preserved instead of dropped.
 - **Reload Discovery Lease** — A fresh registered Editor remains listed with `status: "reloading"` and `isReachable: false` while its HTTP bridge restarts.
