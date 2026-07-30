@@ -2,6 +2,12 @@
 
 All notable changes to this package will be documented in this file.
 
+## [4.2.2] - 2026-07-30
+
+### Changed
+- Refresh the 39 release-managed Unity tool descriptors from VM Unity MCP 5.3.0 so project/preference default sources and explicit-value precedence remain visible in startup and offline fallback schemas.
+- Keep the public tool surface unchanged; live metadata remains authoritative after connection.
+
 ## [4.2.1] - 2026-07-30
 
 ### Fixed

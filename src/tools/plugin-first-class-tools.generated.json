@@ -327,7 +327,9 @@
         },
         "limit": {
           "type": "number",
-          "description": "Maximum assets. Defaults to 100; capped at 500."
+          "description": "Maximum assets. Defaults to 100; capped at 500.",
+          "x-unityMcpDefaultSource": "Preferences/Unity MCP > Tool Responses > Default Result Limit (when override is enabled)",
+          "x-unityMcpExplicitValueWins": true
         }
       }
     },
@@ -570,7 +572,9 @@
         },
         "maxNodes": {
           "type": "number",
-          "description": "Maximum hierarchy nodes to return. Defaults to 250; capped at 2000."
+          "description": "Maximum hierarchy nodes to return. Defaults to 250; capped at 2000.",
+          "x-unityMcpDefaultSource": "Preferences/Unity MCP > Tool Responses > Default Result Limit (when override is enabled)",
+          "x-unityMcpExplicitValueWins": true
         },
         "parentPath": {
           "type": "string",
@@ -613,7 +617,9 @@
       "properties": {
         "path": {
           "type": "string",
-          "description": "Output PNG path. Defaults under Assets/Screenshots."
+          "description": "Output PNG path. Defaults to the Unity MCP project screenshot directory (Assets/Screenshots initially).",
+          "x-unityMcpDefaultSource": "Project Settings/Unity MCP > Tool Defaults",
+          "x-unityMcpExplicitValueWins": true
         },
         "superSize": {
           "type": "number",
@@ -656,7 +662,9 @@
         },
         "limit": {
           "type": "number",
-          "description": "Maximum packages. Defaults to 100; capped at 200."
+          "description": "Maximum packages. Defaults to 100; capped at 200.",
+          "x-unityMcpDefaultSource": "Preferences/Unity MCP > Tool Responses > Default Result Limit (when override is enabled)",
+          "x-unityMcpExplicitValueWins": true
         }
       }
     },
@@ -777,7 +785,9 @@
         },
         "limit": {
           "type": "number",
-          "description": "Maximum results. Defaults to 200; capped at 500."
+          "description": "Maximum results. Defaults to 200; capped at 500.",
+          "x-unityMcpDefaultSource": "Preferences/Unity MCP > Tool Responses > Default Result Limit (when override is enabled)",
+          "x-unityMcpExplicitValueWins": true
         }
       }
     },
@@ -894,7 +904,9 @@
         },
         "maxProperties": {
           "type": "number",
-          "description": "Maximum properties to return when propertyPath is omitted. Defaults to 50; capped at 500."
+          "description": "Maximum properties to return when propertyPath is omitted. Defaults to 50; capped at 500.",
+          "x-unityMcpDefaultSource": "Preferences/Unity MCP > Tool Responses > Default Result Limit (when override is enabled)",
+          "x-unityMcpExplicitValueWins": true
         },
         "includeChildren": {
           "type": "boolean",
@@ -1020,7 +1032,9 @@
         },
         "includePrefabFileDiff": {
           "type": "boolean",
-          "description": "Return before/after prefab YAML diff. Defaults to true."
+          "description": "Return before/after prefab YAML diff. Defaults to the Unity MCP user preference (disabled initially).",
+          "x-unityMcpDefaultSource": "Preferences/Unity MCP > Tool Responses > Include Prefab YAML Diffs",
+          "x-unityMcpExplicitValueWins": true
         },
         "prefabFileDiffMode": {
           "type": "string",
@@ -1344,7 +1358,9 @@
       "properties": {
         "count": {
           "type": "number",
-          "description": "Maximum returned entries. Defaults to 50; capped at 200."
+          "description": "Maximum returned entries. Defaults to 50; capped at 200.",
+          "x-unityMcpDefaultSource": "Preferences/Unity MCP > Tool Responses > Default Result Limit (when override is enabled)",
+          "x-unityMcpExplicitValueWins": true
         },
         "offset": {
           "type": "number",
@@ -1458,7 +1474,9 @@
         },
         "maxResults": {
           "type": "number",
-          "description": "Maximum returned elements. Defaults to 50."
+          "description": "Maximum returned elements. Defaults to 50.",
+          "x-unityMcpDefaultSource": "Preferences/Unity MCP > Tool Responses > Default Result Limit (when override is enabled)",
+          "x-unityMcpExplicitValueWins": true
         },
         "includeStyle": {
           "type": "boolean",
@@ -1671,7 +1689,9 @@
         },
         "limit": {
           "type": "number",
-          "description": "Individual test result limit. Defaults to 100; capped at 500."
+          "description": "Individual test result limit. Defaults to 100; capped at 500.",
+          "x-unityMcpDefaultSource": "Preferences/Unity MCP > Tool Responses > Default Result Limit (when override is enabled)",
+          "x-unityMcpExplicitValueWins": true
         },
         "failureLimit": {
           "type": "number",
@@ -1698,7 +1718,9 @@
         },
         "limit": {
           "type": "number",
-          "description": "Maximum project tools. Defaults to 100; capped at 200."
+          "description": "Maximum project tools. Defaults to 100; capped at 200.",
+          "x-unityMcpDefaultSource": "Preferences/Unity MCP > Tool Responses > Default Result Limit (when override is enabled)",
+          "x-unityMcpExplicitValueWins": true
         }
       }
     },
@@ -1950,7 +1972,9 @@
         },
         "limit": {
           "type": "number",
-          "description": "Maximum shader properties returned. Defaults to 100; capped at 500."
+          "description": "Maximum shader properties returned. Defaults to 100; capped at 500.",
+          "x-unityMcpDefaultSource": "Preferences/Unity MCP > Tool Responses > Default Result Limit (when override is enabled)",
+          "x-unityMcpExplicitValueWins": true
         }
       },
       "required": [
