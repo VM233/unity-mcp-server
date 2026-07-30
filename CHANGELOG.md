@@ -2,6 +2,15 @@
 
 All notable changes to this package will be documented in this file.
 
+## [4.2.0] - 2026-07-30
+
+### Added
+- Publish the six VM Unity MCP 5.2.0 P0 routes as release-managed concrete tools: persistent-job cancellation, semantic importer get/set, multi-scene workspace management, and typed Material property get/set.
+
+### Changed
+- Refresh the generated plugin descriptor snapshot from the live, exact-SHA Unity package so schemas, annotations, descriptions, and project-binding fields remain authoritative.
+- Keep VFX Graph, Audio Mixer, Build Profile, Addressables, Timeline, and Cinemachine integrations in the lazy catalog, gated by the Editor package's live capabilities and package versions.
+
 ## [4.1.0] - 2026-07-30
 
 ### Changed

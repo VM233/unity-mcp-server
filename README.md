@@ -124,6 +124,8 @@ Project-defined tools are deliberately not promoted to concrete Node-server tool
 
 The server advertises MCP tool-list change notifications and refreshes live plugin metadata in the background. When a package update changes one of the release-managed concrete routes, compatible MCP clients automatically request the updated tool list without reconnecting. Metadata refresh requests compact schema-bearing first-class pages only; they do not transfer the full plugin route catalog.
 
+VM Unity MCP 5.2 adds concrete tools for persistent-job cancellation, semantic importer settings, multi-scene workspaces, and typed Material properties. Package-specific VFX Graph, Audio Mixer, Build Profile, Addressables, Timeline, and Cinemachine routes remain lazily discoverable and are published only when the Editor reports the corresponding capability.
+
 ### Multi-Instance Support
 
 The server automatically discovers all running Unity Editor instances on startup. If only one instance is found, it auto-connects. If multiple instances are running (e.g., main editor + ParrelSync clones), it prompts you to select which one to work with.

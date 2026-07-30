@@ -1761,5 +1761,264 @@
     "annotations": {
       "destructiveHint": true
     }
+  },
+  {
+    "toolName": "unity_jobs_cancel",
+    "route": "jobs/cancel",
+    "category": "jobs",
+    "description": "Request owner-checked cancellation of a persistent build, test, package-test, memory-snapshot, or Addressables build job and report the actual cancellation mode.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "jobId": {
+          "type": "string",
+          "description": "Persistent job identifier returned by its start route."
+        },
+        "jobType": {
+          "type": "string",
+          "description": "Optional job type disambiguator."
+        },
+        "expectedProjectPath": {
+          "type": "string",
+          "description": "Expected Unity project root path. The request is rejected before mutation if it reaches another project."
+        },
+        "expectedProjectName": {
+          "type": "string",
+          "description": "Optional expected Unity project name used with expectedProjectPath as an additional target-binding check."
+        }
+      },
+      "required": [
+        "jobId"
+      ]
+    },
+    "annotations": {}
+  },
+  {
+    "toolName": "unity_asset_import_settings_get",
+    "route": "asset/import-settings/get",
+    "category": "asset",
+    "description": "Read semantic TextureImporter, ModelImporter, or AudioImporter settings without exposing Unity's internal serialized fields.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "assetPath": {
+          "type": "string",
+          "description": "Texture, model, or audio asset path below Assets/."
+        },
+        "platform": {
+          "type": "string",
+          "description": "Optional Unity platform override name such as Standalone, Android, or iPhone."
+        }
+      },
+      "required": [
+        "assetPath"
+      ]
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true
+    }
+  },
+  {
+    "toolName": "unity_asset_import_settings_set",
+    "route": "asset/import-settings/set",
+    "category": "asset",
+    "description": "Validate and update semantic TextureImporter, ModelImporter, or AudioImporter settings, optional platform overrides, and reimport behavior.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "assetPath": {
+          "type": "string",
+          "description": "Texture, model, or audio asset path below Assets/."
+        },
+        "settings": {
+          "type": "object",
+          "description": "Semantic importer fields. Unsupported keys are rejected with the allowed field list."
+        },
+        "platform": {
+          "type": "string",
+          "description": "Optional Unity platform override name such as Standalone, Android, or iPhone."
+        },
+        "platformSettings": {
+          "type": "object",
+          "description": "Optional semantic TextureImporter or AudioImporter override settings for platform."
+        },
+        "reimport": {
+          "type": "boolean",
+          "description": "Save and reimport the asset after updating settings. Defaults to true."
+        },
+        "dryRun": {
+          "type": "boolean",
+          "description": "Validate and return before/requested settings without modifying the importer."
+        },
+        "expectedProjectPath": {
+          "type": "string",
+          "description": "Expected Unity project root path. The request is rejected before mutation if it reaches another project."
+        },
+        "expectedProjectName": {
+          "type": "string",
+          "description": "Optional expected Unity project name used with expectedProjectPath as an additional target-binding check."
+        }
+      },
+      "required": [
+        "assetPath",
+        "settings"
+      ]
+    },
+    "annotations": {}
+  },
+  {
+    "toolName": "unity_scene_workspace",
+    "route": "scene/workspace",
+    "category": "scene",
+    "description": "List loaded scenes, open a scene additively or singly, close a loaded scene with an explicit dirty-scene policy, or set the active scene.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "description": "Workspace action: list, open, close, or set-active. Defaults to list."
+        },
+        "path": {
+          "type": "string",
+          "description": "Scene asset path for open, close, or set-active."
+        },
+        "name": {
+          "type": "string",
+          "description": "Loaded scene name for close or set-active when path is omitted."
+        },
+        "mode": {
+          "type": "string",
+          "description": "Open mode: additive (default) or single."
+        },
+        "saveModified": {
+          "type": "boolean",
+          "description": "For single open, save every dirty loaded scene before replacement."
+        },
+        "discardModified": {
+          "type": "boolean",
+          "description": "For single open, explicitly allow replacement of dirty loaded scenes without saving."
+        },
+        "save": {
+          "type": "boolean",
+          "description": "For close, save a dirty scene before closing."
+        },
+        "discardChanges": {
+          "type": "boolean",
+          "description": "For close, explicitly discard dirty scene changes."
+        },
+        "removeScene": {
+          "type": "boolean",
+          "description": "For close, remove the scene from the workspace. Defaults to true."
+        },
+        "expectedProjectPath": {
+          "type": "string",
+          "description": "Expected Unity project root path. The request is rejected before mutation if it reaches another project."
+        },
+        "expectedProjectName": {
+          "type": "string",
+          "description": "Optional expected Unity project name used with expectedProjectPath as an additional target-binding check."
+        }
+      }
+    },
+    "annotations": {
+      "destructiveHint": true
+    }
+  },
+  {
+    "toolName": "unity_material_properties_get",
+    "route": "material/properties/get",
+    "category": "material",
+    "description": "Read a Material's shader, typed shader properties, textures, keywords, render queue, and instancing settings through Unity's public Material API.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "assetPath": {
+          "type": "string",
+          "description": "Material asset path below Assets/."
+        },
+        "propertyNames": {
+          "type": "array",
+          "description": "Optional shader property names. Omit to page through declared shader properties.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "offset": {
+          "type": "number",
+          "description": "Shader property offset. Defaults to 0."
+        },
+        "limit": {
+          "type": "number",
+          "description": "Maximum shader properties returned. Defaults to 100; capped at 500."
+        }
+      },
+      "required": [
+        "assetPath"
+      ]
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true
+    }
+  },
+  {
+    "toolName": "unity_material_properties_set",
+    "route": "material/properties/set",
+    "category": "material",
+    "description": "Transactionally set typed Material shader properties, texture references and transforms, keywords, render queue, and instancing settings.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "assetPath": {
+          "type": "string",
+          "description": "Material asset path below Assets/."
+        },
+        "properties": {
+          "type": "object",
+          "description": "Shader property values keyed by declared shader property name. Texture values accept assetPath plus optional scale and offset."
+        },
+        "keywords": {
+          "type": "object",
+          "description": "Keyword changes with enable and disable string arrays."
+        },
+        "shader": {
+          "type": "string",
+          "description": "Optional replacement shader name."
+        },
+        "renderQueue": {
+          "type": "number",
+          "description": "Optional Material render queue."
+        },
+        "enableInstancing": {
+          "type": "boolean",
+          "description": "Optional GPU instancing flag."
+        },
+        "doubleSidedGI": {
+          "type": "boolean",
+          "description": "Optional double-sided global illumination flag."
+        },
+        "globalIlluminationFlags": {
+          "type": "string",
+          "description": "Optional MaterialGlobalIlluminationFlags value."
+        },
+        "dryRun": {
+          "type": "boolean",
+          "description": "Validate and return requested changes without modifying the Material."
+        },
+        "expectedProjectPath": {
+          "type": "string",
+          "description": "Expected Unity project root path. The request is rejected before mutation if it reaches another project."
+        },
+        "expectedProjectName": {
+          "type": "string",
+          "description": "Optional expected Unity project name used with expectedProjectPath as an additional target-binding check."
+        }
+      },
+      "required": [
+        "assetPath"
+      ]
+    },
+    "annotations": {}
   }
 ]

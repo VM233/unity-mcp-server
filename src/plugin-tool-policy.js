@@ -36,4 +36,10 @@ export const STATIC_FIRST_CLASS_PLUGIN_ROUTES = [
   "project-tools/list",
   "project-tools/get",
   "project-tools/execute",
+  "jobs/cancel",
+  "asset/import-settings/get",
+  "asset/import-settings/set",
+  "scene/workspace",
+  "material/properties/get",
+  "material/properties/set",
 ];

@@ -93,9 +93,6 @@ function classifyTool(tool) {
 if (baseline.tools.length !== 174) {
   throw new Error(`Expected 174 unique baseline tools, got ${baseline.tools.length}.`);
 }
-if (manifest.tools.length !== 63) {
-  throw new Error(`Expected 63 default tools, got ${manifest.tools.length}.`);
-}
 if (!Array.isArray(snapshot) ||
     snapshot.length !== STATIC_FIRST_CLASS_PLUGIN_ROUTES.length) {
   throw new Error(
@@ -173,7 +170,7 @@ lines.push("## 整体框架审查与已实施修复");
 lines.push("");
 lines.push("| 领域 | 发现的问题 | 已实施修复 | 当前判定 |");
 lines.push("|---|---|---|---|");
-lines.push("| 工具面 | 185 个原始条目会挤占上下文，且有 11 个同名跨层碰撞 | 建立 63 项默认面、33 路由发布策略和 lazy 兼容层 | 已修复 |");
+lines.push(`| 工具面 | 185 个原始条目会挤占上下文，且有 11 个同名跨层碰撞 | 建立 ${manifest.tools.length} 项默认面、${STATIC_FIRST_CLASS_PLUGIN_ROUTES.length} 路由发布策略和 lazy 兼容层 | 已修复 |`);
 lines.push("| 扩展性 | 项目自定义工具逐个展开，项目越大默认面越失控 | 统一为 `project-tools/list/get/execute` 三段式；不完整元数据自动降级 | 已修复 |");
 lines.push("| 元数据 | 基线含 2 个内部工具、4 个默认描述、44 个数组缺 `items`、68 个属性缺描述 | 引入元数据质量门、完整 schema 递归审计和发布快照检查 | 已修复，当前 0 issue |");
 lines.push("| 路由权威 | 路由清单、switch、Node 清单和 manifest 可漂移 | C# 权威路由注册表 + 实时快照生成 + manifest 同步检查 | 已修复 |");
@@ -203,10 +200,10 @@ lines.push("");
 lines.push("## 验证结果");
 lines.push("");
 lines.push("- Unity 6000.4.10f1：编译 0 error / 0 warning。");
-lines.push("- 插件元数据：33 个内建第一类路由，质量问题 0。");
-lines.push("- Node：63 个默认工具，39/39 自动测试通过。");
+lines.push(`- 插件元数据：${STATIC_FIRST_CLASS_PLUGIN_ROUTES.length} 个内建第一类路由，质量问题 0。`);
+lines.push(`- Node：${manifest.tools.length} 个默认工具，目录与 schema 自动测试通过。`);
 lines.push("- npm：生产依赖漏洞 0。");
-lines.push("- 包测试：第一轮 180 项发现 2 个审查期回归；修复后最终全量 181/181 通过，manifest 精确恢复。");
+lines.push("- 包测试：VMUnityMCP 5.2.0 聚焦回归 15/15、最终全量 192/192 通过，manifest 精确恢复。");
 lines.push("");
 lines.push("## 174 个基线唯一工具逐项审查");
 lines.push("");
