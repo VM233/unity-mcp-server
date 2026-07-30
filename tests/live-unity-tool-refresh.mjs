@@ -13,13 +13,14 @@ const registryPath = join(tempRoot, "instances.json");
 const cachePath = join(tempRoot, "plugin-tools-metadata-cache-v3.json");
 
 writeFileSync(cachePath, JSON.stringify({
-  schemaVersion: 1,
+  schemaVersion: 3,
   updatedAt: 0,
   tools: [{
-    route: "mcp/health",
-    toolName: "unity_mcp_health",
+    route: "asset/import",
+    toolName: "unity_asset_import",
     firstClass: true,
     exposure: "first-class",
+    description: "Stale test metadata.",
     inputSchema: { type: "object", properties: {} },
   }],
 }));
@@ -109,37 +110,37 @@ try {
   }
   assert.equal(initial.tools.some((tool) => tool.name.startsWith("unity_uma_")), false);
 
-  const refreshedMetadataTools = [
-    "unity_testing_run_package_tests",
-    "unity_prefab_asset_move_component",
-    "unity_prefab_asset_transaction_edit",
-  ];
-  const initialAlreadyHasLiveMetadata = refreshedMetadataTools.every((toolName) =>
-    initial.tools.some((tool) => tool.name === toolName));
-  if (!initialAlreadyHasLiveMetadata) {
-    await withTimeout(listChanged, 60000, "tool list change notification timed out");
-  }
+  await withTimeout(listChanged, 60000, "tool list change notification timed out");
 
   const refreshed = await client.listTools();
   const refreshedChars = JSON.stringify(refreshed).length;
-  assert.equal(refreshed.tools.some((tool) => tool.name === "unity_testing_run_package_tests"), true);
-  assert.equal(refreshed.tools.some((tool) => tool.name === "unity_prefab_asset_move_component"), true);
+  for (const toolName of [
+    "unity_jobs_cancel",
+    "unity_asset_import_settings_get",
+    "unity_asset_import_settings_set",
+    "unity_scene_workspace",
+    "unity_material_properties_get",
+    "unity_material_properties_set",
+  ]) {
+    assertEditorBindingSchema(refreshed.tools, toolName);
+  }
+  assert.equal(refreshed.tools.some((tool) =>
+    tool.name === "unity_testing_run_package_tests"), false);
+  assert.equal(refreshed.tools.some((tool) =>
+    tool.name === "unity_prefab_asset_move_component"), false);
+  assert.equal(refreshed.tools.some((tool) =>
+    tool.name === "unity_prefab_asset_transaction_edit"), false);
   assert.equal(refreshed.tools.some((tool) => tool.name === "unity_prefab_asset_batch_edit"), false);
   assert.equal(refreshed.tools.some((tool) => tool.name === "unity_asset_move_batch"), false);
   assert.equal(refreshed.tools.some((tool) => tool.name === "unity_component_batch_wire"), false);
   assert.equal(refreshed.tools.some((tool) => tool.name === "unity_localization_upsert_entries"), false);
   assert.equal(refreshed.tools.some((tool) => tool.name === "unity_project_tools_get"), true);
   assert.equal(refreshed.tools.some((tool) => tool.name.startsWith("unity_uma_")), false);
-  const transaction = refreshed.tools.find((tool) => tool.name === "unity_prefab_asset_transaction_edit");
   const assetMove = refreshed.tools.find((tool) => tool.name === "unity_asset_move");
   const setReference = refreshed.tools.find((tool) => tool.name === "unity_component_set_reference");
-  const localizationUpsert = refreshed.tools.find((tool) => tool.name === "unity_localization_upsert_entry");
   const refreshJob = refreshed.tools.find((tool) => tool.name === "unity_asset_get_refresh_job");
-  assert.deepEqual(transaction.inputSchema.properties.execution.properties.mode.enum,
-    ["auto", "immediate", "batched"]);
   assert.deepEqual(assetMove.inputSchema.required, ["moves"]);
   assert.deepEqual(setReference.inputSchema.required, ["references"]);
-  assert.deepEqual(localizationUpsert.inputSchema.required, ["collection", "entries"]);
   assert.ok(refreshJob.inputSchema.properties.jobId);
   assert.ok(refreshJob.inputSchema.properties.refreshRequestId);
   assert.ok(refreshJob.inputSchema.properties.clear);
@@ -224,6 +225,8 @@ try {
   const prefabCatalog = JSON.parse(prefabCatalogText);
   assert.ok(prefabCatalogText.length < 50_000);
   assert.ok(prefabCatalog.tools.length <= 25);
+  assert.equal(prefabCatalog.tools.some((tool) =>
+    tool.route === "prefab-asset/transaction-edit"), true);
   console.log(`tools/list: ${initial.tools.length} tools / ${initialChars} chars initially; ` +
     `${refreshed.tools.length} tools / ${refreshedChars} chars after refresh.`);
   console.log(`advanced catalog: ${catalogText.length} chars summary; ` +

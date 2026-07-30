@@ -2,10 +2,16 @@
 
 All notable changes to this package will be documented in this file.
 
+## [4.2.1] - 2026-07-30
+
+### Fixed
+- Align the live metadata-refresh integration test with the bounded release policy: verify the six 5.2 P0 routes as concrete tools and verify specialized package-test and prefab transaction routes remain available lazily.
+- Pair unbound read-only metadata refresh with VM Unity MCP 5.2.1, which defers project-binding validation from the outer queue envelope to its inner route.
+
 ## [4.2.0] - 2026-07-30
 
 ### Added
-- Publish the six VM Unity MCP 5.2.0 P0 routes as release-managed concrete tools: persistent-job cancellation, semantic importer get/set, multi-scene workspace management, and typed Material property get/set.
+- Publish the six VM Unity MCP 5.2 P0 routes as release-managed concrete tools: persistent-job cancellation, semantic importer get/set, multi-scene workspace management, and typed Material property get/set.
 
 ### Changed
 - Refresh the generated plugin descriptor snapshot from the live, exact-SHA Unity package so schemas, annotations, descriptions, and project-binding fields remain authoritative.
