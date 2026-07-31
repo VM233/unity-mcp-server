@@ -2,6 +2,20 @@
 
 All notable changes to this package will be documented in this file.
 
+## [4.4.0] - 2026-07-31
+
+### Changed
+- Consume VM Unity MCP schema-v5 presence-only `tags` instead of duplicated
+  `firstClass`, `preferred`, `exposure`, and false capability booleans.
+- Move live plugin metadata to the schema-v5 disk cache and include normalized
+  tags and side effects in change fingerprints.
+- Compact advanced-tool pagination to an optional `nextOffset`, and expose
+  positive tags, side effects, and tool-specific error codes for dynamically
+  discovered tools.
+- Merge server-owned queue replay, transport recovery, timeout, and ticket
+  booleans into the same presence-only `tags` contract.
+- Omit absent media MIME types instead of returning empty strings.
+
 ## [4.3.0] - 2026-07-31
 
 ### Added

@@ -77,10 +77,8 @@ await runWithRequestContext({
       throw new Error(`Unity metadata request failed: ${JSON.stringify(response)}`);
     }
     pluginTools.push(...payload.tools);
-    if (!payload.hasMore) break;
-    offset = Number.isInteger(payload.nextOffset)
-      ? payload.nextOffset
-      : offset + payload.tools.length;
+    if (!Number.isInteger(payload.nextOffset)) break;
+    offset = payload.nextOffset;
   }
 });
 

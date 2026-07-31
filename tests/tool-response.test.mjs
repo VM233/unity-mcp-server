@@ -110,10 +110,46 @@ test("successful internal bridge envelopes are removed from public tool replies"
       data: { value: 3 },
       recoveredAfterTransportFailure: true,
     }),
-    { value: 3, recoveredAfterTransportFailure: true }
+    { value: 3, tags: ["recoveredAfterTransportFailure"] }
   );
   const failure = '{"success":false,"errorCode":"failed","error":"No."}';
   assert.equal(compactSuccessfulToolResult(failure), failure);
+});
+
+test("server transport lifecycle booleans use presence-only tags", () => {
+  const success = buildToolResponse({
+    success: true,
+    data: {
+      status: "succeeded",
+      recoveredAfterTransportFailure: true,
+    },
+    replayedAfterLostTicket: true,
+    replayCount: 1,
+    ticketReceived: false,
+  });
+  assert.deepEqual(success.structuredContent, {
+    success: true,
+    result: {
+      status: "succeeded",
+    },
+    replayCount: 1,
+    tags: [
+      "recoveredAfterTransportFailure",
+      "replayedAfterLostTicket",
+    ],
+  });
+
+  const failure = buildToolResponse({
+    success: false,
+    errorCode: "queue_reload_recovery_timeout",
+    error: "Unity did not reconnect.",
+    retryable: true,
+    pollTimedOut: true,
+    ticketReceived: false,
+  });
+  assert.equal(failure.structuredContent.pollTimedOut, undefined);
+  assert.equal(failure.structuredContent.ticketReceived, undefined);
+  assert.deepEqual(failure.structuredContent.tags, ["pollTimedOut"]);
 });
 
 test("response sizing counts UTF-8 bytes and never appends a soft warning block", () => {

@@ -28,10 +28,10 @@ import { STATIC_FIRST_CLASS_PLUGIN_ROUTES } from "./plugin-tool-policy.js";
 import { logDebug } from "./logger.js";
 import { createToolError } from "./tool-response.js";
 
-const PLUGIN_TOOLS_CACHE_SCHEMA_VERSION = 4;
+const PLUGIN_TOOLS_CACHE_SCHEMA_VERSION = 5;
 const PLUGIN_TOOLS_CACHE_FILE = join(
   dirname(CONFIG.instanceRegistryPath),
-  "plugin-tools-metadata-cache-v4.json"
+  "plugin-tools-metadata-cache-v5.json"
 );
 const PLUGIN_TOOLS_LIVE_REFRESH_INTERVAL_MS = 10_000;
 const STATIC_FIRST_CLASS_PLUGIN_ROUTE_SET =
@@ -189,10 +189,9 @@ async function fetchPluginToolsLive(firstClassOnly = true, {
       if (!Array.isArray(metaTools?.tools)) break;
       receivedToolPage = true;
       tools.push(...metaTools.tools);
-      if (!metaTools.hasMore || metaTools.tools.length === 0) break;
-      offset = Number.isInteger(metaTools.nextOffset)
-        ? metaTools.nextOffset
-        : offset + metaTools.tools.length;
+      if (!Number.isInteger(metaTools.nextOffset) ||
+          metaTools.tools.length === 0) break;
+      offset = metaTools.nextOffset;
     }
 
     if (receivedToolPage) {
@@ -218,13 +217,12 @@ export function pluginToolsFingerprint(tools) {
     tools
       .filter((tool) =>
         STATIC_FIRST_CLASS_PLUGIN_ROUTE_SET.has(tool?.route) &&
-        (tool?.firstClass === true ||
-         tool?.preferred === true ||
-         tool?.exposure === "first-class"))
+        hasToolTag(tool, "firstClass"))
       .map((tool) => ({
         toolName: tool?.toolName || "",
         route: tool?.route || "",
-        exposure: tool?.exposure || "",
+        tags: normalizeToolTags(tool),
+        sideEffects: normalizeStringList(tool?.sideEffects),
         description: tool?.description || "",
         inputSchema: tool?.inputSchema || null,
         outputSchema: tool?.outputSchema || null,
@@ -269,23 +267,34 @@ async function fetchPluginToolsForCatalog({ category, includeSchema = false } = 
 }
 
 function isFallbackTool(tool) {
-  return tool?.exposure === "fallback" || tool?.fallback === true;
+  return hasToolTag(tool, "fallback");
 }
 
 function isFirstClassRouteTool(tool) {
-  const explicitlyFirstClass =
-    tool?.firstClass === true ||
-    tool?.exposure === "first-class" ||
-    tool?.preferred === true;
-
   return (
     tool &&
-    explicitlyFirstClass &&
+    hasToolTag(tool, "firstClass") &&
     !isFallbackTool(tool) &&
     typeof tool.toolName === "string" &&
     typeof tool.route === "string" &&
     tool.route.length > 0
   );
+}
+
+function normalizeStringList(value) {
+  return Array.isArray(value)
+    ? [...new Set(value
+      .filter((item) => typeof item === "string" && item.length > 0))]
+      .sort((left, right) => left.localeCompare(right))
+    : [];
+}
+
+function normalizeToolTags(tool) {
+  return normalizeStringList(tool?.tags);
+}
+
+function hasToolTag(tool, tag) {
+  return normalizeToolTags(tool).includes(tag);
 }
 
 function normalizeInputSchema(schema) {
@@ -563,6 +572,18 @@ export function splitToolTiers(allEditorTools) {
             if (meta?.route) {
               result.route = meta.route;
             }
+            const tags = normalizeToolTags(meta);
+            if (tags.length > 0) {
+              result.tags = tags;
+            }
+            const sideEffects = normalizeStringList(meta?.sideEffects);
+            if (sideEffects.length > 0) {
+              result.sideEffects = sideEffects;
+            }
+            const errorCodes = normalizeStringList(meta?.errorCodes);
+            if (errorCodes.length > 0) {
+              result.errorCodes = errorCodes;
+            }
             return result;
           });
 
@@ -590,16 +611,18 @@ export function splitToolTiers(allEditorTools) {
         }
         const page = allTools.slice(offset, offset + limit);
         const nextOffset = offset + page.length;
-        return {
+        const result = {
           category: cat,
-          totalTools: allTools.length,
-          offset,
-          limit,
-          returnedTools: page.length,
-          hasMore: nextOffset < allTools.length,
-          nextOffset: nextOffset < allTools.length ? nextOffset : null,
           tools: page,
         };
+        if (offset > 0) {
+          result.offset = offset;
+        }
+        if (nextOffset < allTools.length) {
+          result.nextOffset = nextOffset;
+          result.totalTools = allTools.length;
+        }
+        return result;
       }
 
       const categorySummaries = Object.entries(mergedCategories)

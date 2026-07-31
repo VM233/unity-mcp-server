@@ -575,8 +575,8 @@ test("generated idempotency keys are unique command-scoped values", () => {
 
 test("plugin tool metadata fingerprint is order independent and schema sensitive", () => {
   const first = [
-    { toolName: "unity_asset_refresh", route: "asset/refresh", firstClass: true, inputSchema: { type: "object" } },
-    { toolName: "unity_asset_list", route: "asset/list", firstClass: true, inputSchema: { type: "object" } },
+    { toolName: "unity_asset_refresh", route: "asset/refresh", tags: ["firstClass"], inputSchema: { type: "object" } },
+    { toolName: "unity_asset_list", route: "asset/list", tags: ["firstClass"], inputSchema: { type: "object" } },
   ];
   const reordered = [first[1], first[0]];
   const changed = [

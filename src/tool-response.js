@@ -1,5 +1,14 @@
 import { Buffer } from "node:buffer";
 
+const SERVER_PRESENCE_TAG_FIELDS = new Map([
+  ["pollTimedOut", "pollTimedOut"],
+  ["recoveredAfterTransportFailure", "recoveredAfterTransportFailure"],
+  ["reloadRecoveryTimedOut", "reloadRecoveryTimedOut"],
+  ["replayedAfterLostTicket", "replayedAfterLostTicket"],
+  ["ticketReceived", "ticketReceived"],
+  ["transportOnly", "transportOnly"],
+]);
+
 export function createToolError(errorCode, message, extra = {}) {
   return {
     success: false,
@@ -112,10 +121,9 @@ function summarizeMediaBlocks(blocks) {
   for (const block of blocks || []) {
     if (!block || typeof block !== "object") continue;
     if (block.type === "image" || block.type === "audio") {
-      summary.push({
-        type: block.type,
-        mimeType: block.mimeType || "",
-      });
+      const item = { type: block.type };
+      if (block.mimeType) item.mimeType = block.mimeType;
+      summary.push(item);
     }
   }
   return summary;
@@ -223,8 +231,47 @@ export function summarizeStructuredToolResult(structuredContent) {
   return "Tool completed successfully.";
 }
 
+function compactServerPresenceMetadata(structuredContent) {
+  if (!structuredContent || typeof structuredContent !== "object" ||
+      Array.isArray(structuredContent)) {
+    return structuredContent;
+  }
+
+  const compacted = { ...structuredContent };
+  const tags = new Set(Array.isArray(compacted.tags) ? compacted.tags : []);
+  const containers = [compacted];
+  if (compacted.result && typeof compacted.result === "object" &&
+      !Array.isArray(compacted.result)) {
+    compacted.result = { ...compacted.result };
+    containers.push(compacted.result);
+  }
+  if (compacted.data && typeof compacted.data === "object" &&
+      !Array.isArray(compacted.data)) {
+    compacted.data = { ...compacted.data };
+    containers.push(compacted.data);
+  }
+
+  for (const container of containers) {
+    for (const [field, tag] of SERVER_PRESENCE_TAG_FIELDS) {
+      if (typeof container[field] !== "boolean") continue;
+      if (container[field]) tags.add(tag);
+      delete container[field];
+    }
+  }
+
+  if (tags.size > 0) {
+    compacted.tags = [...tags]
+      .filter((tag) => typeof tag === "string" && tag.length > 0)
+      .sort((left, right) => left.localeCompare(right));
+  } else {
+    delete compacted.tags;
+  }
+  return compacted;
+}
+
 export function buildToolResponse(result) {
-  const structuredContent = normalizeStructuredToolResult(result);
+  const structuredContent = compactServerPresenceMetadata(
+    normalizeStructuredToolResult(result));
   const originalBlocks = Array.isArray(result) ? result : [];
   const mediaBlocks = originalBlocks.filter((block) =>
     block?.type === "image" || block?.type === "audio" || block?.type === "resource");
@@ -264,6 +311,8 @@ export function compactSuccessfulToolResult(result) {
       ? { ...data, ...metadata }
       : { result: data, ...metadata };
   }
+
+  compacted = compactServerPresenceMetadata(compacted);
 
   return wasString ? JSON.stringify(compacted) : compacted;
 }

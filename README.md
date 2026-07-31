@@ -116,7 +116,8 @@ Use `params` for the tool or route arguments. This lets new Unity plugin routes 
 
 Project-defined tools use a separate three-stage contract:
 
-1. `unity_project_tools_list` returns compact names, descriptions, and behavior flags without schemas.
+1. `unity_project_tools_list` returns compact names, descriptions,
+   presence-only `tags`, and exact `sideEffects` without schemas.
 2. `unity_project_tools_get` returns the complete descriptor and input schema for one selected tool.
 3. `unity_project_tools_execute` executes that tool with validated arguments.
 
@@ -125,6 +126,14 @@ machine-readable value in `structuredContent` using one stable
 `{ success, result }` or `{ success:false, errorCode, error, retryable }`
 envelope. The text content is intentionally only a short human-readable
 summary, so clients no longer need to parse JSON out of a text block.
+
+Tool metadata uses schema-v5 presence semantics: positive capabilities are
+sorted strings in `tags`, missing tags mean false, and mutations are described
+once in `sideEffects`. Empty/default metadata and completed pagination aliases
+are omitted instead of being returned as false, null, or empty strings.
+Server-owned queue recovery state follows the same rule: replay, recovery,
+timeout, and ticket lifecycle markers are merged into `tags`, while numeric
+evidence such as `replayCount` remains explicit.
 
 Project-defined tools are deliberately not promoted to concrete Node-server tools, even when the Editor package marks one first-class. This prevents a tool from one open Unity project remaining advertised after the MCP session switches to another project.
 

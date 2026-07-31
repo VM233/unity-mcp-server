@@ -630,10 +630,14 @@
             "interrupted"
           ]
         },
+        "tags": [
+          "[items, System.Collections.Generic.Dictionary`2[System.String,System.Object]]",
+          "[type, array]",
+          "[uniqueItems, True]"
+        ],
         "cleanupStatus": {
           "type": "string",
           "enum": [
-            "none",
             "available",
             "queued",
             "running",
@@ -643,33 +647,11 @@
             "interrupted"
           ]
         },
-        "cleanupAvailable": {
-          "type": "boolean"
-        },
-        "cleanupDeclared": {
-          "type": "boolean"
-        },
         "cleanupToken": {
           "type": "string"
         },
-        "cancellationRequested": {
-          "type": "boolean"
-        },
-        "cancelMode": {
-          "type": "string",
-          "enum": [
-            "beforeStart",
-            "betweenSteps"
-          ]
-        },
-        "incremental": {
-          "type": "boolean"
-        },
         "progress": {
-          "type": [
-            "number",
-            "null"
-          ],
+          "type": "number",
           "minimum": 0,
           "maximum": 1
         },
@@ -678,7 +660,7 @@
         },
         "stepCount": {
           "type": "integer",
-          "minimum": 0
+          "minimum": 1
         },
         "nextRunAt": {
           "type": "string"
@@ -698,54 +680,18 @@
         "updatedAt": {
           "type": "string"
         },
-        "sideEffects": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "statusRoute": {
-          "const": "jobs/get"
-        },
-        "cancelRoute": {
-          "const": "jobs/cancel"
-        },
-        "cleanupRoute": {
-          "const": "jobs/cleanup"
-        },
-        "reused": {
-          "type": "boolean"
-        }
+        "sideEffects": [
+          "[items, System.Collections.Generic.Dictionary`2[System.String,System.Object]]",
+          "[type, array]"
+        ]
       },
       "required": [
         "jobId",
         "jobType",
         "operation",
         "status",
-        "cleanupStatus",
-        "cleanupAvailable",
-        "cleanupDeclared",
-        "cleanupToken",
-        "cancellationRequested",
-        "cancelMode",
-        "incremental",
-        "progress",
-        "statusMessage",
-        "stepCount",
-        "nextRunAt",
-        "idempotencyKey",
         "createdAt",
-        "startedAt",
-        "completedAt",
-        "updatedAt",
-        "sideEffects",
-        "result",
-        "error",
-        "cleanupResult",
-        "cleanupError",
-        "statusRoute",
-        "cancelRoute",
-        "cleanupRoute"
+        "updatedAt"
       ],
       "additionalProperties": false
     },
@@ -2193,10 +2139,14 @@
             "interrupted"
           ]
         },
+        "tags": [
+          "[items, System.Collections.Generic.Dictionary`2[System.String,System.Object]]",
+          "[type, array]",
+          "[uniqueItems, True]"
+        ],
         "cleanupStatus": {
           "type": "string",
           "enum": [
-            "none",
             "available",
             "queued",
             "running",
@@ -2206,33 +2156,11 @@
             "interrupted"
           ]
         },
-        "cleanupAvailable": {
-          "type": "boolean"
-        },
-        "cleanupDeclared": {
-          "type": "boolean"
-        },
         "cleanupToken": {
           "type": "string"
         },
-        "cancellationRequested": {
-          "type": "boolean"
-        },
-        "cancelMode": {
-          "type": "string",
-          "enum": [
-            "beforeStart",
-            "betweenSteps"
-          ]
-        },
-        "incremental": {
-          "type": "boolean"
-        },
         "progress": {
-          "type": [
-            "number",
-            "null"
-          ],
+          "type": "number",
           "minimum": 0,
           "maximum": 1
         },
@@ -2241,7 +2169,7 @@
         },
         "stepCount": {
           "type": "integer",
-          "minimum": 0
+          "minimum": 1
         },
         "nextRunAt": {
           "type": "string"
@@ -2261,54 +2189,18 @@
         "updatedAt": {
           "type": "string"
         },
-        "sideEffects": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "statusRoute": {
-          "const": "jobs/get"
-        },
-        "cancelRoute": {
-          "const": "jobs/cancel"
-        },
-        "cleanupRoute": {
-          "const": "jobs/cleanup"
-        },
-        "reused": {
-          "type": "boolean"
-        }
+        "sideEffects": [
+          "[items, System.Collections.Generic.Dictionary`2[System.String,System.Object]]",
+          "[type, array]"
+        ]
       },
       "required": [
         "jobId",
         "jobType",
         "operation",
         "status",
-        "cleanupStatus",
-        "cleanupAvailable",
-        "cleanupDeclared",
-        "cleanupToken",
-        "cancellationRequested",
-        "cancelMode",
-        "incremental",
-        "progress",
-        "statusMessage",
-        "stepCount",
-        "nextRunAt",
-        "idempotencyKey",
         "createdAt",
-        "startedAt",
-        "completedAt",
-        "updatedAt",
-        "sideEffects",
-        "result",
-        "error",
-        "cleanupResult",
-        "cleanupError",
-        "statusRoute",
-        "cancelRoute",
-        "cleanupRoute"
+        "updatedAt"
       ],
       "additionalProperties": false
     },
@@ -2377,10 +2269,14 @@
             "interrupted"
           ]
         },
+        "tags": [
+          "[items, System.Collections.Generic.Dictionary`2[System.String,System.Object]]",
+          "[type, array]",
+          "[uniqueItems, True]"
+        ],
         "cleanupStatus": {
           "type": "string",
           "enum": [
-            "none",
             "available",
             "queued",
             "running",
@@ -2390,33 +2286,11 @@
             "interrupted"
           ]
         },
-        "cleanupAvailable": {
-          "type": "boolean"
-        },
-        "cleanupDeclared": {
-          "type": "boolean"
-        },
         "cleanupToken": {
           "type": "string"
         },
-        "cancellationRequested": {
-          "type": "boolean"
-        },
-        "cancelMode": {
-          "type": "string",
-          "enum": [
-            "beforeStart",
-            "betweenSteps"
-          ]
-        },
-        "incremental": {
-          "type": "boolean"
-        },
         "progress": {
-          "type": [
-            "number",
-            "null"
-          ],
+          "type": "number",
           "minimum": 0,
           "maximum": 1
         },
@@ -2425,7 +2299,7 @@
         },
         "stepCount": {
           "type": "integer",
-          "minimum": 0
+          "minimum": 1
         },
         "nextRunAt": {
           "type": "string"
@@ -2445,54 +2319,18 @@
         "updatedAt": {
           "type": "string"
         },
-        "sideEffects": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "statusRoute": {
-          "const": "jobs/get"
-        },
-        "cancelRoute": {
-          "const": "jobs/cancel"
-        },
-        "cleanupRoute": {
-          "const": "jobs/cleanup"
-        },
-        "reused": {
-          "type": "boolean"
-        }
+        "sideEffects": [
+          "[items, System.Collections.Generic.Dictionary`2[System.String,System.Object]]",
+          "[type, array]"
+        ]
       },
       "required": [
         "jobId",
         "jobType",
         "operation",
         "status",
-        "cleanupStatus",
-        "cleanupAvailable",
-        "cleanupDeclared",
-        "cleanupToken",
-        "cancellationRequested",
-        "cancelMode",
-        "incremental",
-        "progress",
-        "statusMessage",
-        "stepCount",
-        "nextRunAt",
-        "idempotencyKey",
         "createdAt",
-        "startedAt",
-        "completedAt",
-        "updatedAt",
-        "sideEffects",
-        "result",
-        "error",
-        "cleanupResult",
-        "cleanupError",
-        "statusRoute",
-        "cancelRoute",
-        "cleanupRoute"
+        "updatedAt"
       ],
       "additionalProperties": false
     },
@@ -2554,10 +2392,14 @@
             "interrupted"
           ]
         },
+        "tags": [
+          "[items, System.Collections.Generic.Dictionary`2[System.String,System.Object]]",
+          "[type, array]",
+          "[uniqueItems, True]"
+        ],
         "cleanupStatus": {
           "type": "string",
           "enum": [
-            "none",
             "available",
             "queued",
             "running",
@@ -2567,33 +2409,11 @@
             "interrupted"
           ]
         },
-        "cleanupAvailable": {
-          "type": "boolean"
-        },
-        "cleanupDeclared": {
-          "type": "boolean"
-        },
         "cleanupToken": {
           "type": "string"
         },
-        "cancellationRequested": {
-          "type": "boolean"
-        },
-        "cancelMode": {
-          "type": "string",
-          "enum": [
-            "beforeStart",
-            "betweenSteps"
-          ]
-        },
-        "incremental": {
-          "type": "boolean"
-        },
         "progress": {
-          "type": [
-            "number",
-            "null"
-          ],
+          "type": "number",
           "minimum": 0,
           "maximum": 1
         },
@@ -2602,7 +2422,7 @@
         },
         "stepCount": {
           "type": "integer",
-          "minimum": 0
+          "minimum": 1
         },
         "nextRunAt": {
           "type": "string"
@@ -2622,54 +2442,18 @@
         "updatedAt": {
           "type": "string"
         },
-        "sideEffects": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "statusRoute": {
-          "const": "jobs/get"
-        },
-        "cancelRoute": {
-          "const": "jobs/cancel"
-        },
-        "cleanupRoute": {
-          "const": "jobs/cleanup"
-        },
-        "reused": {
-          "type": "boolean"
-        }
+        "sideEffects": [
+          "[items, System.Collections.Generic.Dictionary`2[System.String,System.Object]]",
+          "[type, array]"
+        ]
       },
       "required": [
         "jobId",
         "jobType",
         "operation",
         "status",
-        "cleanupStatus",
-        "cleanupAvailable",
-        "cleanupDeclared",
-        "cleanupToken",
-        "cancellationRequested",
-        "cancelMode",
-        "incremental",
-        "progress",
-        "statusMessage",
-        "stepCount",
-        "nextRunAt",
-        "idempotencyKey",
         "createdAt",
-        "startedAt",
-        "completedAt",
-        "updatedAt",
-        "sideEffects",
-        "result",
-        "error",
-        "cleanupResult",
-        "cleanupError",
-        "statusRoute",
-        "cancelRoute",
-        "cleanupRoute"
+        "updatedAt"
       ],
       "additionalProperties": false
     },

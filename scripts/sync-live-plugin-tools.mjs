@@ -47,10 +47,8 @@ await runWithRequestContext({
       );
     }
     allTools.push(...payload.tools);
-    if (!payload.hasMore) break;
-    offset = Number.isInteger(payload.nextOffset)
-      ? payload.nextOffset
-      : offset + payload.tools.length;
+    if (!Number.isInteger(payload.nextOffset)) break;
+    offset = payload.nextOffset;
   }
 });
 
@@ -65,9 +63,8 @@ if (missingRoutes.length > 0) {
 
 const snapshot = STATIC_FIRST_CLASS_PLUGIN_ROUTES.map((route) => {
   const tool = toolsByRoute.get(route);
-  const isFirstClass = tool.firstClass === true ||
-    tool.preferred === true ||
-    tool.exposure === "first-class";
+  const isFirstClass = Array.isArray(tool.tags) &&
+    tool.tags.includes("firstClass");
   if (!isFirstClass) {
     throw new Error(`Unity metadata route "${route}" is not first-class.`);
   }

@@ -10,16 +10,15 @@ import { ToolListChangedNotificationSchema } from "@modelcontextprotocol/sdk/typ
 const serverRoot = resolve(new URL("..", import.meta.url).pathname.replace(/^\/(.:)/, "$1"));
 const tempRoot = mkdtempSync(join(tmpdir(), "unity-mcp-live-refresh-"));
 const registryPath = join(tempRoot, "instances.json");
-const cachePath = join(tempRoot, "plugin-tools-metadata-cache-v4.json");
+const cachePath = join(tempRoot, "plugin-tools-metadata-cache-v5.json");
 
 writeFileSync(cachePath, JSON.stringify({
-  schemaVersion: 4,
+  schemaVersion: 5,
   updatedAt: 0,
   tools: [{
     route: "asset/import",
     toolName: "unity_asset_import",
-    firstClass: true,
-    exposure: "first-class",
+    tags: ["firstClass"],
     description: "Stale test metadata.",
     inputSchema: { type: "object", properties: {} },
   }],
@@ -213,6 +212,12 @@ try {
   const projectList = getStructuredResult(projectListResponse);
   assert.ok(Array.isArray(projectList.tools));
   assert.equal(projectList.tools.some((tool) => "inputSchema" in tool), false);
+  assert.equal(projectList.tools.some((tool) =>
+    ["readOnly", "dangerous", "longRunning", "requiresPlayMode",
+      "firstClass", "cleanupAvailable", "incrementalJob", "valid"]
+      .some((key) => key in tool)), false);
+  assert.equal(projectList.tools.every((tool) =>
+    !("tags" in tool) || Array.isArray(tool.tags)), true);
 
   const selectedProjectTool = projectList.tools.find(
     (tool) => tool.toolName === "vmframework/list-game-prefab-types"
@@ -229,6 +234,9 @@ try {
   assert.equal(projectGet.tool.toolName, selectedProjectTool.toolName);
   assert.ok(projectGet.tool.inputSchema);
   assert.ok(projectGet.tool.outputSchema);
+  assert.equal(["readOnly", "dangerous", "longRunning", "requiresPlayMode",
+    "firstClass", "cleanupAvailable", "incrementalJob", "valid"]
+    .some((key) => key in projectGet.tool), false);
 
   const prefabCatalogResponse = await client.callTool({
     name: "unity_list_advanced_tools",
