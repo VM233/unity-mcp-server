@@ -114,6 +114,9 @@ export function auditToolDescriptor(tool, { requireRoute = false } = {}) {
   }
 
   auditSchemaNode(tool?.inputSchema, "$.inputSchema", issues);
+  if (tool?.outputSchema !== undefined && tool?.outputSchema !== null) {
+    auditSchemaNode(tool.outputSchema, "$.outputSchema", issues);
+  }
   return issues;
 }
 

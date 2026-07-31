@@ -21,6 +21,7 @@ export const editorTools = [
       properties: {
         tags: {
           type: "array",
+          description: "Presence-only Editor process-state facts.",
           items: {
             type: "string",
             enum: ["idle", "playing", "paused", "compiling", "updating", "changingPlayMode"],
@@ -28,12 +29,30 @@ export const editorTools = [
           minItems: 1,
           uniqueItems: true,
         },
-        activeScene: { type: "string" },
-        activeScenePath: { type: "string" },
-        sceneDirty: { type: "boolean" },
-        unityVersion: { type: "string" },
-        platform: { type: "string" },
-        projectPath: { type: "string" },
+        activeScene: {
+          type: "string",
+          description: "Name of the active Scene.",
+        },
+        activeScenePath: {
+          type: "string",
+          description: "Project-relative asset path of the active Scene.",
+        },
+        sceneDirty: {
+          type: "boolean",
+          description: "Whether the active Scene has unsaved serialized changes.",
+        },
+        unityVersion: {
+          type: "string",
+          description: "Unity Editor version serving the request.",
+        },
+        platform: {
+          type: "string",
+          description: "Current Unity build target platform.",
+        },
+        projectPath: {
+          type: "string",
+          description: "Absolute root path of the selected Unity project.",
+        },
       },
       required: [
         "tags",

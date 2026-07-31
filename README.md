@@ -126,6 +126,9 @@ machine-readable value in `structuredContent` using one stable
 `{ success, result }` or `{ success:false, errorCode, error, retryable }`
 envelope. The text content is intentionally only a short human-readable
 summary, so clients no longer need to parse JSON out of a text block.
+Release validation audits every declared input and output schema, including
+array item shapes and property descriptions; malformed live metadata cannot be
+promoted into the static first-class tool catalog.
 
 Tool metadata uses schema-v5 presence semantics: positive capabilities are
 sorted strings in `tags`, missing tags mean false, and mutations are described

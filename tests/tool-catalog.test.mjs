@@ -36,6 +36,33 @@ test("generated plugin snapshot exactly implements the first-class route policy"
   );
 });
 
+test("tool catalog audit rejects malformed output schemas", () => {
+  const issues = auditToolCatalog([
+    {
+      name: "malformed_output",
+      description: "Exercise output schema validation.",
+      inputSchema: {
+        type: "object",
+        properties: {},
+      },
+      outputSchema: {
+        type: "object",
+        properties: {
+          tags: [
+            "[items, System.Collections.Generic.Dictionary`2[System.String,System.Object]]",
+            "[type, array]",
+          ],
+        },
+      },
+    },
+  ]);
+
+  assert.ok(issues.some((issue) =>
+    issue.code === "schema_not_object" &&
+    issue.path === "$.outputSchema.tags"
+  ));
+});
+
 test("incomplete live metadata cannot erase a release-managed build schema", () => {
   const buildSnapshot = staticFirstClassPluginTools.find(
     (tool) => tool.toolName === "unity_build");

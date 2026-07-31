@@ -478,6 +478,7 @@
     "description": "Read tracked Unity compilation errors and warnings with bounded pagination and a separate obsolete-API warning summary.",
     "inputSchema": {
       "type": "object",
+      "properties": {},
       "additionalProperties": true
     },
     "outputSchema": {
@@ -608,19 +609,24 @@
       "properties": {
         "jobId": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "description": "Opaque identifier of the persistent Job."
         },
         "jobAccessToken": {
-          "type": "string"
+          "type": "string",
+          "description": "Capability token used to access the Job after its originating agent disconnects."
         },
         "jobType": {
-          "type": "string"
+          "type": "string",
+          "description": "Durable Job owner type used to resume the correct workflow."
         },
         "operation": {
-          "type": "string"
+          "type": "string",
+          "description": "Originating execute-code or project-tool operation."
         },
         "status": {
           "type": "string",
+          "description": "Current persistent Job lifecycle state.",
           "enum": [
             "queued",
             "running",
@@ -630,13 +636,17 @@
             "interrupted"
           ]
         },
-        "tags": [
-          "[items, System.Collections.Generic.Dictionary`2[System.String,System.Object]]",
-          "[type, array]",
-          "[uniqueItems, True]"
-        ],
+        "tags": {
+          "type": "array",
+          "description": "Presence-only Job capabilities and positive lifecycle facts.",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
         "cleanupStatus": {
           "type": "string",
+          "description": "Current lifecycle state of the Job's explicit cleanup workflow.",
           "enum": [
             "available",
             "queued",
@@ -648,42 +658,67 @@
           ]
         },
         "cleanupToken": {
-          "type": "string"
+          "type": "string",
+          "description": "Opaque tool-defined token consumed by the explicit cleanup contract."
         },
         "progress": {
           "type": "number",
+          "description": "Normalized Job progress from zero through one.",
           "minimum": 0,
           "maximum": 1
         },
         "statusMessage": {
-          "type": "string"
+          "type": "string",
+          "description": "Current human-readable progress or terminal-status summary."
         },
         "stepCount": {
           "type": "integer",
+          "description": "Number of incremental continuation steps executed by the Job.",
           "minimum": 1
         },
         "nextRunAt": {
-          "type": "string"
+          "type": "string",
+          "description": "UTC timestamp after which the next incremental step may run."
         },
         "idempotencyKey": {
-          "type": "string"
+          "type": "string",
+          "description": "Caller key bound to the exact operation arguments for safe reuse."
         },
         "createdAt": {
-          "type": "string"
+          "type": "string",
+          "description": "UTC timestamp when the Job record was created."
         },
         "startedAt": {
-          "type": "string"
+          "type": "string",
+          "description": "UTC timestamp when execution first crossed the Job boundary."
         },
         "completedAt": {
-          "type": "string"
+          "type": "string",
+          "description": "UTC timestamp when the Job reached a terminal state."
         },
         "updatedAt": {
-          "type": "string"
+          "type": "string",
+          "description": "UTC timestamp of the latest persisted Job mutation."
         },
-        "sideEffects": [
-          "[items, System.Collections.Generic.Dictionary`2[System.String,System.Object]]",
-          "[type, array]"
-        ]
+        "sideEffects": {
+          "type": "array",
+          "description": "Exact side-effect categories declared by the originating operation.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "result": {
+          "description": "Validated terminal result produced by the originating operation."
+        },
+        "error": {
+          "description": "Structured failure produced when the Job cannot complete."
+        },
+        "cleanupResult": {
+          "description": "Terminal result produced by the explicit cleanup workflow."
+        },
+        "cleanupError": {
+          "description": "Structured failure produced when explicit cleanup cannot complete."
+        }
       },
       "required": [
         "jobId",
@@ -741,7 +776,8 @@
     "category": "queue",
     "description": "Inspect queue capacity, active work, and per-agent depth.",
     "inputSchema": {
-      "type": "object"
+      "type": "object",
+      "properties": {}
     },
     "outputSchema": {
       "type": "object",
@@ -2117,19 +2153,24 @@
       "properties": {
         "jobId": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "description": "Opaque identifier of the persistent Job."
         },
         "jobAccessToken": {
-          "type": "string"
+          "type": "string",
+          "description": "Capability token used to access the Job after its originating agent disconnects."
         },
         "jobType": {
-          "type": "string"
+          "type": "string",
+          "description": "Durable Job owner type used to resume the correct workflow."
         },
         "operation": {
-          "type": "string"
+          "type": "string",
+          "description": "Originating execute-code or project-tool operation."
         },
         "status": {
           "type": "string",
+          "description": "Current persistent Job lifecycle state.",
           "enum": [
             "queued",
             "running",
@@ -2139,13 +2180,17 @@
             "interrupted"
           ]
         },
-        "tags": [
-          "[items, System.Collections.Generic.Dictionary`2[System.String,System.Object]]",
-          "[type, array]",
-          "[uniqueItems, True]"
-        ],
+        "tags": {
+          "type": "array",
+          "description": "Presence-only Job capabilities and positive lifecycle facts.",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
         "cleanupStatus": {
           "type": "string",
+          "description": "Current lifecycle state of the Job's explicit cleanup workflow.",
           "enum": [
             "available",
             "queued",
@@ -2157,42 +2202,67 @@
           ]
         },
         "cleanupToken": {
-          "type": "string"
+          "type": "string",
+          "description": "Opaque tool-defined token consumed by the explicit cleanup contract."
         },
         "progress": {
           "type": "number",
+          "description": "Normalized Job progress from zero through one.",
           "minimum": 0,
           "maximum": 1
         },
         "statusMessage": {
-          "type": "string"
+          "type": "string",
+          "description": "Current human-readable progress or terminal-status summary."
         },
         "stepCount": {
           "type": "integer",
+          "description": "Number of incremental continuation steps executed by the Job.",
           "minimum": 1
         },
         "nextRunAt": {
-          "type": "string"
+          "type": "string",
+          "description": "UTC timestamp after which the next incremental step may run."
         },
         "idempotencyKey": {
-          "type": "string"
+          "type": "string",
+          "description": "Caller key bound to the exact operation arguments for safe reuse."
         },
         "createdAt": {
-          "type": "string"
+          "type": "string",
+          "description": "UTC timestamp when the Job record was created."
         },
         "startedAt": {
-          "type": "string"
+          "type": "string",
+          "description": "UTC timestamp when execution first crossed the Job boundary."
         },
         "completedAt": {
-          "type": "string"
+          "type": "string",
+          "description": "UTC timestamp when the Job reached a terminal state."
         },
         "updatedAt": {
-          "type": "string"
+          "type": "string",
+          "description": "UTC timestamp of the latest persisted Job mutation."
         },
-        "sideEffects": [
-          "[items, System.Collections.Generic.Dictionary`2[System.String,System.Object]]",
-          "[type, array]"
-        ]
+        "sideEffects": {
+          "type": "array",
+          "description": "Exact side-effect categories declared by the originating operation.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "result": {
+          "description": "Validated terminal result produced by the originating operation."
+        },
+        "error": {
+          "description": "Structured failure produced when the Job cannot complete."
+        },
+        "cleanupResult": {
+          "description": "Terminal result produced by the explicit cleanup workflow."
+        },
+        "cleanupError": {
+          "description": "Structured failure produced when explicit cleanup cannot complete."
+        }
       },
       "required": [
         "jobId",
@@ -2247,19 +2317,24 @@
       "properties": {
         "jobId": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "description": "Opaque identifier of the persistent Job."
         },
         "jobAccessToken": {
-          "type": "string"
+          "type": "string",
+          "description": "Capability token used to access the Job after its originating agent disconnects."
         },
         "jobType": {
-          "type": "string"
+          "type": "string",
+          "description": "Durable Job owner type used to resume the correct workflow."
         },
         "operation": {
-          "type": "string"
+          "type": "string",
+          "description": "Originating execute-code or project-tool operation."
         },
         "status": {
           "type": "string",
+          "description": "Current persistent Job lifecycle state.",
           "enum": [
             "queued",
             "running",
@@ -2269,13 +2344,17 @@
             "interrupted"
           ]
         },
-        "tags": [
-          "[items, System.Collections.Generic.Dictionary`2[System.String,System.Object]]",
-          "[type, array]",
-          "[uniqueItems, True]"
-        ],
+        "tags": {
+          "type": "array",
+          "description": "Presence-only Job capabilities and positive lifecycle facts.",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
         "cleanupStatus": {
           "type": "string",
+          "description": "Current lifecycle state of the Job's explicit cleanup workflow.",
           "enum": [
             "available",
             "queued",
@@ -2287,42 +2366,67 @@
           ]
         },
         "cleanupToken": {
-          "type": "string"
+          "type": "string",
+          "description": "Opaque tool-defined token consumed by the explicit cleanup contract."
         },
         "progress": {
           "type": "number",
+          "description": "Normalized Job progress from zero through one.",
           "minimum": 0,
           "maximum": 1
         },
         "statusMessage": {
-          "type": "string"
+          "type": "string",
+          "description": "Current human-readable progress or terminal-status summary."
         },
         "stepCount": {
           "type": "integer",
+          "description": "Number of incremental continuation steps executed by the Job.",
           "minimum": 1
         },
         "nextRunAt": {
-          "type": "string"
+          "type": "string",
+          "description": "UTC timestamp after which the next incremental step may run."
         },
         "idempotencyKey": {
-          "type": "string"
+          "type": "string",
+          "description": "Caller key bound to the exact operation arguments for safe reuse."
         },
         "createdAt": {
-          "type": "string"
+          "type": "string",
+          "description": "UTC timestamp when the Job record was created."
         },
         "startedAt": {
-          "type": "string"
+          "type": "string",
+          "description": "UTC timestamp when execution first crossed the Job boundary."
         },
         "completedAt": {
-          "type": "string"
+          "type": "string",
+          "description": "UTC timestamp when the Job reached a terminal state."
         },
         "updatedAt": {
-          "type": "string"
+          "type": "string",
+          "description": "UTC timestamp of the latest persisted Job mutation."
         },
-        "sideEffects": [
-          "[items, System.Collections.Generic.Dictionary`2[System.String,System.Object]]",
-          "[type, array]"
-        ]
+        "sideEffects": {
+          "type": "array",
+          "description": "Exact side-effect categories declared by the originating operation.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "result": {
+          "description": "Validated terminal result produced by the originating operation."
+        },
+        "error": {
+          "description": "Structured failure produced when the Job cannot complete."
+        },
+        "cleanupResult": {
+          "description": "Terminal result produced by the explicit cleanup workflow."
+        },
+        "cleanupError": {
+          "description": "Structured failure produced when explicit cleanup cannot complete."
+        }
       },
       "required": [
         "jobId",
@@ -2370,19 +2474,24 @@
       "properties": {
         "jobId": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "description": "Opaque identifier of the persistent Job."
         },
         "jobAccessToken": {
-          "type": "string"
+          "type": "string",
+          "description": "Capability token used to access the Job after its originating agent disconnects."
         },
         "jobType": {
-          "type": "string"
+          "type": "string",
+          "description": "Durable Job owner type used to resume the correct workflow."
         },
         "operation": {
-          "type": "string"
+          "type": "string",
+          "description": "Originating execute-code or project-tool operation."
         },
         "status": {
           "type": "string",
+          "description": "Current persistent Job lifecycle state.",
           "enum": [
             "queued",
             "running",
@@ -2392,13 +2501,17 @@
             "interrupted"
           ]
         },
-        "tags": [
-          "[items, System.Collections.Generic.Dictionary`2[System.String,System.Object]]",
-          "[type, array]",
-          "[uniqueItems, True]"
-        ],
+        "tags": {
+          "type": "array",
+          "description": "Presence-only Job capabilities and positive lifecycle facts.",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
         "cleanupStatus": {
           "type": "string",
+          "description": "Current lifecycle state of the Job's explicit cleanup workflow.",
           "enum": [
             "available",
             "queued",
@@ -2410,42 +2523,67 @@
           ]
         },
         "cleanupToken": {
-          "type": "string"
+          "type": "string",
+          "description": "Opaque tool-defined token consumed by the explicit cleanup contract."
         },
         "progress": {
           "type": "number",
+          "description": "Normalized Job progress from zero through one.",
           "minimum": 0,
           "maximum": 1
         },
         "statusMessage": {
-          "type": "string"
+          "type": "string",
+          "description": "Current human-readable progress or terminal-status summary."
         },
         "stepCount": {
           "type": "integer",
+          "description": "Number of incremental continuation steps executed by the Job.",
           "minimum": 1
         },
         "nextRunAt": {
-          "type": "string"
+          "type": "string",
+          "description": "UTC timestamp after which the next incremental step may run."
         },
         "idempotencyKey": {
-          "type": "string"
+          "type": "string",
+          "description": "Caller key bound to the exact operation arguments for safe reuse."
         },
         "createdAt": {
-          "type": "string"
+          "type": "string",
+          "description": "UTC timestamp when the Job record was created."
         },
         "startedAt": {
-          "type": "string"
+          "type": "string",
+          "description": "UTC timestamp when execution first crossed the Job boundary."
         },
         "completedAt": {
-          "type": "string"
+          "type": "string",
+          "description": "UTC timestamp when the Job reached a terminal state."
         },
         "updatedAt": {
-          "type": "string"
+          "type": "string",
+          "description": "UTC timestamp of the latest persisted Job mutation."
         },
-        "sideEffects": [
-          "[items, System.Collections.Generic.Dictionary`2[System.String,System.Object]]",
-          "[type, array]"
-        ]
+        "sideEffects": {
+          "type": "array",
+          "description": "Exact side-effect categories declared by the originating operation.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "result": {
+          "description": "Validated terminal result produced by the originating operation."
+        },
+        "error": {
+          "description": "Structured failure produced when the Job cannot complete."
+        },
+        "cleanupResult": {
+          "description": "Terminal result produced by the explicit cleanup workflow."
+        },
+        "cleanupError": {
+          "description": "Structured failure produced when explicit cleanup cannot complete."
+        }
       },
       "required": [
         "jobId",

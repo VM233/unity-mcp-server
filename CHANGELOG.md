@@ -2,6 +2,15 @@
 
 All notable changes to this package will be documented in this file.
 
+## [4.4.2] - 2026-07-31
+
+### Fixed
+- Audit explicit output schemas as well as input schemas before a live plugin
+  snapshot or release tool catalog can be published.
+- Reject malformed output properties and require semantic descriptions for
+  every declared output field, closing the gap that allowed persistent Job
+  `tags` and `sideEffects` schemas to become string arrays.
+
 ## [4.4.1] - 2026-07-31
 
 ### Fixed
