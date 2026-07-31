@@ -131,7 +131,9 @@ array item shapes and property descriptions; malformed live metadata cannot be
 promoted into the static first-class tool catalog. Release-managed schemas also
 remain authoritative when a cold-start disk cache contains an invalid live
 schema, so callers never need to wait for background metadata refresh to obtain
-a valid Job contract.
+a valid Job contract. Composition branches inherit the containing object's
+declared property contracts during release auditing, so conditional schemas do
+not need to duplicate descriptions merely to constrain or require a field.
 
 Tool metadata uses schema-v5 presence semantics: positive capabilities are
 sorted strings in `tags`, missing tags mean false, and mutations are described

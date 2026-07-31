@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { STATIC_FIRST_CLASS_PLUGIN_ROUTES } from "../src/plugin-tool-policy.js";
-import { auditToolCatalog } from "../src/tool-schema-audit.js";
+import {
+  auditSchema,
+  auditToolCatalog,
+} from "../src/tool-schema-audit.js";
 import { contextTools } from "../src/tools/context-tools.js";
 import { editorTools } from "../src/tools/editor-tools.js";
 import { hubTools } from "../src/tools/hub-tools.js";
@@ -60,6 +63,66 @@ test("tool catalog audit rejects malformed output schemas", () => {
   assert.ok(issues.some((issue) =>
     issue.code === "schema_not_object" &&
     issue.path === "$.outputSchema.tags"
+  ));
+});
+
+test("schema audit resolves parent properties inside composition branches", () => {
+  const schema = {
+    type: "object",
+    properties: {
+      action: {
+        type: "string",
+        description: "Selected operation.",
+      },
+      cleanupToken: {
+        type: "string",
+        description: "Persistent cleanup capability.",
+      },
+    },
+    oneOf: [
+      {
+        properties: {
+          action: { const: "run" },
+        },
+      },
+      {
+        properties: {
+          action: { const: "cleanup" },
+        },
+        required: ["cleanupToken"],
+      },
+    ],
+  };
+
+  assert.deepEqual(auditSchema(schema), []);
+});
+
+test("schema audit still rejects undeclared or undescribed branch properties", () => {
+  const issues = auditSchema({
+    type: "object",
+    properties: {
+      action: {
+        type: "string",
+        description: "Selected operation.",
+      },
+    },
+    oneOf: [
+      {
+        properties: {
+          branchOnly: { type: "boolean" },
+        },
+        required: ["missing"],
+      },
+    ],
+  });
+
+  assert.ok(issues.some((issue) =>
+    issue.code === "property_description_missing" &&
+    issue.path === "$.schema.oneOf[0].branchOnly"
+  ));
+  assert.ok(issues.some((issue) =>
+    issue.code === "required_property_undeclared" &&
+    issue.path === "$.schema.oneOf[0].required"
   ));
 });
 

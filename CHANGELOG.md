@@ -2,6 +2,14 @@
 
 All notable changes to this package will be documented in this file.
 
+## [4.4.4] - 2026-07-31
+
+### Fixed
+- Resolve parent object properties while auditing `oneOf`, `anyOf`, and
+  `allOf` branches. Branches can constrain or require a parent-declared field
+  without duplicating its description, while truly undeclared or undescribed
+  branch-only fields still fail release validation.
+
 ## [4.4.3] - 2026-07-31
 
 ### Fixed

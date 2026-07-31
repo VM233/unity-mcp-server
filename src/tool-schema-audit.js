@@ -11,13 +11,40 @@ function addIssue(issues, code, path, message) {
   issues.push({ code, path, message });
 }
 
-function auditSchemaNode(schema, path, issues, { isProperty = false } = {}) {
+function mergePropertyContexts(inheritedProperties, properties) {
+  const merged = { ...inheritedProperties };
+  for (const [name, schema] of Object.entries(properties)) {
+    const inherited = inheritedProperties[name];
+    if (isObject(inherited) && isObject(schema)) {
+      merged[name] = {
+        ...inherited,
+        ...schema,
+        description: String(schema.description || "").trim()
+          ? schema.description
+          : inherited.description,
+      };
+    } else {
+      merged[name] = schema;
+    }
+  }
+  return merged;
+}
+
+function auditSchemaNode(
+  schema,
+  path,
+  issues,
+  { isProperty = false, inheritedProperty, inheritedProperties = {} } = {}
+) {
   if (!isObject(schema)) {
     addIssue(issues, "schema_not_object", path, "Schema node must be an object.");
     return;
   }
 
-  if (isProperty && !String(schema.description || "").trim()) {
+  if (
+    isProperty &&
+    !String(schema.description || inheritedProperty?.description || "").trim()
+  ) {
     addIssue(
       issues,
       "property_description_missing",
@@ -48,8 +75,13 @@ function auditSchemaNode(schema, path, issues, { isProperty = false } = {}) {
   for (const [name, propertySchema] of Object.entries(properties)) {
     auditSchemaNode(propertySchema, `${path}.${name}`, issues, {
       isProperty: true,
+      inheritedProperty: inheritedProperties[name],
     });
   }
+  const availableProperties = mergePropertyContexts(
+    inheritedProperties,
+    properties
+  );
 
   if (isObject(schema.items)) {
     auditSchemaNode(schema.items, `${path}[]`, issues);
@@ -57,7 +89,10 @@ function auditSchemaNode(schema, path, issues, { isProperty = false } = {}) {
 
   if (Array.isArray(schema.required)) {
     for (const name of schema.required) {
-      if (typeof name !== "string" || !Object.hasOwn(properties, name)) {
+      if (
+        typeof name !== "string" ||
+        !Object.hasOwn(availableProperties, name)
+      ) {
         addIssue(
           issues,
           "required_property_undeclared",
@@ -80,7 +115,9 @@ function auditSchemaNode(schema, path, issues, { isProperty = false } = {}) {
       continue;
     }
     schema[keyword].forEach((variant, index) => {
-      auditSchemaNode(variant, `${path}.${keyword}[${index}]`, issues);
+      auditSchemaNode(variant, `${path}.${keyword}[${index}]`, issues, {
+        inheritedProperties: availableProperties,
+      });
     });
   }
 }
