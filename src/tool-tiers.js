@@ -309,6 +309,31 @@ function normalizeInputSchema(schema) {
   };
 }
 
+function isNonEmptyObject(value) {
+  return value &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    Object.keys(value).length > 0;
+}
+
+export function mergeFirstClassPluginToolMetadata(releaseManaged, live) {
+  if (!releaseManaged) return live;
+  if (!live) return releaseManaged;
+
+  const merged = { ...releaseManaged, ...live };
+  for (const key of ["toolName", "route", "category", "description"]) {
+    if (typeof live[key] !== "string" || live[key].length === 0) {
+      merged[key] = releaseManaged[key];
+    }
+  }
+  for (const key of ["inputSchema", "outputSchema", "annotations"]) {
+    if (!isNonEmptyObject(live[key]) && isNonEmptyObject(releaseManaged[key])) {
+      merged[key] = releaseManaged[key];
+    }
+  }
+  return merged;
+}
+
 export function sanitizeToolMetadata(value) {
   if (typeof value === "string") {
     return value
@@ -348,7 +373,10 @@ export async function fetchFirstClassPluginTools() {
     if (!STATIC_FIRST_CLASS_PLUGIN_ROUTE_SET.has(tool?.route)) continue;
     if (!isFirstClassRouteTool(tool)) continue;
     if (!tool.toolName) continue;
-    candidatesByName.set(tool.toolName, tool);
+    candidatesByName.set(
+      tool.toolName,
+      mergeFirstClassPluginToolMetadata(candidatesByName.get(tool.toolName), tool)
+    );
   }
 
   const exposed = [];

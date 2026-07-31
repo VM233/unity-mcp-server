@@ -2,6 +2,16 @@
 
 All notable changes to this package will be documented in this file.
 
+## [4.4.1] - 2026-07-31
+
+### Fixed
+- Preserve a release-managed first-class tool's input/output schemas when live
+  Unity metadata for the same route is temporarily incomplete, preventing
+  `unity_build` from degrading to an undeclared argument object.
+- Document and publish the compact `unity_editor_state` result schema. Stable
+  snapshots now require the `idle` tag supplied by VM Unity MCP 5.5.2 instead
+  of exposing no process-state fact.
+
 ## [4.4.0] - 2026-07-31
 
 ### Changed

@@ -135,6 +135,13 @@ Server-owned queue recovery state follows the same rule: replay, recovery,
 timeout, and ticket lifecycle markers are merged into `tags`, while numeric
 evidence such as `replayCount` remains explicit.
 
+`unity_editor_state` follows the same compact contract but never returns an
+ambiguous state-less snapshot: a stable Editor includes `idle`, while active
+states add `playing`, `paused`, `compiling`, `updating`, or
+`changingPlayMode`. Release-managed first-class schemas such as `unity_build`
+also remain the fallback authority when temporarily incomplete live metadata
+arrives during a package reload.
+
 Project-defined tools are deliberately not promoted to concrete Node-server tools, even when the Editor package marks one first-class. This prevents a tool from one open Unity project remaining advertised after the MCP session switches to another project.
 
 The server advertises MCP tool-list change notifications and refreshes live plugin metadata in the background. When a package update changes one of the release-managed concrete routes, compatible MCP clients automatically request the updated tool list without reconnecting. Metadata refresh requests compact schema-bearing first-class pages only; they do not transfer the full plugin route catalog.

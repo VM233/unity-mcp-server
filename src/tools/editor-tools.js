@@ -11,8 +11,41 @@ export const editorTools = [
   },
   {
     name: "unity_editor_state",
-    description: "Get the current Unity Editor state: play mode, compilation status, active scene, project path.",
+    description:
+      "Get one authoritative Unity Editor snapshot. Process state is encoded as presence-only tags: " +
+      "idle, playing, paused, compiling, updating, and changingPlayMode. Missing tags mean false; " +
+      "a stable Editor always includes idle, including during stable Play Mode.",
     inputSchema: { type: "object", properties: {} },
+    outputSchema: {
+      type: "object",
+      properties: {
+        tags: {
+          type: "array",
+          items: {
+            type: "string",
+            enum: ["idle", "playing", "paused", "compiling", "updating", "changingPlayMode"],
+          },
+          minItems: 1,
+          uniqueItems: true,
+        },
+        activeScene: { type: "string" },
+        activeScenePath: { type: "string" },
+        sceneDirty: { type: "boolean" },
+        unityVersion: { type: "string" },
+        platform: { type: "string" },
+        projectPath: { type: "string" },
+      },
+      required: [
+        "tags",
+        "activeScene",
+        "activeScenePath",
+        "sceneDirty",
+        "unityVersion",
+        "platform",
+        "projectPath",
+      ],
+      additionalProperties: false,
+    },
     handler: async () => JSON.stringify(await bridge.getEditorState()),
   },
 
