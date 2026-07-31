@@ -961,6 +961,16 @@ test("prefab add component exposes atomic initial serialized properties", () => 
   assert.match(properties.description, /before the new component is saved/i);
 });
 
+test("prefab add GameObject uses the bridge parent-path contract", () => {
+  const addGameObject = editorTools.find(
+    (tool) => tool.name === "unity_prefab_add_gameobject"
+  );
+
+  assert.ok(addGameObject);
+  assert.ok(addGameObject.inputSchema.properties.parentPrefabPath);
+  assert.equal(addGameObject.inputSchema.properties.prefabPath, undefined);
+});
+
 test("asset refresh queue failure is reconciled by exact persistent request ID", async () => {
   const originalFetch = globalThis.fetch;
   let submittedRequestId = "";

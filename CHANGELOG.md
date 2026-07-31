@@ -2,6 +2,13 @@
 
 All notable changes to this package will be documented in this file.
 
+## [4.4.8] - 2026-07-31
+
+### Fixed
+- Align `unity_prefab_add_gameobject` with the Unity bridge's
+  `parentPrefabPath` contract. Nested children are no longer silently created
+  at the Prefab root when callers use the published schema.
+
 ## [4.4.7] - 2026-07-31
 
 ### Fixed

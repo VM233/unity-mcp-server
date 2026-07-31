@@ -1207,7 +1207,7 @@ export const editorTools = [
       type: "object",
       properties: {
         assetPath: { type: "string", description: "Asset path of the prefab" },
-        prefabPath: { type: "string", description: "Parent path within the prefab hierarchy. Empty = add under root." },
+        parentPrefabPath: { type: "string", description: "Parent path within the prefab hierarchy. Empty = add under root." },
         name: { type: "string", description: "Name for the new GameObject" },
         primitiveType: { type: "string", enum: ["Cube", "Sphere", "Capsule", "Cylinder", "Plane", "Quad"], description: "Optional primitive mesh type" },
         position: { type: "object", properties: { x: { type: "number" }, y: { type: "number" }, z: { type: "number" } }, description: "Local position" },
