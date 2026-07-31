@@ -1,5 +1,9 @@
 // AnkleBreaker Unity MCP â€” Tool definitions for Unity Editor operations (via HTTP bridge)
 import * as bridge from "../unity-editor-bridge.js";
+import {
+  compactSuccessfulToolResult,
+  createToolError,
+} from "../tool-response.js";
 
 export const editorTools = [
   // â”€â”€â”€ Connection â”€â”€â”€
@@ -2524,8 +2528,16 @@ export const editorTools = [
       required: ["assetPath"],
     },
     handler: async (params) => {
-      const result = await bridge.captureAssetPreview(params);
-      if (result.error) return JSON.stringify(result);
+      const result = compactSuccessfulToolResult(
+        await bridge.captureAssetPreview(params));
+      if (result?.success === false || result?.error) {
+        return JSON.stringify(result);
+      }
+      if (typeof result?.base64 !== "string" || result.base64.length === 0) {
+        return JSON.stringify(createToolError(
+          "asset_preview_payload_missing",
+          "Unity completed the asset preview request without returning a PNG payload."));
+      }
       const metadata = { ...result };
       delete metadata.base64;
       return [
@@ -2586,9 +2598,18 @@ export const editorTools = [
       },
     },
     handler: async (params) => {
-      const result = await bridge.getMaterialInfo(params);
-      if (result.error) return JSON.stringify(result);
-      if (result.base64) {
+      const result = compactSuccessfulToolResult(
+        await bridge.getMaterialInfo(params));
+      if (result?.success === false || result?.error) {
+        return JSON.stringify(result);
+      }
+      if (Object.hasOwn(result || {}, "base64") &&
+          typeof result.base64 !== "string") {
+        return JSON.stringify(createToolError(
+          "material_preview_payload_invalid",
+          "Unity returned a material preview payload that is not a base64 string."));
+      }
+      if (typeof result?.base64 === "string" && result.base64.length > 0) {
         const metadata = { ...result };
         delete metadata.base64;
         return [
@@ -4046,13 +4067,15 @@ export const editorTools = [
       },
     },
     handler: async (params) => {
-      const result = await bridge.runTests(params);
+      const result = compactSuccessfulToolResult(
+        await bridge.runTests(params));
       // If the run started successfully, auto-poll for a few seconds to provide early feedback
       if (result.jobId && result.status === "running") {
         // Wait briefly then check for early results
         await new Promise((r) => setTimeout(r, 2000));
         try {
-          const status = await bridge.getTestJob({ jobId: result.jobId });
+          const status = compactSuccessfulToolResult(
+            await bridge.getTestJob({ jobId: result.jobId }));
           return JSON.stringify(status);
         } catch (_) {
           return JSON.stringify(result);

@@ -345,7 +345,7 @@ export function normalizeEditorCommandResult(data) {
     break;
   }
 
-  return { success: true, data };
+  return { success: true, data: current };
 }
 
 function getQueuePollTimeoutMs(command, params = {}) {

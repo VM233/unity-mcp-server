@@ -4,7 +4,7 @@
 
 # Unity MCP Server AI-Powered Unity Editor & Hub Control
 
-> **The most comprehensive [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server for Unity game development.** Connect Claude, Cursor, Windsurf, or any MCP-compatible AI assistant to **Unity Editor** and **Unity Hub** with **300+ tools** across **30+ categories**. Built and maintained by [AnkleBreaker Studio](https://github.com/AnkleBreaker-Studio).
+> **The most comprehensive [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server for Unity game development.** Connect Claude, Cursor, Windsurf, or any MCP-compatible AI assistant to **Unity Editor** and **Unity Hub** with hundreds of tools across **30+ categories**. Built and maintained by [AnkleBreaker Studio](https://github.com/AnkleBreaker-Studio).
 
 **AnkleBreaker Unity MCP** turns your AI assistant into a full Unity co-pilot — create scenes, manipulate GameObjects, manage components, run builds, profile performance, edit Shader Graphs, sculpt terrain, bake NavMesh, manage animations, run multiplayer playmode scenarios, and much more — all without leaving your AI chat. Works with Claude Desktop, Claude Cowork, Cursor, Windsurf, and any tool that supports the Model Context Protocol.
 
@@ -38,7 +38,7 @@
 
 ## Features
 
-**300+ tools** covering the full Unity workflow:
+**Hundreds of tools** covering the full Unity workflow:
 
 | Category | Tools |
 |----------|-------|
@@ -65,7 +65,7 @@
 | **UI** | Canvas, UI elements, layout groups, event system |
 | **Tags & Layers** | List/add/remove tags, assign tags & layers |
 | **Selection** | Get/set editor selection, find by name/tag/component/layer/tag |
-| **Graphics** | Scene and game view capture (inline images for visual inspection) |
+| **Graphics** | Scene/game capture plus asset and material previews as inline images |
 | **Input Actions** | Action maps, actions, bindings (Input System package) |
 | **Assembly Defs** | List, inspect, create, update .asmdef files |
 | **ScriptableObjects** | Create, inspect, modify ScriptableObject assets |
@@ -93,17 +93,17 @@ This server communicates with:
 - **Unity Hub** via its current `--headless` CLI
 - **Unity Editor** via the companion [VM Unity MCP](https://github.com/VM233/VMUnityMCP) package, which runs a queue-only HTTP bridge inside the editor
 
-### 300+ Tools Across 30+ Categories
+### Hundreds of Tools Across 30+ Categories
 > Scene management, GameObjects, components, physics, terrain, Shader Graph, profiling, animation, NavMesh, builds, multiplayer, and more.
 
 <p align="center">
-  <img src="docs/unity-mcp-features.gif" alt="Unity MCP Features — 300+ tools across 30+ categories for AI-powered game development" width="800" />
+  <img src="docs/unity-mcp-features.gif" alt="Unity MCP Features — hundreds of tools across 30+ categories for AI-powered game development" width="800" />
 </p>
 
 ### Two-Tier Tool System
 
-To avoid overwhelming MCP clients with 300+ tools, the server uses a two-tier architecture:
-- **Core and high-frequency plugin tools** stay near 60 release-managed concrete tools
+To avoid overwhelming MCP clients with hundreds of tools, the server uses a two-tier architecture:
+- **Core and high-frequency plugin tools** stay in a bounded release-managed concrete surface
 - **Advanced tools** are accessed through `unity_advanced_tool` with lazy metadata loading
 
 This keeps the tool count manageable while preserving access to every Unity feature. `unity_list_advanced_tools` returns compact category counts by default; pass `category`, `offset`, `limit`, and optional `includeSchema` to inspect one paginated category.
@@ -126,6 +126,9 @@ machine-readable value in `structuredContent` using one stable
 `{ success, result }` or `{ success:false, errorCode, error, retryable }`
 envelope. The text content is intentionally only a short human-readable
 summary, so clients no longer need to parse JSON out of a text block.
+Media-producing tools return standard MCP `image` or `audio` content blocks
+alongside structured metadata. A required media payload that is absent or
+malformed becomes a structured tool error instead of an invalid content block.
 Release validation audits every declared input and output schema, including
 array item shapes and property descriptions; malformed live metadata cannot be
 promoted into the static first-class tool catalog. Release-managed schemas also
@@ -161,6 +164,9 @@ and keeps package-specific VFX Graph, Audio Mixer, Build Profile, Addressables,
 Timeline, and Cinemachine routes lazily discoverable. The Editor's live
 capability metadata, rather than this README, is authoritative for availability
 and schemas.
+The generated `manifest.json` and `docs/tool-audit-report.md` are authoritative
+for the current tool count and exposure tiers; this README intentionally avoids
+maintaining a second numeric catalog that can drift.
 
 For prefab creation, `unity_prefab_asset_add_component` accepts an optional
 `properties` map. The Editor applies those serialized values before the first
@@ -295,7 +301,7 @@ AnkleBreaker Unity MCP is the most comprehensive MCP integration for Unity, purp
 
 | Feature | **AnkleBreaker MCP** | **Bezi** | **Coplay MCP** | **Unity AI** |
 |---------|:-------------------:|:--------:|:--------------:|:------------:|
-| **Total Tools** | **300+** | ~30 | 34 | Limited (built-in) |
+| **Total Tools** | **Hundreds (lazy catalog)** | ~30 | 34 | Limited (built-in) |
 | **Feature Categories** | **30+** | ~5 | ~5 | N/A |
 | **Non-Blocking Editor** | ✅ Full background operation | ❌ Freezes Unity during tasks | ✅ | ✅ |
 | **Open Source** | ✅ AnkleBreaker Open License | ❌ Proprietary | ✅ MIT License | ❌ Proprietary |
@@ -323,7 +329,7 @@ AnkleBreaker Unity MCP is the most comprehensive MCP integration for Unity, purp
 
 | Solution | Monthly Cost | What You Get |
 |----------|:----------:|--------------| 
-| **AnkleBreaker MCP (free) + Claude Pro** | **$20/mo** | 300+ tools, full Unity control, open source — MCP is free, price is Claude only |
+| **AnkleBreaker MCP (free) + Claude Pro** | **$20/mo** | Hundreds of tools, full Unity control, open source — MCP is free, price is Claude only |
 | **AnkleBreaker MCP (free) + Claude Max 5x** | **$100/mo** | Same + 5x usage for heavy workflows — MCP is free, price is Claude only |
 | **AnkleBreaker MCP (free) + Claude Max 20x** | **$200/mo** | Same + 20x usage for teams/studios — MCP is free, price is Claude only |
 | **Bezi Pro** | $20/mo | ~30 tools, 800 credits/mo, freezes Unity |
@@ -338,7 +344,7 @@ AnkleBreaker Unity MCP is the most comprehensive MCP integration for Unity, purp
 Bezi runs as a proprietary Unity plugin with its own credit-based billing — $20–$200/mo on top of your AI subscription. It has historically suffered from freezing the Unity Editor during AI tasks, blocking your workflow. AnkleBreaker MCP is completely free and open source, runs entirely in the background with zero editor impact, and offers 8x more tools — the only cost is your existing Claude subscription.
 
 **vs. Coplay MCP:**
-Coplay MCP provides 34 tools across ~5 categories. AnkleBreaker MCP delivers 300+ tools across 30+ categories including advanced features like physics raycasts, terrain editing, shader graph management, profiling, NavMesh, particle systems, and MPPM multiplayer — none of which exist in Coplay. Our two-tier lazy loading system is specifically optimized for Claude Cowork's tool limits.
+Coplay MCP provides 34 tools across ~5 categories. AnkleBreaker MCP delivers hundreds of tools across 30+ categories including advanced features like physics raycasts, terrain editing, shader graph management, profiling, NavMesh, particle systems, and MPPM multiplayer — none of which exist in Coplay. Our two-tier lazy loading system is specifically optimized for Claude Cowork's tool limits.
 
 **vs. Unity AI:**
 Unity AI (successor to Muse) is built into Unity 6.2+ but limited to Unity's own AI models and a credit-based "Unity Points" system. It cannot be used with Claude or any external AI assistant, has no MCP support, and offers a fraction of the automation capabilities. AnkleBreaker MCP works with any MCP-compatible AI while giving you full control over which AI models you use.
@@ -356,31 +362,10 @@ If Unity MCP helps your workflow, consider supporting its development! Your supp
 
 **Sponsor tiers include priority feature requests** — your ideas get bumped up the roadmap! Check out the tiers on [GitHub Sponsors](https://github.com/sponsors/AnkleBreaker-Studio) or [Patreon](https://www.patreon.com/AnkleBreakerStudio).
 
-## What's New in v2.30.0
+## Release History
 
-- **`unity_screenshot_editor_window` tool** — capture any Editor window (Inspector, Project, Console, custom editor windows) to a PNG. Unlike the game/scene capture tools (which render a camera), it grabs the real editor UI via the Win32 `PrintWindow` API, so it works even when the window is hidden behind other windows — no raising or focus-stealing. **Windows editor only**: on macOS/Linux it returns a clear "unsupported platform" message instead of capturing, and the assistant will tell you the feature isn't available on your OS. Defaults to `Assets/Screenshots/`, accepts any user-chosen `.png` path. The assistant only invokes it when you explicitly ask for an editor-window screenshot. Companion to `unity-mcp-plugin` v2.32.0.
-
-## What's New in v2.28.2
-
-- **Codex CLI compatibility** — Two diagnostic `console.debug(...)` calls in the bridge were writing to stdout, corrupting the MCP JSON-RPC framing. Strict clients like Codex CLI closed the transport as soon as they hit the non-JSON line; the bug was invisible on Claude Desktop / Claude Code which tolerate the framing violation. Both call sites now log to stderr.
-
-## What's New in v2.28.0
-
-- **npm auto-publish** — A GitHub Action now automatically publishes to npm whenever a new GitHub release is created. Contributed by [@vatanaksoytezer](https://github.com/vatanaksoytezer) in [#8](https://github.com/AnkleBreaker-Studio/unity-mcp-server/pull/8).
-- **npm package renamed** — Package renamed from `unity-mcp-server` to `anklebreaker-unity-mcp` to avoid name conflict on npm. Install via `npx anklebreaker-unity-mcp@latest`.
-- **SpriteAtlas tools** — 7 new tools for Unity SpriteAtlas management: create, inspect, add/remove sprites, configure packing & texture settings, delete, and list SpriteAtlases. Contributed by [@zaferdace](https://github.com/zaferdace). Registered as advanced tools accessible via `unity_advanced_tool`.
-- **UTF-8 encoding fix** — Fixed corrupted characters in `unity-editor-bridge.js` comments and section headers.
-
-## What's New in v2.26.0
-
-- **Compilation error detection** — `unity_get_compilation_errors` retrieves C# compilation errors and warnings directly from Unity's `CompilationPipeline` API. Unlike `unity_console_query`, this is independent of the console log buffer — not affected by console clear, Play Mode log flooding, or buffer overflow. Supports filtering by severity (`error`, `warning`, `all`) and count limit.
-
-## What's New in v2.25.0
-
-- **Parallel-safe instance routing** — When multiple AI agents (e.g. Claude Cowork tasks) share the same MCP process, each agent can now include a `port` parameter in every `unity_*` tool call to guarantee routing to the correct Unity Editor instance. This prevents cross-agent contamination where one task's `unity_select_instance` could redirect another task's commands to the wrong project.
-- **Per-request port override** — A new stateless routing mechanism bypasses the shared per-agent state entirely. The `port` parameter is extracted by middleware before the tool handler runs, used for routing, then stripped from the args. This is safe because MCP stdio transport processes requests sequentially.
-- **Schema injection** — Optional `port` and `expectedProjectPath` parameters are automatically injected into every Editor-targeting `unity_*` tool schema (except `unity_list_instances`, `unity_select_instance`, and `unity_hub_*`). Supplying `expectedProjectPath` can resolve the target port by project path, and mutating requests are rejected before execution if the bound project does not match.
-- **Enhanced select_instance response** — `unity_select_instance` now returns explicit routing instructions telling the AI to include `port` in all subsequent calls.
+See [CHANGELOG.md](CHANGELOG.md) for versioned release notes. Keeping the
+history in one file avoids stale duplicate “What's New” sections in this README.
 
 ## Frequently Asked Questions
 
@@ -388,10 +373,10 @@ If Unity MCP helps your workflow, consider supporting its development! Your supp
 Unity MCP (Model Context Protocol) is an open-source integration that connects AI assistants like Claude, Cursor, and Windsurf to the Unity Editor and Unity Hub. It allows AI to directly control Unity — creating scenes, placing objects, writing scripts, running builds, profiling, and more — through a standardized protocol.
 
 **How does AnkleBreaker Unity MCP compare to other Unity AI tools?**
-AnkleBreaker Unity MCP offers 300+ tools across 30+ categories, making it the most comprehensive Unity MCP integration available. Competitors like Bezi (~30 tools) and Coplay MCP (34 tools) cover a fraction of Unity's features. Unlike Bezi, AnkleBreaker MCP is free, open source, and doesn't freeze the Unity Editor during AI operations.
+AnkleBreaker Unity MCP offers hundreds of tools across 30+ categories, making it the most comprehensive Unity MCP integration available. Competitors like Bezi (~30 tools) and Coplay MCP (34 tools) cover a fraction of Unity's features. Unlike Bezi, AnkleBreaker MCP is free, open source, and doesn't freeze the Unity Editor during AI operations.
 
 **Does it work with Claude Desktop / Claude Cowork?**
-Yes. AnkleBreaker Unity MCP is purpose-built for Claude Desktop and Claude Cowork. It uses a two-tier lazy loading system to stay within MCP client tool limits while exposing 300+ tools on demand.
+Yes. AnkleBreaker Unity MCP is purpose-built for Claude Desktop and Claude Cowork. It uses a two-tier lazy loading system to stay within MCP client tool limits while exposing hundreds of tools on demand.
 
 **Does it work with Cursor, Windsurf, or other MCP clients?**
 Yes. Any AI tool that supports the Model Context Protocol can connect to this server. This includes Cursor, Windsurf, Claude Desktop, Claude Cowork, and any other MCP-compatible client.

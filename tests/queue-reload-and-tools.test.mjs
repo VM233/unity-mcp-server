@@ -87,6 +87,188 @@ test("Editor command failures propagate error-only payloads", () => {
   assert.equal(result.errorCode, "editor_command_failed");
 });
 
+test("successful Editor command envelopes unwrap to one bridge data layer", () => {
+  assert.deepEqual(normalizeEditorCommandResult({
+    success: true,
+    data: {
+      success: true,
+      data: { value: 3 },
+    },
+  }), {
+    success: true,
+    data: { value: 3 },
+  });
+});
+
+test("asset preview unwraps bridge data into valid MCP media blocks", async () => {
+  const originalFetch = globalThis.fetch;
+  const previewBase64 = Buffer.from("preview-png").toString("base64");
+  globalThis.fetch = createCompletedQueueFetch({
+    success: true,
+    data: {
+      assetPath: "Assets/Preview.prefab",
+      width: 64,
+      height: 32,
+      base64: previewBase64,
+    },
+  });
+
+  try {
+    const preview = editorTools.find(
+      (tool) => tool.name === "unity_graphics_asset_preview");
+    const result = await runWithRequestContext(testRequestContext(), () =>
+      preview.handler({ assetPath: "Assets/Preview.prefab" }));
+
+    assert.equal(Array.isArray(result), true);
+    assert.deepEqual(result[0], {
+      type: "image",
+      data: previewBase64,
+      mimeType: "image/png",
+    });
+    assert.deepEqual(JSON.parse(result[1].text), {
+      assetPath: "Assets/Preview.prefab",
+      width: 64,
+      height: 32,
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("asset preview reports a structured failure instead of emitting undefined image data",
+  async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = createCompletedQueueFetch({
+      success: true,
+      data: { assetPath: "Assets/Preview.prefab" },
+    });
+
+    try {
+      const preview = editorTools.find(
+        (tool) => tool.name === "unity_graphics_asset_preview");
+      const result = await runWithRequestContext(testRequestContext(), () =>
+        preview.handler({ assetPath: "Assets/Preview.prefab" }));
+      const failure = JSON.parse(result);
+
+      assert.equal(failure.success, false);
+      assert.equal(failure.errorCode, "asset_preview_payload_missing");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+test("material info preserves its optional inline preview after bridge unwrapping",
+  async () => {
+    const originalFetch = globalThis.fetch;
+    const previewBase64 = Buffer.from("material-png").toString("base64");
+    globalThis.fetch = createCompletedQueueFetch({
+      success: true,
+      data: {
+        assetPath: "Assets/Preview.mat",
+        shader: "Test/Shader",
+        base64: previewBase64,
+      },
+    });
+
+    try {
+      const materialInfo = editorTools.find(
+        (tool) => tool.name === "unity_graphics_material_info");
+      const result = await runWithRequestContext(testRequestContext(), () =>
+        materialInfo.handler({ assetPath: "Assets/Preview.mat" }));
+
+      assert.equal(Array.isArray(result), true);
+      assert.equal(result[0].data, previewBase64);
+      assert.deepEqual(JSON.parse(result[1].text), {
+        assetPath: "Assets/Preview.mat",
+        shader: "Test/Shader",
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+test("test runner reads the started job before performing its early poll", async () => {
+  const originalFetch = globalThis.fetch;
+  let submitCount = 0;
+  globalThis.fetch = async (url) => {
+    const target = String(url);
+    if (target.endsWith("/api/queue/submit")) {
+      submitCount++;
+      return Response.json({ ticketId: submitCount });
+    }
+    if (target.includes("/api/queue/status?ticketId=1")) {
+      return Response.json({
+        ticketId: 1,
+        actionName: "testing/run-tests",
+        status: "Completed",
+        result: {
+          success: true,
+          data: { jobId: "test-job-1", status: "running" },
+        },
+      });
+    }
+    if (target.includes("/api/queue/status?ticketId=2")) {
+      return Response.json({
+        ticketId: 2,
+        actionName: "testing/get-job",
+        status: "Completed",
+        result: {
+          success: true,
+          data: { jobId: "test-job-1", status: "succeeded", passed: 3 },
+        },
+      });
+    }
+    throw new Error(`unexpected fetch ${target}`);
+  };
+
+  try {
+    const runTests = editorTools.find(
+      (tool) => tool.name === "unity_testing_run_tests");
+    const result = await runWithRequestContext(testRequestContext(), () =>
+      runTests.handler({ mode: "EditMode" }));
+
+    assert.equal(submitCount, 2);
+    assert.deepEqual(JSON.parse(result), {
+      jobId: "test-job-1",
+      status: "succeeded",
+      passed: 3,
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+function createCompletedQueueFetch(result) {
+  return async (url) => {
+    const target = String(url);
+    if (target.endsWith("/api/queue/submit")) {
+      return Response.json({ ticketId: 901 });
+    }
+    if (target.includes("/api/queue/status?ticketId=901")) {
+      return Response.json({
+        ticketId: 901,
+        actionName: "test/command",
+        status: "Completed",
+        result,
+      });
+    }
+    throw new Error(`unexpected fetch ${target}`);
+  };
+}
+
+function testRequestContext() {
+  return {
+    agentId: "agent-editor-tool-envelope",
+    portOverride: 7891,
+    targetInstance: {
+      port: 7891,
+      projectPath: "D:/UnityProjects/BattleIdle/apps/game-client-unity",
+      projectName: "BattleIdle",
+    },
+    expectedProjectPath: "D:/UnityProjects/BattleIdle/apps/game-client-unity",
+  };
+}
+
 test("incomplete reload JSON is a transient transport failure", () => {
   assert.equal(isTransientError(new SyntaxError("Unexpected end of JSON input"), null), true);
   assert.equal(isTransientError(new Error("other side closed"), null), true);

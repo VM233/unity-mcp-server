@@ -2,6 +2,22 @@
 
 All notable changes to this package will be documented in this file.
 
+## [4.4.7] - 2026-07-31
+
+### Fixed
+- Return the fully unwrapped successful Unity queue payload from the bridge
+  normalizer instead of reintroducing the original `success/data` envelope.
+- Restore valid inline image blocks for asset and material previews. A missing
+  required asset-preview PNG now becomes a structured error instead of an
+  MCP response containing undefined image data.
+- Restore the test runner's early Job poll by reading the unwrapped start and
+  status payloads.
+
+### Documentation
+- Make generated manifests and the tool audit the authority for current tool
+  counts, document the media-block contract, and remove duplicated legacy
+  “What's New” sections from the README.
+
 ## [4.4.6] - 2026-07-31
 
 ### Fixed
