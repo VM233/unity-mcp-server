@@ -164,7 +164,10 @@ For prefab creation, `unity_prefab_asset_add_component` accepts an optional
 `properties` map. The Editor applies those serialized values before the first
 save and verifies them by readback; use
 `unity_prefab_asset_configure_component` for idempotent ensure/update work or
-ObjectReference wiring.
+ObjectReference wiring. Its optional `createPathIfMissing` flag creates a
+missing semantic GameObject path in the same atomic transaction. Routine asset
+duplication uses the concrete rollback-capable `unity_asset_copy` tool rather
+than arbitrary Editor code.
 
 ### Multi-Instance Support
 

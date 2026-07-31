@@ -2,6 +2,22 @@
 
 All notable changes to this package will be documented in this file.
 
+## [4.4.5] - 2026-07-31
+
+### Added
+- Publish VM Unity MCP's rollback-capable `unity_asset_copy` as a
+  release-managed concrete tool instead of requiring the advanced fallback.
+
+### Fixed
+- Summarize failed persistent Jobs with their structured error code and message
+  while keeping detailed compiler diagnostics in `structuredContent`; the text
+  channel no longer exposes a CLR dictionary type name.
+- Refresh the Prefab component configuration schema with
+  `createPathIfMissing`, allowing semantic child creation and component setup
+  through one atomic tool call.
+- Consume the plugin's concise shared project-binding descriptions, keeping the
+  73-tool default catalog at 58,821 bytes under the 60 KB release gate.
+
 ## [4.4.4] - 2026-07-31
 
 ### Fixed

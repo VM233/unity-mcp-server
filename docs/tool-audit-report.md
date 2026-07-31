@@ -1,20 +1,20 @@
 # Unity MCP 插件与工具逐项设计审查
 
-生成时间：2026-07-30T09:14:54.392Z
+生成时间：2026-07-31T12:28:38.247Z
 
 ## 结论
 
-基线有 58 个 Node 工具和 127 个插件第一类工具，原始合计 185 项；按名称去重后为 174 项，并存在 11 个跨层同名碰撞。修复后默认面为 69 项，其中插件发布策略固定为 39 条路由。
+基线有 58 个 Node 工具和 127 个插件第一类工具，原始合计 185 项；按名称去重后为 174 项，并存在 11 个跨层同名碰撞。修复后默认面为 73 项，其中插件发布策略固定为 43 条路由。
 
-174 个基线唯一工具的处理结果：默认保留 60、懒加载 87、合并 4、内部化 5、三段式 18。
+174 个基线唯一工具的处理结果：默认保留 62、懒加载 85、合并 4、内部化 5、三段式 18。
 
-当前默认面新增的规范入口：`unity_build`、`unity_search_scene`、`unity_scene_instantiate_prefab`、`unity_jobs_cancel`、`unity_asset_import_settings_get`、`unity_asset_import_settings_set`、`unity_scene_workspace`、`unity_material_properties_get`、`unity_material_properties_set`。
+当前默认面新增的规范入口：`unity_build`、`unity_editor_execute_code`、`unity_search_scene`、`unity_scene_instantiate_prefab`、`unity_jobs_cancel`、`unity_jobs_cleanup`、`unity_asset_import_settings_get`、`unity_asset_import_settings_set`、`unity_scene_workspace`、`unity_material_properties_get`、`unity_material_properties_set`。
 
 ## 整体框架审查与已实施修复
 
 | 领域 | 发现的问题 | 已实施修复 | 当前判定 |
 |---|---|---|---|
-| 工具面 | 185 个原始条目会挤占上下文，且有 11 个同名跨层碰撞 | 建立 69 项默认面、39 路由发布策略和 lazy 兼容层 | 已修复 |
+| 工具面 | 185 个原始条目会挤占上下文，且有 11 个同名跨层碰撞 | 建立 73 项默认面、43 路由发布策略和 lazy 兼容层 | 已修复 |
 | 扩展性 | 项目自定义工具逐个展开，项目越大默认面越失控 | 统一为 `project-tools/list/get/execute` 三段式；不完整元数据自动降级 | 已修复 |
 | 元数据 | 基线含 2 个内部工具、4 个默认描述、44 个数组缺 `items`、68 个属性缺描述 | 引入元数据质量门、完整 schema 递归审计和发布快照检查 | 已修复，当前 0 issue |
 | 路由权威 | 路由清单、switch、Node 清单和 manifest 可漂移 | C# 权威路由注册表 + 实时快照生成 + manifest 同步检查 | 已修复 |
@@ -44,10 +44,10 @@
 ## 验证结果
 
 - Unity 6000.4.10f1：编译 0 error / 0 warning。
-- 插件元数据：39 个内建第一类路由，质量问题 0。
-- Node：69 个默认工具，目录与 schema 自动测试通过。
+- 插件元数据：43 个内建第一类路由，质量问题 0。
+- Node：73 个默认工具，目录与 schema 自动测试通过。
 - npm：生产依赖漏洞 0。
-- 包测试：VMUnityMCP 5.3.2 本次 Prefab 修复聚焦回归 4/4；最终全量 201/201 通过，manifest 精确恢复。
+- 包测试：VMUnityMCP 5.6.6 全量 219/219 通过；最终元数据变更聚焦回归 2/2，manifest 精确恢复。
 
 ## 174 个基线唯一工具逐项审查
 
@@ -117,7 +117,7 @@
 | 62 | `unity_animation_transition_info` | plugin | `animation/transition-info` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
 | 63 | `unity_animation_update_state` | plugin | `animation/update-state` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
 | 64 | `unity_animation_update_transition` | plugin | `animation/update-transition` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
-| 65 | `unity_asset_copy` | plugin | `asset/copy` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 65 | `unity_asset_copy` | plugin | `asset/copy` | 默认保留 | `unity_asset_copy` | 唯一默认入口；描述与输入 schema 已通过自动质量门。 |
 | 66 | `unity_asset_create_folder` | plugin | `asset/create-folder` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
 | 67 | `unity_asset_dependencies` | plugin | `asset/dependencies` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
 | 68 | `unity_asset_export_unitypackage` | plugin | `asset/export-unitypackage` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
@@ -131,7 +131,7 @@
 | 76 | `unity_component_set_reference` | plugin | `component/set-reference` | 默认保留 | `unity_component_set_reference` | 唯一默认入口；描述与输入 schema 已通过自动质量门。 |
 | 77 | `unity_console_query` | plugin | `console/query` | 默认保留 | `unity_console_query` | 唯一默认入口；描述与输入 schema 已通过自动质量门。 |
 | 78 | `unity_editor_play_mode` | plugin | `editor/play-mode` | 合并 | `unity_play_mode` | 与同域工具高度重合，统一到 unity_play_mode。 |
-| 79 | `unity_jobs_get` | plugin | `jobs/get` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
+| 79 | `unity_jobs_get` | plugin | `jobs/get` | 默认保留 | `unity_jobs_get` | 唯一默认入口；描述与输入 schema 已通过自动质量门。 |
 | 80 | `unity_jobs_list` | plugin | `jobs/list` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
 | 81 | `unity_localization_collections` | plugin | `localization/collections` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |
 | 82 | `unity_localization_create_collection` | plugin | `localization/create-collection` | 懒加载 | `unity_advanced_tool` | 能力保留，但从默认上下文移出；按需通过高级入口执行。 |

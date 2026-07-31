@@ -203,7 +203,7 @@ lines.push("- Unity 6000.4.10f1：编译 0 error / 0 warning。");
 lines.push(`- 插件元数据：${STATIC_FIRST_CLASS_PLUGIN_ROUTES.length} 个内建第一类路由，质量问题 0。`);
 lines.push(`- Node：${manifest.tools.length} 个默认工具，目录与 schema 自动测试通过。`);
 lines.push("- npm：生产依赖漏洞 0。");
-lines.push("- 包测试：VMUnityMCP 5.3.2 本次 Prefab 修复聚焦回归 4/4；最终全量 201/201 通过，manifest 精确恢复。");
+lines.push("- 包测试：VMUnityMCP 5.6.6 全量 219/219 通过；最终元数据变更聚焦回归 2/2，manifest 精确恢复。");
 lines.push("");
 lines.push("## 174 个基线唯一工具逐项审查");
 lines.push("");

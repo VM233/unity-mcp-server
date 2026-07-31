@@ -220,6 +220,13 @@ export function summarizeStructuredToolResult(structuredContent) {
   if (candidate?.jobId) {
     const type = candidate.jobType || "persistent";
     const status = candidate.status || "queued";
+    const normalizedStatus = String(status).toLowerCase();
+    if (["failed", "interrupted", "canceled", "cancelled"].includes(normalizedStatus)) {
+      const failure = summarizeNestedError(candidate.error);
+      if (failure) {
+        return `${type} job ${candidate.jobId} ${status}: ${failure}`;
+      }
+    }
     return `${type} job ${candidate.jobId} is ${status}.`;
   }
   if (candidate?.ticketId) {
@@ -229,6 +236,28 @@ export function summarizeStructuredToolResult(structuredContent) {
     return `Cleanup is ${candidate.cleanupStatus}.`;
   }
   return "Tool completed successfully.";
+}
+
+function summarizeNestedError(value) {
+  if (typeof value === "string" && value.trim()) {
+    return truncateSummary(value.trim());
+  }
+  if (!value || typeof value !== "object" || Array.isArray(value)) return "";
+
+  const code = typeof value.errorCode === "string" ? value.errorCode.trim() : "";
+  const message = typeof value.error === "string" && value.error.trim()
+    ? value.error.trim()
+    : typeof value.message === "string" && value.message.trim()
+      ? value.message.trim()
+      : "";
+  if (!code && !message) return "";
+  return truncateSummary(code && message ? `${code}: ${message}` : code || message);
+}
+
+function truncateSummary(value, maxLength = 300) {
+  return value.length <= maxLength
+    ? value
+    : `${value.slice(0, maxLength - 1)}…`;
 }
 
 function compactServerPresenceMetadata(structuredContent) {

@@ -284,11 +284,11 @@
         },
         "expectedProjectPath": {
           "type": "string",
-          "description": "Expected Unity project root path. The request is rejected before mutation if it reaches another project."
+          "description": "Expected Unity project root; rejects cross-project mutation."
         },
         "expectedProjectName": {
           "type": "string",
-          "description": "Optional expected Unity project name used with expectedProjectPath as an additional target-binding check."
+          "description": "Optional project name used as an additional target-binding check."
         }
       },
       "required": [
@@ -375,11 +375,11 @@
         },
         "expectedProjectPath": {
           "type": "string",
-          "description": "Expected Unity project root path. The request is rejected before mutation if it reaches another project."
+          "description": "Expected Unity project root; rejects cross-project mutation."
         },
         "expectedProjectName": {
           "type": "string",
-          "description": "Optional expected Unity project name used with expectedProjectPath as an additional target-binding check."
+          "description": "Optional project name used as an additional target-binding check."
         }
       }
     },
@@ -454,11 +454,11 @@
         },
         "expectedProjectPath": {
           "type": "string",
-          "description": "Expected Unity project root path. The request is rejected before mutation if it reaches another project."
+          "description": "Expected Unity project root; rejects cross-project mutation."
         },
         "expectedProjectName": {
           "type": "string",
-          "description": "Optional expected Unity project name used with expectedProjectPath as an additional target-binding check."
+          "description": "Optional project name used as an additional target-binding check."
         }
       },
       "required": [
@@ -519,11 +519,11 @@
         },
         "expectedProjectPath": {
           "type": "string",
-          "description": "Expected Unity project root path. The request is rejected before mutation if it reaches another project."
+          "description": "Expected Unity project root; rejects cross-project mutation."
         },
         "expectedProjectName": {
           "type": "string",
-          "description": "Optional expected Unity project name used with expectedProjectPath as an additional target-binding check."
+          "description": "Optional project name used as an additional target-binding check."
         }
       },
       "required": [
@@ -593,11 +593,11 @@
         },
         "expectedProjectPath": {
           "type": "string",
-          "description": "Expected Unity project root path. The request is rejected before mutation if it reaches another project."
+          "description": "Expected Unity project root; rejects cross-project mutation."
         },
         "expectedProjectName": {
           "type": "string",
-          "description": "Optional expected Unity project name used with expectedProjectPath as an additional target-binding check."
+          "description": "Optional project name used as an additional target-binding check."
         }
       },
       "required": [
@@ -756,11 +756,11 @@
         },
         "expectedProjectPath": {
           "type": "string",
-          "description": "Expected Unity project root path. The request is rejected before mutation if it reaches another project."
+          "description": "Expected Unity project root; rejects cross-project mutation."
         },
         "expectedProjectName": {
           "type": "string",
-          "description": "Optional expected Unity project name used with expectedProjectPath as an additional target-binding check."
+          "description": "Optional project name used as an additional target-binding check."
         }
       }
     },
@@ -945,11 +945,11 @@
         },
         "expectedProjectPath": {
           "type": "string",
-          "description": "Expected Unity project root path. The request is rejected before mutation if it reaches another project."
+          "description": "Expected Unity project root; rejects cross-project mutation."
         },
         "expectedProjectName": {
           "type": "string",
-          "description": "Optional expected Unity project name used with expectedProjectPath as an additional target-binding check."
+          "description": "Optional project name used as an additional target-binding check."
         }
       },
       "required": [
@@ -1107,11 +1107,11 @@
         },
         "expectedProjectPath": {
           "type": "string",
-          "description": "Expected Unity project root path. The request is rejected before mutation if it reaches another project."
+          "description": "Expected Unity project root; rejects cross-project mutation."
         },
         "expectedProjectName": {
           "type": "string",
-          "description": "Optional expected Unity project name used with expectedProjectPath as an additional target-binding check."
+          "description": "Optional project name used as an additional target-binding check."
         }
       },
       "required": [
@@ -1234,11 +1234,11 @@
         },
         "expectedProjectPath": {
           "type": "string",
-          "description": "Expected Unity project root path. The request is rejected before mutation if it reaches another project."
+          "description": "Expected Unity project root; rejects cross-project mutation."
         },
         "expectedProjectName": {
           "type": "string",
-          "description": "Optional expected Unity project name used with expectedProjectPath as an additional target-binding check."
+          "description": "Optional project name used as an additional target-binding check."
         }
       },
       "required": [
@@ -1279,6 +1279,10 @@
         "addIfMissing": {
           "type": "boolean",
           "description": "Add the component when componentIndex equals the current component count. Defaults to true."
+        },
+        "createPathIfMissing": {
+          "type": "boolean",
+          "description": "Create missing prefabPath GameObjects before configuring the component. New children inherit their parent layer. Defaults to false."
         },
         "properties": {
           "type": "object",
@@ -1349,11 +1353,11 @@
         },
         "expectedProjectPath": {
           "type": "string",
-          "description": "Expected Unity project root path. The request is rejected before mutation if it reaches another project."
+          "description": "Expected Unity project root; rejects cross-project mutation."
         },
         "expectedProjectName": {
           "type": "string",
-          "description": "Optional expected Unity project name used with expectedProjectPath as an additional target-binding check."
+          "description": "Optional project name used as an additional target-binding check."
         }
       },
       "required": [
@@ -1468,15 +1472,90 @@
         },
         "expectedProjectPath": {
           "type": "string",
-          "description": "Expected Unity project root path. The request is rejected before mutation if it reaches another project."
+          "description": "Expected Unity project root; rejects cross-project mutation."
         },
         "expectedProjectName": {
           "type": "string",
-          "description": "Optional expected Unity project name used with expectedProjectPath as an additional target-binding check."
+          "description": "Optional project name used as an additional target-binding check."
         }
       },
       "required": [
         "references"
+      ]
+    },
+    "outputSchema": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "annotations": {}
+  },
+  {
+    "toolName": "unity_asset_copy",
+    "route": "asset/copy",
+    "category": "asset",
+    "description": "Copy one or more Unity asset files with parent-folder creation, overwrite snapshots, and rollback.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "sourcePath": {
+          "type": "string",
+          "description": "Source asset path for a single copy."
+        },
+        "targetPath": {
+          "type": "string",
+          "description": "Target asset path for a single copy."
+        },
+        "overwrite": {
+          "type": "boolean",
+          "description": "Replace existing targets with rollback snapshots. Defaults to false."
+        },
+        "dryRun": {
+          "type": "boolean",
+          "description": "Preflight without copying. Defaults to false."
+        },
+        "copies": {
+          "type": "array",
+          "description": "Batch of sourcePath/targetPath copy requests.",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "properties": {
+              "sourcePath": {
+                "type": "string",
+                "description": "Source asset path."
+              },
+              "targetPath": {
+                "type": "string",
+                "description": "Target asset path."
+              }
+            },
+            "required": [
+              "sourcePath",
+              "targetPath"
+            ]
+          }
+        },
+        "expectedProjectPath": {
+          "type": "string",
+          "description": "Expected Unity project root; rejects cross-project mutation."
+        },
+        "expectedProjectName": {
+          "type": "string",
+          "description": "Optional project name used as an additional target-binding check."
+        }
+      },
+      "oneOf": [
+        {
+          "required": [
+            "sourcePath",
+            "targetPath"
+          ]
+        },
+        {
+          "required": [
+            "copies"
+          ]
+        }
       ]
     },
     "outputSchema": {
@@ -1542,11 +1621,11 @@
         },
         "expectedProjectPath": {
           "type": "string",
-          "description": "Expected Unity project root path. The request is rejected before mutation if it reaches another project."
+          "description": "Expected Unity project root; rejects cross-project mutation."
         },
         "expectedProjectName": {
           "type": "string",
-          "description": "Optional expected Unity project name used with expectedProjectPath as an additional target-binding check."
+          "description": "Optional project name used as an additional target-binding check."
         }
       }
     },
@@ -1622,11 +1701,11 @@
         },
         "expectedProjectPath": {
           "type": "string",
-          "description": "Expected Unity project root path. The request is rejected before mutation if it reaches another project."
+          "description": "Expected Unity project root; rejects cross-project mutation."
         },
         "expectedProjectName": {
           "type": "string",
-          "description": "Optional expected Unity project name used with expectedProjectPath as an additional target-binding check."
+          "description": "Optional project name used as an additional target-binding check."
         }
       },
       "required": [
@@ -1814,11 +1893,11 @@
         },
         "expectedProjectPath": {
           "type": "string",
-          "description": "Expected Unity project root path. The request is rejected before mutation if it reaches another project."
+          "description": "Expected Unity project root; rejects cross-project mutation."
         },
         "expectedProjectName": {
           "type": "string",
-          "description": "Optional expected Unity project name used with expectedProjectPath as an additional target-binding check."
+          "description": "Optional project name used as an additional target-binding check."
         }
       }
     },
@@ -1853,11 +1932,11 @@
         },
         "expectedProjectPath": {
           "type": "string",
-          "description": "Expected Unity project root path. The request is rejected before mutation if it reaches another project."
+          "description": "Expected Unity project root; rejects cross-project mutation."
         },
         "expectedProjectName": {
           "type": "string",
-          "description": "Optional expected Unity project name used with expectedProjectPath as an additional target-binding check."
+          "description": "Optional project name used as an additional target-binding check."
         }
       },
       "required": [
@@ -1896,11 +1975,11 @@
         },
         "expectedProjectPath": {
           "type": "string",
-          "description": "Expected Unity project root path. The request is rejected before mutation if it reaches another project."
+          "description": "Expected Unity project root; rejects cross-project mutation."
         },
         "expectedProjectName": {
           "type": "string",
-          "description": "Optional expected Unity project name used with expectedProjectPath as an additional target-binding check."
+          "description": "Optional project name used as an additional target-binding check."
         }
       },
       "required": [
@@ -1960,11 +2039,11 @@
         },
         "expectedProjectPath": {
           "type": "string",
-          "description": "Expected Unity project root path. The request is rejected before mutation if it reaches another project."
+          "description": "Expected Unity project root; rejects cross-project mutation."
         },
         "expectedProjectName": {
           "type": "string",
-          "description": "Optional expected Unity project name used with expectedProjectPath as an additional target-binding check."
+          "description": "Optional project name used as an additional target-binding check."
         }
       }
     },
@@ -2104,11 +2183,11 @@
         },
         "expectedProjectPath": {
           "type": "string",
-          "description": "Expected Unity project root path. The request is rejected before mutation if it reaches another project."
+          "description": "Expected Unity project root; rejects cross-project mutation."
         },
         "expectedProjectName": {
           "type": "string",
-          "description": "Optional expected Unity project name used with expectedProjectPath as an additional target-binding check."
+          "description": "Optional project name used as an additional target-binding check."
         }
       },
       "required": [
@@ -2301,11 +2380,11 @@
         },
         "expectedProjectPath": {
           "type": "string",
-          "description": "Expected Unity project root path. The request is rejected before mutation if it reaches another project."
+          "description": "Expected Unity project root; rejects cross-project mutation."
         },
         "expectedProjectName": {
           "type": "string",
-          "description": "Optional expected Unity project name used with expectedProjectPath as an additional target-binding check."
+          "description": "Optional project name used as an additional target-binding check."
         }
       },
       "required": [
@@ -2458,11 +2537,11 @@
         },
         "expectedProjectPath": {
           "type": "string",
-          "description": "Expected Unity project root path. The request is rejected before mutation if it reaches another project."
+          "description": "Expected Unity project root; rejects cross-project mutation."
         },
         "expectedProjectName": {
           "type": "string",
-          "description": "Optional expected Unity project name used with expectedProjectPath as an additional target-binding check."
+          "description": "Optional project name used as an additional target-binding check."
         }
       },
       "required": [
@@ -2663,11 +2742,11 @@
         },
         "expectedProjectPath": {
           "type": "string",
-          "description": "Expected Unity project root path. The request is rejected before mutation if it reaches another project."
+          "description": "Expected Unity project root; rejects cross-project mutation."
         },
         "expectedProjectName": {
           "type": "string",
-          "description": "Optional expected Unity project name used with expectedProjectPath as an additional target-binding check."
+          "description": "Optional project name used as an additional target-binding check."
         }
       },
       "required": [
@@ -2727,11 +2806,11 @@
         },
         "expectedProjectPath": {
           "type": "string",
-          "description": "Expected Unity project root path. The request is rejected before mutation if it reaches another project."
+          "description": "Expected Unity project root; rejects cross-project mutation."
         },
         "expectedProjectName": {
           "type": "string",
-          "description": "Optional expected Unity project name used with expectedProjectPath as an additional target-binding check."
+          "description": "Optional project name used as an additional target-binding check."
         }
       }
     },
@@ -2832,11 +2911,11 @@
         },
         "expectedProjectPath": {
           "type": "string",
-          "description": "Expected Unity project root path. The request is rejected before mutation if it reaches another project."
+          "description": "Expected Unity project root; rejects cross-project mutation."
         },
         "expectedProjectName": {
           "type": "string",
-          "description": "Optional expected Unity project name used with expectedProjectPath as an additional target-binding check."
+          "description": "Optional project name used as an additional target-binding check."
         }
       },
       "required": [

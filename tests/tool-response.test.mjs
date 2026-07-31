@@ -99,6 +99,33 @@ test("success-only bridge envelopes normalize into the stable result field", () 
   assert.match(response.content[0].text, /job-1/);
 });
 
+test("failed job snapshots summarize structured errors without duplicating diagnostics", () => {
+  const response = buildToolResponse({
+    success: true,
+    jobId: "job-compile",
+    jobType: "execute-code",
+    status: "failed",
+    error: {
+      success: false,
+      errorCode: "execute_code_compilation_failed",
+      error: "Compilation failed",
+      retryable: false,
+      errors: ["CS0103: MissingName"],
+      userCodeExecuted: false,
+    },
+  });
+
+  assert.equal(response.isError, undefined,
+    "jobs/get succeeded even though the job it inspected failed");
+  assert.equal(response.content[0].text,
+    "execute-code job job-compile failed: execute_code_compilation_failed: Compilation failed");
+  assert.deepEqual(response.structuredContent.result.error.errors,
+    ["CS0103: MissingName"]);
+  assert.doesNotMatch(response.content[0].text, /Dictionary/);
+  assert.doesNotMatch(response.content[0].text, /CS0103/,
+    "compiler detail belongs in structuredContent, not the concise text channel");
+});
+
 test("successful internal bridge envelopes are removed from public tool replies", () => {
   assert.equal(
     compactSuccessfulToolResult('{"success":true,"data":{"value":3}}'),

@@ -24,6 +24,7 @@ export const STATIC_FIRST_CLASS_PLUGIN_ROUTES = [
   "serialized-object/set",
   "prefab-asset/configure-component",
   "component/set-reference",
+  "asset/copy",
   "asset/get-refresh-job",
   "asset/rename",
   "asset/move",

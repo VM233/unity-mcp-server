@@ -1,6 +1,6 @@
 {
   "name": "anklebreaker-unity-mcp",
-  "version": "4.4.4",
+  "version": "4.4.5",
   "description": "Multi-agent Unity MCP server with structuredContent, output schemas, selected-instance binding, persistent jobs, and live plugin metadata.",
   "type": "module",
   "main": "src/index.js",
