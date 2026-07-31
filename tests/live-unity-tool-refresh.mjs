@@ -127,7 +127,9 @@ try {
   const refreshed = await client.listTools();
   const refreshedChars = JSON.stringify(refreshed).length;
   for (const toolName of [
+    "unity_jobs_get",
     "unity_jobs_cancel",
+    "unity_jobs_cleanup",
     "unity_asset_import_settings_get",
     "unity_asset_import_settings_set",
     "unity_scene_workspace",
@@ -135,6 +137,22 @@ try {
     "unity_material_properties_set",
   ]) {
     assertEditorBindingSchema(refreshed.tools, toolName);
+  }
+  for (const toolName of [
+    "unity_jobs_get",
+    "unity_jobs_cancel",
+    "unity_jobs_cleanup",
+  ]) {
+    const tool = refreshed.tools.find((candidate) => candidate.name === toolName);
+    const jobResult = tool.outputSchema.properties.result;
+    const jobProperties = jobResult.properties;
+    assert.equal(jobProperties.tags.type, "array", `${toolName} tags schema`);
+    assert.equal(jobProperties.sideEffects.type, "array",
+      `${toolName} sideEffects schema`);
+    for (const [name, schema] of Object.entries(jobProperties)) {
+      assert.ok(schema.description?.trim(),
+        `${toolName} output property ${name} needs a description`);
+    }
   }
   assert.equal(refreshed.tools.some((tool) =>
     tool.name === "unity_testing_run_package_tests"), false);
