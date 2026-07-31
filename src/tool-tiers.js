@@ -29,14 +29,16 @@ import { logDebug } from "./logger.js";
 import { createToolError } from "./tool-response.js";
 import { auditSchema } from "./tool-schema-audit.js";
 
-const PLUGIN_TOOLS_CACHE_SCHEMA_VERSION = 5;
+const PLUGIN_TOOLS_CACHE_SCHEMA_VERSION = 6;
 const PLUGIN_TOOLS_CACHE_FILE = join(
   dirname(CONFIG.instanceRegistryPath),
-  "plugin-tools-metadata-cache-v5.json"
+  "plugin-tools-metadata-cache-v6.json"
 );
 const PLUGIN_TOOLS_LIVE_REFRESH_INTERVAL_MS = 10_000;
 const STATIC_FIRST_CLASS_PLUGIN_ROUTE_SET =
   new Set(STATIC_FIRST_CLASS_PLUGIN_ROUTES);
+const RELEASE_MANAGED_PLUGIN_TOOLS_FINGERPRINT =
+  pluginToolsFingerprint(staticFirstClassPluginTools);
 
 let livePluginToolsCache = null;
 let livePluginToolsFetchedAt = 0;
@@ -139,8 +141,7 @@ function loadPluginToolsCache() {
   try {
     if (existsSync(PLUGIN_TOOLS_CACHE_FILE)) {
       const data = JSON.parse(readFileSync(PLUGIN_TOOLS_CACHE_FILE, "utf-8"));
-      if (data?.schemaVersion === PLUGIN_TOOLS_CACHE_SCHEMA_VERSION &&
-          Array.isArray(data.tools)) {
+      if (isPluginToolsCacheCompatible(data)) {
         return data.tools;
       }
     }
@@ -150,17 +151,28 @@ function loadPluginToolsCache() {
   return [];
 }
 
+export function isPluginToolsCacheCompatible(data) {
+  return data?.schemaVersion === PLUGIN_TOOLS_CACHE_SCHEMA_VERSION &&
+    data?.releaseFingerprint === RELEASE_MANAGED_PLUGIN_TOOLS_FINGERPRINT &&
+    Array.isArray(data?.tools);
+}
+
+export function createPluginToolsCachePayload(tools, updatedAt = Date.now()) {
+  return {
+    schemaVersion: PLUGIN_TOOLS_CACHE_SCHEMA_VERSION,
+    releaseFingerprint: RELEASE_MANAGED_PLUGIN_TOOLS_FINGERPRINT,
+    updatedAt,
+    tools,
+  };
+}
+
 function savePluginToolsCache(tools) {
   if (Array.isArray(tools) && tools.length > 0) {
     try {
       mkdirSync(dirname(PLUGIN_TOOLS_CACHE_FILE), { recursive: true });
       writeFileSync(
         PLUGIN_TOOLS_CACHE_FILE,
-        JSON.stringify({
-          schemaVersion: PLUGIN_TOOLS_CACHE_SCHEMA_VERSION,
-          updatedAt: Date.now(),
-          tools,
-        })
+        JSON.stringify(createPluginToolsCachePayload(tools))
       );
     } catch {
       // Live metadata remains usable even when the disk cache cannot be written.

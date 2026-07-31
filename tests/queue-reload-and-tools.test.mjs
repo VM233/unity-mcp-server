@@ -29,8 +29,10 @@ import { instanceTools } from "../src/tools/instance-tools.js";
 import { contextTools } from "../src/tools/context-tools.js";
 import { staticFirstClassPluginTools } from "../src/tools/plugin-first-class-tools.js";
 import {
+  createPluginToolsCachePayload,
   createAdvertisedToolRegistry,
   invokeFirstClassPluginRoute,
+  isPluginToolsCacheCompatible,
   pluginToolsFingerprint,
   splitToolTiers,
 } from "../src/tool-tiers.js";
@@ -588,6 +590,22 @@ test("plugin tool metadata fingerprint is order independent and schema sensitive
   assert.notEqual(pluginToolsFingerprint(first), pluginToolsFingerprint(changed));
 });
 
+test("cold-start plugin metadata cache is bound to the release snapshot", () => {
+  const current = createPluginToolsCachePayload([
+    { toolName: "unity_prefab_asset_configure_component" },
+  ], 1234);
+
+  assert.equal(isPluginToolsCacheCompatible(current), true);
+  assert.equal(isPluginToolsCacheCompatible({
+    ...current,
+    releaseFingerprint: "stale-release-snapshot",
+  }), false);
+  assert.equal(isPluginToolsCacheCompatible({
+    ...current,
+    schemaVersion: current.schemaVersion - 1,
+  }), false);
+});
+
 test("advertised tools remain callable across volatile instance catalog refreshes", () => {
   const core = { name: "unity_editor_ping", handler: () => "pong" };
   const battleToolV1 = {
@@ -714,6 +732,7 @@ test("default tool surface stays bounded and exposes only canonical consolidated
   const configureComponent = exposedByName.get("unity_prefab_asset_configure_component");
   assert.ok(configureComponent);
   assert.deepEqual(configureComponent.inputSchema.required, ["assetPath", "componentType"]);
+  assert.ok(configureComponent.inputSchema.properties.createPathIfMissing);
   assert.ok(configureComponent.inputSchema.properties.properties);
   assert.ok(configureComponent.inputSchema.properties.references.items.properties.referenceAssetPath);
 

@@ -129,9 +129,11 @@ summary, so clients no longer need to parse JSON out of a text block.
 Release validation audits every declared input and output schema, including
 array item shapes and property descriptions; malformed live metadata cannot be
 promoted into the static first-class tool catalog. Release-managed schemas also
-remain authoritative when a cold-start disk cache contains an invalid live
-schema, so callers never need to wait for background metadata refresh to obtain
-a valid Job contract. Composition branches inherit the containing object's
+remain authoritative when a cold-start disk cache belongs to an older release
+snapshot, even if that cached schema is otherwise valid. The cache is bound to
+the generated release fingerprint, so callers never need to wait for background
+metadata refresh to obtain newly published arguments. Composition branches
+inherit the containing object's
 declared property contracts during release auditing, so conditional schemas do
 not need to duplicate descriptions merely to constrain or require a field.
 
