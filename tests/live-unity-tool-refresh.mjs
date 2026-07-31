@@ -21,6 +21,24 @@ writeFileSync(cachePath, JSON.stringify({
     tags: ["firstClass"],
     description: "Stale test metadata.",
     inputSchema: { type: "object", properties: {} },
+  }, {
+    route: "jobs/get",
+    toolName: "unity_jobs_get",
+    tags: ["firstClass"],
+    description: "Stale Job metadata with a malformed output schema.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        jobId: { type: "string", description: "Job identifier." },
+      },
+      required: ["jobId"],
+    },
+    outputSchema: {
+      type: "object",
+      properties: {
+        tags: ["[type, array]"],
+      },
+    },
   }],
 }));
 
@@ -120,6 +138,14 @@ try {
   ]) {
     assert.equal(initial.tools.some((tool) => tool.name === toolName), true);
   }
+  const initialJobsGet = initial.tools.find(
+    (tool) => tool.name === "unity_jobs_get");
+  assert.ok(initialJobsGet);
+  assert.equal(
+    initialJobsGet.outputSchema.properties.result.properties.tags.type,
+    "array",
+    "malformed cached Job metadata must not replace the release schema"
+  );
   assert.equal(initial.tools.some((tool) => tool.name.startsWith("unity_uma_")), false);
 
   await withTimeout(listChanged, 60000, "tool list change notification timed out");

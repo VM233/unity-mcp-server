@@ -27,6 +27,7 @@ import { staticFirstClassPluginTools } from "./tools/plugin-first-class-tools.js
 import { STATIC_FIRST_CLASS_PLUGIN_ROUTES } from "./plugin-tool-policy.js";
 import { logDebug } from "./logger.js";
 import { createToolError } from "./tool-response.js";
+import { auditSchema } from "./tool-schema-audit.js";
 
 const PLUGIN_TOOLS_CACHE_SCHEMA_VERSION = 5;
 const PLUGIN_TOOLS_CACHE_FILE = join(
@@ -316,6 +317,11 @@ function isNonEmptyObject(value) {
     Object.keys(value).length > 0;
 }
 
+function isValidToolSchema(value, path) {
+  return isNonEmptyObject(value) &&
+    auditSchema(value, path).length === 0;
+}
+
 export function mergeFirstClassPluginToolMetadata(releaseManaged, live) {
   if (!releaseManaged) return live;
   if (!live) return releaseManaged;
@@ -326,10 +332,15 @@ export function mergeFirstClassPluginToolMetadata(releaseManaged, live) {
       merged[key] = releaseManaged[key];
     }
   }
-  for (const key of ["inputSchema", "outputSchema", "annotations"]) {
-    if (!isNonEmptyObject(live[key]) && isNonEmptyObject(releaseManaged[key])) {
+  for (const key of ["inputSchema", "outputSchema"]) {
+    if (!isValidToolSchema(live[key], `$.${key}`) &&
+        isNonEmptyObject(releaseManaged[key])) {
       merged[key] = releaseManaged[key];
     }
+  }
+  if (!isNonEmptyObject(live.annotations) &&
+      isNonEmptyObject(releaseManaged.annotations)) {
+    merged.annotations = releaseManaged.annotations;
   }
   return merged;
 }

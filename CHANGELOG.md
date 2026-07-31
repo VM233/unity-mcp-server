@@ -2,6 +2,16 @@
 
 All notable changes to this package will be documented in this file.
 
+## [4.4.3] - 2026-07-31
+
+### Fixed
+- Validate live and disk-cached first-class input/output schemas before merging
+  them over release-managed descriptors. A stale malformed cache can no longer
+  corrupt Job contracts during the cold-start window before Unity refreshes
+  metadata.
+- Cover malformed cold-start Job metadata through the public MCP
+  `tools/list` surface.
+
 ## [4.4.2] - 2026-07-31
 
 ### Fixed

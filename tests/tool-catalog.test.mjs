@@ -85,6 +85,28 @@ test("incomplete live metadata cannot erase a release-managed build schema", () 
   assert.deepEqual(merged.outputSchema, buildSnapshot.outputSchema);
 });
 
+test("malformed cached metadata cannot erase a release-managed Job schema", () => {
+  const jobSnapshot = staticFirstClassPluginTools.find(
+    (tool) => tool.toolName === "unity_jobs_get");
+  assert.ok(jobSnapshot);
+
+  const merged = mergeFirstClassPluginToolMetadata(jobSnapshot, {
+    ...jobSnapshot,
+    description: "Live Job metadata with a corrupted output schema.",
+    outputSchema: {
+      type: "object",
+      properties: {
+        tags: ["[type, array]"],
+      },
+    },
+  });
+
+  assert.equal(merged.description,
+    "Live Job metadata with a corrupted output schema.");
+  assert.deepEqual(merged.outputSchema, jobSnapshot.outputSchema);
+  assert.equal(merged.outputSchema.properties.tags.type, "array");
+});
+
 test("editor state declares its compact process-state contract", () => {
   const editorState = editorTools.find((tool) => tool.name === "unity_editor_state");
   assert.ok(editorState);

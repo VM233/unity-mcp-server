@@ -128,7 +128,10 @@ envelope. The text content is intentionally only a short human-readable
 summary, so clients no longer need to parse JSON out of a text block.
 Release validation audits every declared input and output schema, including
 array item shapes and property descriptions; malformed live metadata cannot be
-promoted into the static first-class tool catalog.
+promoted into the static first-class tool catalog. Release-managed schemas also
+remain authoritative when a cold-start disk cache contains an invalid live
+schema, so callers never need to wait for background metadata refresh to obtain
+a valid Job contract.
 
 Tool metadata uses schema-v5 presence semantics: positive capabilities are
 sorted strings in `tags`, missing tags mean false, and mutations are described

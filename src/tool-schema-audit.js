@@ -85,6 +85,12 @@ function auditSchemaNode(schema, path, issues, { isProperty = false } = {}) {
   }
 }
 
+export function auditSchema(schema, path = "$.schema") {
+  const issues = [];
+  auditSchemaNode(schema, path, issues);
+  return issues;
+}
+
 export function auditToolDescriptor(tool, { requireRoute = false } = {}) {
   const issues = [];
   const name = tool?.name || tool?.toolName;
@@ -113,9 +119,9 @@ export function auditToolDescriptor(tool, { requireRoute = false } = {}) {
     );
   }
 
-  auditSchemaNode(tool?.inputSchema, "$.inputSchema", issues);
+  issues.push(...auditSchema(tool?.inputSchema, "$.inputSchema"));
   if (tool?.outputSchema !== undefined && tool?.outputSchema !== null) {
-    auditSchemaNode(tool.outputSchema, "$.outputSchema", issues);
+    issues.push(...auditSchema(tool.outputSchema, "$.outputSchema"));
   }
   return issues;
 }
