@@ -505,6 +505,10 @@ export async function buildQueuePollTimeoutResult(ticketId, command, timeoutMs, 
 
   const queueInfo = await fetchQueueInfoRaw()
     .catch((error) => ({ success: false, error: error.message }));
+  const nextToolArgs = {
+    tool: "unity_queue_ticket_status",
+    params: { ticketId },
+  };
 
   return {
     success: false,
@@ -512,7 +516,7 @@ export async function buildQueuePollTimeoutResult(ticketId, command, timeoutMs, 
     errorCode: "queue_poll_timeout",
     error:
       `Queue polling timed out after ${timeoutMs}ms for ticket ${ticketId}. ` +
-      "Inspect the existing ticket before retrying the command.",
+      "Inspect the existing ticket with unity_advanced_tool before retrying the command.",
     ticketId,
     command,
     pollTimedOut: true,
@@ -522,7 +526,8 @@ export async function buildQueuePollTimeoutResult(ticketId, command, timeoutMs, 
     reloadRecoveryElapsedMs: timing.reloadRecoveryElapsedMs ?? 0,
     lastKnownTicket: summarizeFinalTicketStatus(finalStatus),
     queueState: summarizeQueueState(queueInfo),
-    nextTool: "unity_queue_ticket_status",
+    nextTool: "unity_advanced_tool",
+    nextToolArgs,
   };
 }
 

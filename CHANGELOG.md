@@ -2,6 +2,14 @@
 
 All notable changes to this package will be documented in this file.
 
+## [4.4.10] - 2026-08-01
+
+### Fixed
+- Route queue-poll timeout recovery through the exposed
+  `unity_advanced_tool` entrypoint and return its exact machine-readable
+  arguments. The timeout no longer directs clients to call the intentionally
+  internalized `unity_queue_ticket_status` tool as if it were exposed.
+
 ## [4.4.9] - 2026-08-01
 
 ### Changed

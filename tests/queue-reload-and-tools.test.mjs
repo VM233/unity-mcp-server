@@ -599,9 +599,21 @@ test("a non-terminal queue ticket remains a timeout failure", async () => {
     assert.equal(result.success, false);
     assert.equal(result.errorCode, "queue_poll_timeout");
     assert.equal(result.retryable, false);
-    assert.equal(result.nextTool, "unity_queue_ticket_status");
+    assert.match(result.error, /unity_advanced_tool/);
+    assert.equal(result.nextTool, "unity_advanced_tool");
+    assert.deepEqual(result.nextToolArgs, {
+      tool: "unity_queue_ticket_status",
+      params: { ticketId: 71 },
+    });
     assert.equal(result.lastKnownTicket.status, "Queued");
     assert.equal(result.queueState.totalQueued, 1);
+
+    const { metaTools } = splitToolTiers(editorTools);
+    const advancedTool = metaTools.find((tool) => tool.name === result.nextTool);
+    const recovered = JSON.parse(await advancedTool.handler(result.nextToolArgs));
+    assert.equal(recovered.success, true);
+    assert.equal(recovered.data.ticketId, 71);
+    assert.equal(recovered.data.status, "Queued");
   } finally {
     globalThis.fetch = originalFetch;
   }

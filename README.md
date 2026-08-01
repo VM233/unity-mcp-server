@@ -114,6 +114,12 @@ This keeps the tool count manageable while preserving access to every Unity feat
 
 Use `params` for the tool or route arguments. This lets new Unity plugin routes run before the MCP client's tool list has refreshed.
 
+If automatic queue polling reaches its bounded timeout, do not resubmit the
+original operation while its ticket is still active. The timeout result returns
+`nextTool: "unity_advanced_tool"` and exact `nextToolArgs` that query the
+internal `unity_queue_ticket_status` control through the callable advanced
+entrypoint. Inspect that ticket first, then decide whether any retry is needed.
+
 Project-defined tools use a separate three-stage contract:
 
 1. `unity_project_tools_list` returns compact names, descriptions,
