@@ -1327,7 +1327,15 @@
               },
               "referenceAssetPath": {
                 "type": "string",
-                "description": "Project asset path to assign."
+                "description": "Project asset path to assign. Ambiguous compatible objects require an exact subasset selector."
+              },
+              "referenceSubAssetName": {
+                "type": "string",
+                "description": "Optional exact object name within referenceAssetPath."
+              },
+              "referenceSubAssetLocalId": {
+                "type": "string",
+                "description": "Optional exact local file ID within referenceAssetPath, encoded as a decimal string."
               },
               "referencePrefabPath": {
                 "type": "string",
@@ -1603,7 +1611,7 @@
     "toolName": "unity_asset_rename",
     "route": "asset/rename",
     "category": "asset",
-    "description": "Safely rename a Unity asset using AssetDatabase while preserving its .meta GUID and synchronizing Single Sprite internal names.",
+    "description": "Safely rename a Unity asset using AssetDatabase while preserving its .meta GUID, synchronizing Single Sprite names, and renaming matching Multiple Sprite prefixes without changing Sprite IDs.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -1639,7 +1647,7 @@
     "toolName": "unity_asset_move",
     "route": "asset/move",
     "category": "asset",
-    "description": "Preflight and move one or more Unity assets with configurable execution, GUID preservation, Single Sprite internal-name synchronization when filenames change, and rollback.",
+    "description": "Preflight and move one or more Unity assets with configurable execution, GUID preservation, Sprite internal-name synchronization when filenames change, Multiple Sprite ID preservation, and rollback.",
     "inputSchema": {
       "type": "object",
       "properties": {

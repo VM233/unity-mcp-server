@@ -2,6 +2,15 @@
 
 All notable changes to this package will be documented in this file.
 
+## [4.4.9] - 2026-08-01
+
+### Changed
+- Synchronize the release-managed Unity plugin snapshot with exact subasset
+  selectors for component references and the current Sprite-preserving asset
+  rename and move contracts.
+- Regenerate the public manifest tool descriptions from that authoritative
+  snapshot.
+
 ## [4.4.8] - 2026-07-31
 
 ### Fixed
