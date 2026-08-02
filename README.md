@@ -4,7 +4,7 @@
 
 # Unity MCP Server AI-Powered Unity Editor & Hub Control
 
-> **The most comprehensive [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server for Unity game development.** Connect Claude, Cursor, Windsurf, or any MCP-compatible AI assistant to **Unity Editor** and **Unity Hub** with hundreds of tools across **30+ categories**. Built and maintained by [AnkleBreaker Studio](https://github.com/AnkleBreaker-Studio).
+> **The most comprehensive [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server for Unity game development.** Connect Claude, Codex, Cursor, Windsurf, or any MCP-compatible AI assistant to **Unity Editor** and **Unity Hub** with hundreds of tools across **30+ categories**. Originally created by [AnkleBreaker Studio](https://github.com/AnkleBreaker-Studio); this repository is independently maintained and retains the required attribution.
 
 **AnkleBreaker Unity MCP** turns your AI assistant into a full Unity co-pilot — create scenes, manipulate GameObjects, manage components, run builds, profile performance, edit Shader Graphs, sculpt terrain, bake NavMesh, manage animations, run multiplayer playmode scenarios, and much more — all without leaving your AI chat. Works with Claude Desktop, Claude Cowork, Cursor, Windsurf, and any tool that supports the Model Context Protocol.
 
@@ -80,6 +80,7 @@
 | **Multi-Agent** | List active agents, get agent action logs, queue monitoring |
 | **SpriteAtlas** | Create, inspect, add/remove sprites, configure settings, delete, list SpriteAtlases |
 | **Project Context** | Auto-inject project-specific docs and guidelines for AI agents |
+| **Server Runtime** | Hot-reload implementation updates while preserving the host's stdio connection and active agent identity |
 
 ## Architecture
 
@@ -239,7 +240,28 @@ Open Claude Desktop > Settings > Developer > Edit Config, and add:
 }
 ```
 
-Restart Claude Desktop. Done!
+Restart the MCP host once after first installing this launcher. Done!
+
+### Server Hot Reload
+
+Starting with 4.4.14, `src/index.js` is a stable stdio launcher. It watches the
+server implementation under `src/` plus package metadata, starts an updated
+runtime beside the current one, replays the existing MCP initialization, and
+switches only after the candidate is ready. Codex, Claude Desktop, and other
+stdio hosts keep the same process and connection.
+
+- In-flight requests drain before a reload; they are never replayed by the
+  launcher.
+- A syntax or startup failure leaves the previous runtime active.
+- Successful activation emits `notifications/tools/list_changed`, so changed
+  tool implementations and schemas become visible in the current session.
+- The Unity queue agent identity remains stable across runtime generations.
+
+Upgrading from an older release requires one final host restart so the host is
+connected to the stable launcher. Later routine server updates hot-reload
+without restarting Codex. Changes to the launcher itself (`src/index.js` or
+`src/hot-reload-proxy.js`), startup environment variables, or the MCP
+capability envelope still require a host reconnect.
 
 ### 4. Try It
 
@@ -260,14 +282,17 @@ Restart Claude Desktop. Done!
 | `UNITY_HUB_PATH` | `C:\Program Files\Unity Hub\Unity Hub.exe` | Unity Hub executable path |
 | `UNITY_BRIDGE_HOST` | `127.0.0.1` | Editor bridge host |
 | `UNITY_BRIDGE_PORT` | `7890` | Editor bridge port (auto-discovered when using multi-instance) |
-| `UNITY_BRIDGE_TIMEOUT` | `30000` | Request timeout in ms |
+| `UNITY_BRIDGE_TIMEOUT` | `60000` | Request timeout in ms |
 | `UNITY_QUEUE_POLL_TIMEOUT` | `120000` | Active Editor processing-time budget for a queued request |
 | `UNITY_QUEUE_RELOAD_RECOVERY_TIMEOUT` | `120000` | Separate bounded budget for transient bridge outages during reload |
 | `UNITY_PORT_RANGE_START` | `7890` | Start of port scan range for multi-instance discovery |
 | `UNITY_PORT_RANGE_END` | `7899` | End of port scan range |
 | `UNITY_REGISTRY_STALENESS_TIMEOUT` | `300000` | Registry entry staleness timeout in ms (crash detection) |
-| `UNITY_RESPONSE_SOFT_LIMIT` | `2097152` | Response size threshold that emits a server-side diagnostic |
-| `UNITY_RESPONSE_HARD_LIMIT` | `4194304` | Response size limit; oversized payloads become a structured error |
+| `UNITY_RESPONSE_SOFT_LIMIT` | `524288` | Response size threshold that emits a server-side diagnostic |
+| `UNITY_RESPONSE_HARD_LIMIT` | `2097152` | Response size limit; oversized payloads become a structured error |
+| `UNITY_MCP_HOT_RELOAD` | `true` | Keep the host stdio process stable and reload changed server implementation files |
+| `UNITY_MCP_HOT_RELOAD_DEBOUNCE_MS` | `250` | File-change debounce before preparing a replacement runtime |
+| `UNITY_MCP_HOT_RELOAD_INIT_TIMEOUT_MS` | `10000` | Candidate runtime initialization timeout before retaining the previous runtime |
 | `UNITY_MCP_DEBUG` | `false` | Enable debug logging for troubleshooting |
 
 The Unity package stores team defaults under **Project Settings > Unity MCP**

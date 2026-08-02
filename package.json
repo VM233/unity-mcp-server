@@ -1,7 +1,7 @@
 {
   "name": "anklebreaker-unity-mcp",
-  "version": "4.4.13",
-  "description": "Multi-agent Unity MCP server with structuredContent, output schemas, selected-instance binding, persistent jobs, and live plugin metadata.",
+  "version": "4.4.14",
+  "description": "Hot-reloadable multi-agent Unity MCP server with stable stdio, structuredContent, selected-instance binding, persistent jobs, and live plugin metadata.",
   "type": "module",
   "main": "src/index.js",
   "bin": {
@@ -9,7 +9,7 @@
   },
   "scripts": {
     "start": "node src/index.js",
-    "dev": "node --watch src/index.js",
+    "dev": "node src/index.js",
     "test": "node scripts/sync-manifest-tools.mjs --check && node --test tests/*.test.mjs",
     "audit:tools": "node scripts/generate-tool-audit-report.mjs",
     "sync:manifest-tools": "node scripts/sync-manifest-tools.mjs",
@@ -21,11 +21,13 @@
     "test:refresh-recovery": "node tests/live-unity-asset-refresh-recovery.mjs",
     "test:refresh-job-reload": "node tests/live-unity-refresh-job-reload.mjs",
     "test:reload": "node tests/live-unity-reload-replay.mjs",
+    "test:server-hot-reload": "node --test tests/hot-reload-proxy.test.mjs",
     "pack": "npx @anthropic-ai/mcpb pack . unity-mcp.mcpb && npx @anthropic-ai/mcpb clean unity-mcp.mcpb"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0"
   },
+  "license": "SEE LICENSE IN LICENSE",
   "engines": {
     "node": ">=18.0.0"
   }

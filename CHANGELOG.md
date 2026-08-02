@@ -2,6 +2,25 @@
 
 All notable changes to this package will be documented in this file.
 
+## [4.4.14] - 2026-08-02
+
+### Added
+- Keep the MCP host's stdio connection in a stable launcher while server
+  implementation files hot-reload in a replaceable child runtime. The launcher
+  drains active requests, preserves the queue agent identity, replays the
+  negotiated MCP initialization, atomically activates a ready candidate, and
+  emits `tools/list_changed` without requiring a Codex restart.
+- Reject broken candidate runtimes without interrupting the active generation;
+  unexpected runtime exits now recover behind the same host connection and
+  return a fail-closed result for requests whose outcome is no longer known.
+
+### Documentation
+- Document the one-time launcher migration, hot-reload boundaries, and runtime
+  configuration. Correct the published bridge/response defaults.
+- Point repository, documentation, and support metadata at the independently
+  maintained `VM233/unity-mcp-server` repository, while retaining the original
+  author attribution and declaring the actual AnkleBreaker Open License.
+
 ## [4.4.13] - 2026-08-02
 
 ### Fixed
