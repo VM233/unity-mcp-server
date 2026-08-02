@@ -5,10 +5,8 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 
 const serverRoot = resolve(new URL("..", import.meta.url).pathname.replace(/^\/(.:)/, "$1"));
-const port = Number(process.env.UNITY_BRIDGE_PORT);
 const projectPath = process.env.UNITY_EXPECTED_PROJECT_PATH;
 const assetPath = process.env.UNITY_REFRESH_ASSET_PATH;
-assert.ok(Number.isFinite(port), "UNITY_BRIDGE_PORT is required");
 assert.ok(projectPath, "UNITY_EXPECTED_PROJECT_PATH is required");
 assert.ok(assetPath, "UNITY_REFRESH_ASSET_PATH is required");
 
@@ -56,7 +54,10 @@ async function call(name, args, label = name) {
 
 try {
   await client.connect(transport);
-  const binding = { port, expectedProjectPath: projectPath };
+  // The project path is authoritative. Omitting an explicit port lets this
+  // regression follow the same Editor if automatic port selection changes its
+  // transport address while scripts reload.
+  const binding = { expectedProjectPath: projectPath };
   const start = await call("unity_asset_refresh", {
     ...binding,
     assetPaths: [assetPath],
