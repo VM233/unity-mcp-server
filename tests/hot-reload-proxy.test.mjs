@@ -1,5 +1,10 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import test from "node:test";
@@ -8,6 +13,7 @@ import { fileURLToPath } from "node:url";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { ToolListChangedNotificationSchema } from "@modelcontextprotocol/sdk/types.js";
+import { createSourceWatcher } from "../src/hot-reload-proxy.js";
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const launcher = join(repositoryRoot, "src", "index.js");
@@ -23,6 +29,95 @@ function withTimeout(promise, timeoutMs, message) {
     }),
   ]).finally(() => clearTimeout(timer));
 }
+
+async function waitForCondition(predicate, message, timeoutMs = 3_000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (predicate()) return;
+    await new Promise((resolveDelay) => setTimeout(resolveDelay, 20));
+  }
+  assert.fail(message);
+}
+
+test("source watcher rescans independent directory trees", async () => {
+  const tempRoot = mkdtempSync(join(tmpdir(), "unity-mcp-source-watcher-trees-"));
+  const firstRoot = join(tempRoot, "first");
+  const secondRoot = join(tempRoot, "second");
+  mkdirSync(firstRoot);
+  mkdirSync(secondRoot);
+
+  const changedPaths = [];
+  const watcherErrors = [];
+  const watcher = createSourceWatcher(
+    [firstRoot, secondRoot],
+    (changedPath) => changedPaths.push(resolve(changedPath)),
+    {
+      onError: (error) => watcherErrors.push(error),
+      rescanDelayMs: 25,
+    }
+  );
+
+  try {
+    const firstChild = join(firstRoot, "generated");
+    const secondChild = join(secondRoot, "generated");
+    mkdirSync(firstChild);
+    mkdirSync(secondChild);
+    await new Promise((resolveDelay) => setTimeout(resolveDelay, 100));
+
+    changedPaths.length = 0;
+    const firstFile = resolve(firstChild, "first.js");
+    const secondFile = resolve(secondChild, "second.js");
+    writeFileSync(firstFile, "first");
+    writeFileSync(secondFile, "second");
+
+    await waitForCondition(
+      () => changedPaths.includes(firstFile) && changedPaths.includes(secondFile),
+      `new directories were not watched: ${JSON.stringify(changedPaths)}`
+    );
+    assert.deepEqual(watcherErrors, []);
+  } finally {
+    watcher.close();
+    rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test("source watcher replaces stale watchers after directory recreation", async () => {
+  const tempRoot = mkdtempSync(join(tmpdir(), "unity-mcp-source-watcher-recreate-"));
+  const child = join(tempRoot, "generated");
+  mkdirSync(child);
+
+  const changedPaths = [];
+  const watcherErrors = [];
+  const watcher = createSourceWatcher(
+    [tempRoot],
+    (changedPath) => changedPaths.push(resolve(changedPath)),
+    {
+      onError: (error) => watcherErrors.push(error),
+      rescanDelayMs: 25,
+    }
+  );
+
+  try {
+    rmSync(child, { recursive: true, force: true });
+    await new Promise((resolveDelay) => setTimeout(resolveDelay, 100));
+    mkdirSync(child);
+    await new Promise((resolveDelay) => setTimeout(resolveDelay, 100));
+
+    const lifecycleChanges = [...changedPaths];
+    changedPaths.length = 0;
+    const recreatedFile = resolve(child, "recreated.js");
+    writeFileSync(recreatedFile, "recreated");
+    await waitForCondition(
+      () => changedPaths.includes(recreatedFile),
+      `recreated directory was not watched: lifecycle=${JSON.stringify(lifecycleChanges.slice(0, 10))}, ` +
+        `writes=${JSON.stringify(changedPaths)}, errors=${watcherErrors.map(String)}`
+    );
+    assert.deepEqual(watcherErrors, []);
+  } finally {
+    watcher.close();
+    rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
 
 test("hot reload preserves one MCP stdio session and drains active requests", {
   timeout: 30_000,

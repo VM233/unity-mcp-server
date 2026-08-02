@@ -6,6 +6,7 @@
 // Also manages instance selection state for the current MCP session.
 
 import { readFileSync } from "fs";
+import process from "node:process";
 import { CONFIG } from "./config.js";
 import { debugLog } from "./state-persistence.js";
 import {
@@ -333,11 +334,11 @@ async function resolveInstanceContextForProjectPathOnce(projectPath) {
   ) || null;
 }
 
-export function normalizeProjectPath(projectPath) {
-  return String(projectPath || "")
+export function normalizeProjectPath(projectPath, platform = process.platform) {
+  const normalized = String(projectPath || "")
     .replace(/\\/g, "/")
-    .replace(/\/+$/, "")
-    .toLowerCase();
+    .replace(/\/+$/, "");
+  return platform === "win32" ? normalized.toLowerCase() : normalized;
 }
 
 function newestRegistryEntry(entries) {

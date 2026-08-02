@@ -70,6 +70,12 @@ function writeMessage(stream, message) {
 }
 
 function collectDirectories(root, results = []) {
+  try {
+    if (!statSync(root).isDirectory()) return results;
+  } catch {
+    return results;
+  }
+
   results.push(root);
   let entries = [];
   try {
@@ -94,29 +100,37 @@ function collectDirectories(root, results = []) {
 export function createSourceWatcher(paths, onChange, {
   ignoredPaths = [],
   onError = () => {},
+  rescanDelayMs = 50,
 } = {}) {
   const ignored = new Set(ignoredPaths.map(normalizePath));
-  const watchers = new Map();
+  const fileWatchers = new Map();
+  const directoryTrees = [];
   let closed = false;
-  let rescanTimer = null;
 
   const isIgnored = (path) => ignored.has(normalizePath(path));
 
-  const addWatcher = (key, directory, filter, rescan) => {
+  const addWatcher = (watchers, key, directory, filter, scheduleRescan) => {
     if (closed || watchers.has(key)) return;
     try {
       const watcher = watch(directory, { persistent: false }, (eventType, fileName) => {
         const changedPath = fileName ? resolve(directory, String(fileName)) : directory;
         if ((!filter || filter(changedPath)) && !isIgnored(changedPath)) {
-          onChange(changedPath, eventType);
+          try {
+            onChange(changedPath, eventType);
+          } catch (error) {
+            onError(error);
+          }
         }
-        if (eventType === "rename" && rescan) {
-          clearTimeout(rescanTimer);
-          rescanTimer = setTimeout(rescan, 50);
-          rescanTimer.unref?.();
+        if (eventType === "rename" && scheduleRescan) {
+          scheduleRescan();
         }
       });
-      watcher.on("error", (error) => onError(error));
+      watcher.on("error", (error) => {
+        if (watchers.get(key) === watcher) watchers.delete(key);
+        watcher.close();
+        onError(error);
+        scheduleRescan?.();
+      });
       watchers.set(key, watcher);
     } catch (error) {
       onError(error);
@@ -124,10 +138,34 @@ export function createSourceWatcher(paths, onChange, {
   };
 
   const addDirectoryTree = (root) => {
+    const tree = {
+      rescanTimer: null,
+      watchers: new Map(),
+    };
+    directoryTrees.push(tree);
+
+    const scheduleScan = () => {
+      if (closed || tree.rescanTimer) return;
+      tree.rescanTimer = setTimeout(scan, rescanDelayMs);
+      tree.rescanTimer.unref?.();
+    };
+
     const scan = () => {
-      for (const directory of collectDirectories(root, [])) {
-        const key = `directory:${normalizePath(directory)}`;
-        addWatcher(key, directory, null, scan);
+      tree.rescanTimer = null;
+      if (closed) return;
+
+      const directories = collectDirectories(root, []);
+      const currentKeys = new Set(directories.map(normalizePath));
+      for (const [key, watcher] of tree.watchers) {
+        if (!currentKeys.has(key)) {
+          watcher.close();
+          tree.watchers.delete(key);
+        }
+      }
+
+      for (const directory of directories) {
+        const key = normalizePath(directory);
+        addWatcher(tree.watchers, key, directory, null, scheduleScan);
       }
     };
     scan();
@@ -150,6 +188,7 @@ export function createSourceWatcher(paths, onChange, {
     const parent = dirname(target);
     const normalizedTarget = normalizePath(target);
     addWatcher(
+      fileWatchers,
       `file:${normalizedTarget}`,
       parent,
       (changedPath) => normalizePath(changedPath) === normalizedTarget,
@@ -160,9 +199,13 @@ export function createSourceWatcher(paths, onChange, {
   return {
     close() {
       closed = true;
-      clearTimeout(rescanTimer);
-      for (const watcher of watchers.values()) watcher.close();
-      watchers.clear();
+      for (const tree of directoryTrees) {
+        clearTimeout(tree.rescanTimer);
+        for (const watcher of tree.watchers.values()) watcher.close();
+        tree.watchers.clear();
+      }
+      for (const watcher of fileWatchers.values()) watcher.close();
+      fileWatchers.clear();
     },
   };
 }

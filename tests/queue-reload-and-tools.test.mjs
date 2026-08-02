@@ -1012,8 +1012,24 @@ test("explicit project binding overrides stale discovered instance identity", ()
 
 test("project identity comparison accepts Windows slash and casing differences", () => {
   assert.equal(
-    normalizeProjectPath("D:\\UnityProjects\\BattleIdle\\apps\\game-client-unity\\"),
-    normalizeProjectPath("d:/unityprojects/battleidle/apps/game-client-unity")
+    normalizeProjectPath(
+      "D:\\UnityProjects\\BattleIdle\\apps\\game-client-unity\\", "win32"),
+    normalizeProjectPath(
+      "d:/unityprojects/battleidle/apps/game-client-unity", "win32")
+  );
+});
+
+test("project identity comparison preserves casing on case-sensitive hosts", () => {
+  for (const platform of ["linux", "darwin"]) {
+    assert.notEqual(
+      normalizeProjectPath("/Projects/BattleIdle", platform),
+      normalizeProjectPath("/projects/battleidle", platform),
+      platform
+    );
+  }
+  assert.equal(
+    normalizeProjectPath("/Projects/BattleIdle/", "linux"),
+    "/Projects/BattleIdle"
   );
 });
 

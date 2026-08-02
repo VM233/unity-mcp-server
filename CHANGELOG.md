@@ -2,6 +2,21 @@
 
 All notable changes to this package will be documented in this file.
 
+## [4.4.15] - 2026-08-02
+
+### Fixed
+- Keep source-tree rescans independent across multiple watch roots, remove stale
+  directory watchers, and reinstall them after a watched subdirectory is deleted
+  and recreated. Rename-event storms are coalesced without indefinitely
+  postponing the rescan.
+- Preserve project-path casing on case-sensitive hosts while retaining
+  case-insensitive Windows instance binding, preventing distinct POSIX Unity
+  projects from being treated as the same target.
+
+### Tests
+- Cover simultaneous watch-root expansion, directory recreation, and explicit
+  Windows, Linux, and macOS project-identity semantics.
+
 ## [4.4.14] - 2026-08-02
 
 ### Added

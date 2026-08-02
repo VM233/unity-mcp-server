@@ -256,12 +256,19 @@ stdio hosts keep the same process and connection.
 - Successful activation emits `notifications/tools/list_changed`, so changed
   tool implementations and schemas become visible in the current session.
 - The Unity queue agent identity remains stable across runtime generations.
+- Directory-tree watches are maintained independently per root. Newly created
+  subdirectories are enrolled, and deleted/recreated subdirectories replace their
+  stale watcher instead of silently dropping later source changes.
 
 Upgrading from an older release requires one final host restart so the host is
 connected to the stable launcher. Later routine server updates hot-reload
 without restarting Codex. Changes to the launcher itself (`src/index.js` or
 `src/hot-reload-proxy.js`), startup environment variables, or the MCP
 capability envelope still require a host reconnect.
+
+Instance binding normalizes slash direction on every host. Windows comparisons
+are case-insensitive; Linux and macOS comparisons preserve casing so two
+distinct case-sensitive project paths cannot be conflated.
 
 ### 4. Try It
 
