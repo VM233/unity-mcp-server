@@ -189,13 +189,13 @@ The server automatically discovers all running Unity Editor instances on startup
 
 **Port Resilience** — The server includes a multi-layer protection system for reliable multi-project workflows:
 
-- **Port Identity Validation** — When restoring a saved connection, the server verifies the instance identity (project name + path) matches the expected target. If Unity restarts and a different project grabs the port, the server detects this and re-discovers the correct instance.
+- **Port Identity Validation** — When restoring a saved connection, the server verifies the instance identity (project name + path) matches the expected target. If Unity restarts and a different project grabs the port, the server detects this and re-discovers the correct instance. An in-flight call whose port was derived from `expectedProjectPath` follows that same verified project to its newly registered port; a caller-supplied `port` remains immutable.
 - **Bound Mutations** — Every mutating request carries the selected instance's expected project path/name; the Editor rejects unbound or misrouted writes.
 - **Idempotent Queue Control** — Stable request keys survive retries, and `unity_queue_cancel` cancels queued work owned by the current agent without preempting an executing Unity API call.
 - **Persistent Code and Project Tools** — Execute-code and long project tools
   return durable Jobs with `jobs/get`, `jobs/cancel`, exact-argument
   `idempotencyKey` reuse, and explicit `jobs/cleanup` contracts.
-- **Queue-Only Reload Recovery** — Transient `queue/submit` 404 responses during package or domain reload retry with the same idempotency key; the server never switches later commands to unsupported direct execution endpoints.
+- **Queue-Only Reload Recovery** — Transient queue submission and status failures during package or domain reload first refresh a derived project-path binding, then retry with the same idempotency key. Initial project discovery keeps its own bounded timeout; it does not consume a long-running operation's reload budget before a target exists. The server never switches later commands to unsupported direct execution endpoints.
 - **Compile-Time Resilience** — During long Unity compiles (when the editor is unresponsive), the server checks the shared instance registry. If the registry entry is fresh (updated within the last 5 minutes via heartbeat), the connection is preserved instead of dropped.
 - **Reload Discovery Lease** — A fresh registered Editor remains listed with `status: "reloading"` and `isReachable: false` while its HTTP bridge restarts.
 - **Crash Detection** — The plugin sends a heartbeat every 30 seconds to the instance registry. If Unity crashes and the heartbeat stops, the server detects the stale registry entry (>5 minutes old) and clears it, allowing proper re-discovery.

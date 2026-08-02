@@ -2,6 +2,23 @@
 
 All notable changes to this package will be documented in this file.
 
+## [4.4.11] - 2026-08-02
+
+### Fixed
+- Re-resolve an in-flight `expectedProjectPath` binding when a Unity domain
+  reload moves the same project to another automatic bridge port. Queue status
+  polling and lost read-ticket replay now adopt the new verified address instead
+  of waiting on the stale pre-reload port until the client times out.
+- Keep an explicitly supplied `port` immutable; project-path recovery never
+  silently redirects an explicit target.
+- Give initial project discovery only its configured resolution budget instead
+  of inheriting a refresh or reload-reconnection timeout before a command has
+  acquired a Unity target.
+
+### Documentation
+- Document the distinction between authoritative project identity and a
+  replaceable derived transport port, including the in-flight reload contract.
+
 ## [4.4.10] - 2026-08-01
 
 ### Fixed

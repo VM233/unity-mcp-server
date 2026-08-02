@@ -9,9 +9,12 @@ import { readFileSync } from "fs";
 import { CONFIG } from "./config.js";
 import { debugLog } from "./state-persistence.js";
 import {
+  canRebindRequestProjectPath,
   getRequestAgentId,
+  getRequestExpectedProjectPath,
   getRequestPortOverride,
   getRequestTargetInstance,
+  replaceRequestTargetInstance,
 } from "./request-context.js";
 
 // ─── Per-Agent Session State ───
@@ -277,6 +280,37 @@ export async function resolveInstanceContextForProjectPath(projectPath, options 
       Math.min(pollIntervalMs, timeoutMs - elapsedMs)
     ));
   }
+}
+
+export async function refreshRequestProjectPathBinding() {
+  if (!canRebindRequestProjectPath()) return null;
+
+  const expectedProjectPath = getRequestExpectedProjectPath();
+  const previousTarget = getRequestTargetInstance();
+  const resolvedTarget = await resolveInstanceContextForProjectPath(
+    expectedProjectPath, { timeoutMs: 0 });
+  if (!resolvedTarget?.projectPath ||
+      normalizeProjectPath(resolvedTarget.projectPath) !==
+        normalizeProjectPath(expectedProjectPath)) {
+    return null;
+  }
+
+  if (!replaceRequestTargetInstance(resolvedTarget)) return null;
+
+  const changed = previousTarget?.port !== resolvedTarget.port;
+  if (changed) {
+    debugLog(
+      `Rebound in-flight project target ${expectedProjectPath} from port ` +
+      `${previousTarget?.port ?? "unknown"} to ${resolvedTarget.port}.`
+    );
+  }
+
+  return {
+    changed,
+    previousPort: previousTarget?.port ?? null,
+    port: resolvedTarget.port,
+    projectPath: resolvedTarget.projectPath,
+  };
 }
 
 async function resolveInstanceContextForProjectPathOnce(projectPath) {

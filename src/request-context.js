@@ -13,6 +13,7 @@ export function runWithRequestContext({
   targetInstance,
   expectedProjectPath,
   expectedProjectName,
+  allowProjectPathRebind = false,
 } = {}, callback) {
   const context = {
     agentId: agentId || defaultAgentId,
@@ -20,6 +21,7 @@ export function runWithRequestContext({
     targetInstance: targetInstance || null,
     expectedProjectPath: expectedProjectPath || null,
     expectedProjectName: expectedProjectName || null,
+    allowProjectPathRebind: Boolean(allowProjectPathRebind),
   };
   return requestContext.run(context, callback);
 }
@@ -42,4 +44,21 @@ export function getRequestExpectedProjectPath() {
 
 export function getRequestExpectedProjectName() {
   return requestContext.getStore()?.expectedProjectName || null;
+}
+
+export function canRebindRequestProjectPath() {
+  const context = requestContext.getStore();
+  return Boolean(context?.allowProjectPathRebind && context.expectedProjectPath);
+}
+
+export function replaceRequestTargetInstance(targetInstance) {
+  const context = requestContext.getStore();
+  if (!context?.allowProjectPathRebind ||
+      !Number.isFinite(targetInstance?.port)) {
+    return false;
+  }
+
+  context.portOverride = targetInstance.port;
+  context.targetInstance = targetInstance;
+  return true;
 }

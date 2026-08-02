@@ -38,7 +38,7 @@ import {
   sanitizeToolMetadata,
   splitToolTiers,
 } from "./tool-tiers.js";
-import { getProjectContext, getReloadReconnectBudgetMs } from "./unity-editor-bridge.js";
+import { getProjectContext } from "./unity-editor-bridge.js";
 import {
   autoSelectInstance,
   getSelectedInstance,
@@ -240,16 +240,6 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
 });
 
 // ─── Call Tool Handler ───
-const reloadSafeCommandByToolName = {
-  unity_asset_refresh: "asset/refresh",
-  unity_asset_get_refresh_job: "asset/get-refresh-job",
-  unity_wait_editor_idle: "wait/editor-idle",
-  unity_uitoolkit_refresh: "uitoolkit/refresh",
-  unity_testing_list_tests: "testing/list-tests",
-  unity_testing_get_job: "testing/get-job",
-  unity_testing_get_package_job: "testing/get-package-job",
-};
-
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
   const meta = request.params._meta || {};
@@ -263,16 +253,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const expectedProjectName = typeof args?.expectedProjectName === "string"
     ? args.expectedProjectName.trim()
     : "";
+  const allowProjectPathRebind = !portOverride && Boolean(expectedProjectPath);
 
   let targetInstance = portOverride
     ? await resolveInstanceContextForPort(portOverride)
     : null;
   if (!portOverride && expectedProjectPath) {
-    const reloadSafeCommand = reloadSafeCommandByToolName[name];
-    const projectResolveTimeoutMs = Math.max(
-      CONFIG.projectResolveTimeoutMs,
-      reloadSafeCommand ? getReloadReconnectBudgetMs(reloadSafeCommand, args || {}) : 0
-    );
+    const projectResolveTimeoutMs = CONFIG.projectResolveTimeoutMs;
     targetInstance = await resolveInstanceContextForProjectPath(expectedProjectPath, {
       timeoutMs: projectResolveTimeoutMs,
       pollIntervalMs: CONFIG.projectResolvePollIntervalMs,
@@ -309,6 +296,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     targetInstance,
     expectedProjectPath,
     expectedProjectName,
+    allowProjectPathRebind,
   }, async () => {
     let tool = null;
     try {

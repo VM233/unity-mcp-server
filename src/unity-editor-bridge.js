@@ -2,8 +2,13 @@
 // Communicates with the C# plugin running inside Unity Editor
 // Uses the async ticket queue exposed by the Unity Editor plugin.
 import { CONFIG } from "./config.js";
-import { getActiveBridgeUrl, getActiveInstanceContext } from "./instance-discovery.js";
 import {
+  getActiveBridgeUrl,
+  getActiveInstanceContext,
+  refreshRequestProjectPathBinding,
+} from "./instance-discovery.js";
+import {
+  canRebindRequestProjectPath,
   getRequestAgentId,
   getRequestExpectedProjectName,
   getRequestExpectedProjectPath,
@@ -13,6 +18,17 @@ import { logDebug, logWarn } from "./logger.js";
 // Dynamic bridge URL â€" resolved per-call based on selected instance
 function getBridgeUrl() {
   return getActiveBridgeUrl();
+}
+
+async function tryRefreshRequestProjectBinding() {
+  try {
+    return await refreshRequestProjectPathBinding();
+  } catch (error) {
+    logWarn(
+      `[MCP Bridge] Failed to refresh the request's project binding: ${error.message}`
+    );
+    return null;
+  }
 }
 
 function buildBridgeHeaders(additional = {}) {
@@ -407,6 +423,16 @@ export function isTransientQueueSubmitError(error) {
     isTransientError(error, null);
 }
 
+function mayIndicateStaleProjectBinding(failure) {
+  return Boolean(
+    failure?.retryable ||
+    Number(failure?.status) === 409 ||
+    Number(failure?.statusCode) === 409 ||
+    failure?.errorCode === "target_project_mismatch" ||
+    failure?.payload?.errorCode === "target_project_mismatch"
+  );
+}
+
 function shouldRetryTransientConnection(command, params, startedAt, retryCount) {
   const reconnectBudgetMs = getReloadReconnectBudgetMs(command, params);
   if (reconnectBudgetMs > 0) {
@@ -646,6 +672,22 @@ export async function pollQueueStatus(ticketId, command, params = {}) {
       const statusResult = await fetchQueueStatusRaw(ticketId);
 
       if (!statusResult.success) {
+        const bindingRecovery = canRebindRequestProjectPath() &&
+          mayIndicateStaleProjectBinding(statusResult);
+        const rebound = bindingRecovery
+          ? await tryRefreshRequestProjectBinding()
+          : null;
+        if (bindingRecovery && (rebound?.changed || !statusResult.retryable)) {
+          beginTransient(pollAttemptStartedAt);
+          sawTransientPollError = true;
+          const delay = capTransientDelay(Math.min(
+            POLL_TRANSIENT_RETRY_BASE_MS * Math.pow(1.5, transientRetryCount++),
+            maxIntervalMs
+          ));
+          await sleep(delay);
+          continue;
+        }
+
         if (statusResult.retryable) {
           beginTransient(pollAttemptStartedAt);
           sawTransientPollError = true;
@@ -719,6 +761,7 @@ export async function pollQueueStatus(ticketId, command, params = {}) {
       );
     } catch (error) {
       if (isTransientError(error, null)) {
+        await tryRefreshRequestProjectBinding();
         beginTransient(pollAttemptStartedAt);
         sawTransientPollError = true;
         const delay = capTransientDelay(Math.min(
@@ -821,7 +864,12 @@ export async function sendCommand(command, params = {}) {
         : result;
     } catch (submitError) {
       submitLastError = submitError;
-      if (isTransientQueueSubmitError(submitError) &&
+      const transientSubmitError = isTransientQueueSubmitError(submitError);
+      const bindingRecovery = canRebindRequestProjectPath() &&
+        mayIndicateStaleProjectBinding(submitError);
+      if (transientSubmitError || bindingRecovery)
+        await tryRefreshRequestProjectBinding();
+      if ((transientSubmitError || bindingRecovery) &&
           shouldRetryQueueSubmission(
             command, params, queueSubmitStartedAt, queueSubmitRetryCount,
             submitError)) {

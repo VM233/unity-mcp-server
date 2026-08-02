@@ -22,7 +22,11 @@ import {
 } from "../src/unity-editor-bridge.js";
 import { runWithRequestContext } from "../src/request-context.js";
 import { injectEditorBindingSchema } from "../src/tool-schema.js";
-import { discoverInstances, normalizeProjectPath } from "../src/instance-discovery.js";
+import {
+  discoverInstances,
+  normalizeProjectPath,
+  refreshRequestProjectPathBinding,
+} from "../src/instance-discovery.js";
 import { editorTools } from "../src/tools/editor-tools.js";
 import { hubTools } from "../src/tools/hub-tools.js";
 import { instanceTools } from "../src/tools/instance-tools.js";
@@ -407,6 +411,164 @@ test("reload-safe waits use their full command timeout instead of a fixed retry 
   assert.ok(getReloadReconnectBudgetMs("asset/get-refresh-job", {}) >= 300_000);
   assert.ok(getReloadReconnectBudgetMs("asset/get-refresh-job", { timeoutMs: 420_000 }) >= 420_000);
   assert.equal(getReloadReconnectBudgetMs("prefab-asset/remove-gameobject", {}), 0);
+});
+
+test("an in-flight project-path binding follows the same project to its reload port",
+  async (t) => {
+    const originalFetch = globalThis.fetch;
+    const originalRegistryPath = CONFIG.instanceRegistryPath;
+    const originalPollTimeout = CONFIG.queuePollTimeoutMs;
+    const originalRecoveryTimeout = CONFIG.queueReloadRecoveryTimeoutMs;
+    const originalPollInterval = CONFIG.queuePollIntervalMs;
+    const originalPollMax = CONFIG.queuePollMaxMs;
+    const projectPath = "D:/UnityProjects/ReloadedProject";
+    const oldPort = 32141;
+    const newPort = 32142;
+    const registryPath = join(
+      mkdtempSync(join(tmpdir(), "unity-mcp-project-rebind-")), "instances.json");
+
+    writeFileSync(registryPath, JSON.stringify([{
+      port: newPort,
+      projectPath,
+      projectName: "ReloadedProject",
+      lastSeen: new Date().toISOString(),
+    }]));
+    CONFIG.instanceRegistryPath = registryPath;
+    CONFIG.queuePollTimeoutMs = 500;
+    CONFIG.queueReloadRecoveryTimeoutMs = 2_000;
+    CONFIG.queuePollIntervalMs = 1;
+    CONFIG.queuePollMaxMs = 2;
+
+    try {
+      for (const staleSignal of ["disconnect", "project-mismatch"]) {
+        await t.test(staleSignal, async () => {
+          const submissions = [];
+          let oldTicketStatusRead = false;
+          let newTicketStatusReads = 0;
+
+          globalThis.fetch = async (url, options = {}) => {
+            const target = String(url);
+            if (target === `http://127.0.0.1:${newPort}/api/ping`) {
+              return Response.json({
+                projectPath,
+                projectName: "ReloadedProject",
+                queueReady: true,
+              });
+            }
+            if (target.endsWith("/api/queue/submit")) {
+              submissions.push({
+                target,
+                requestId: options.headers["Idempotency-Key"],
+                expectedProjectPath:
+                  options.headers["X-UnityMCP-Expected-Project-Path"],
+              });
+              return Response.json({ ticketId: submissions.length });
+            }
+            if (target ===
+                `http://127.0.0.1:${oldPort}/api/queue/status?ticketId=1`) {
+              oldTicketStatusRead = true;
+              if (staleSignal === "project-mismatch") {
+                return Response.json({
+                  success: false,
+                  error: "The port now hosts another Unity project.",
+                  errorCode: "target_project_mismatch",
+                  retryable: false,
+                }, { status: 409 });
+              }
+
+              const error = new Error("fetch failed: ECONNRESET");
+              error.code = "ECONNRESET";
+              throw error;
+            }
+            if (target ===
+                `http://127.0.0.1:${newPort}/api/queue/status?ticketId=1`) {
+              newTicketStatusReads++;
+              return Response.json({
+                success: false,
+                error: "The pre-reload read ticket no longer exists.",
+                errorCode: "queue_ticket_not_found",
+                retryable: false,
+              }, { status: 404 });
+            }
+            if (target ===
+                `http://127.0.0.1:${newPort}/api/queue/status?ticketId=2`) {
+              return Response.json({
+                ticketId: 2,
+                actionName: "asset/get-refresh-job",
+                status: "Completed",
+                result: {
+                  jobId: `refresh-${staleSignal}`,
+                  status: "succeeded",
+                },
+              });
+            }
+            throw new Error(`unexpected fetch ${target}`);
+          };
+
+          const result = await runWithRequestContext({
+            agentId: `agent-${staleSignal}`,
+            portOverride: oldPort,
+            targetInstance: {
+              port: oldPort,
+              projectPath,
+              projectName: "ReloadedProject",
+            },
+            expectedProjectPath: projectPath,
+            allowProjectPathRebind: true,
+          }, () => sendCommand("asset/get-refresh-job", {
+            jobId: `refresh-${staleSignal}`,
+            timeoutMs: 500,
+          }));
+
+          assert.equal(result.success, true);
+          assert.equal(result.data.status, "succeeded");
+          assert.equal(result.data.jobId, `refresh-${staleSignal}`);
+          assert.equal(result.replayedAfterLostTicket, true);
+          assert.equal(oldTicketStatusRead, true);
+          assert.ok(newTicketStatusReads >= 1);
+          assert.equal(submissions.length, 2);
+          assert.match(submissions[0].target, new RegExp(`:${oldPort}/`));
+          assert.match(submissions[1].target, new RegExp(`:${newPort}/`));
+          assert.equal(submissions[1].expectedProjectPath, projectPath);
+          assert.equal(submissions[0].requestId, submissions[1].requestId);
+        });
+      }
+    } finally {
+      globalThis.fetch = originalFetch;
+      CONFIG.instanceRegistryPath = originalRegistryPath;
+      CONFIG.queuePollTimeoutMs = originalPollTimeout;
+      CONFIG.queueReloadRecoveryTimeoutMs = originalRecoveryTimeout;
+      CONFIG.queuePollIntervalMs = originalPollInterval;
+      CONFIG.queuePollMaxMs = originalPollMax;
+    }
+  });
+
+test("an explicit port binding never migrates through project-path recovery", async () => {
+  let fetchCount = 0;
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => {
+    fetchCount++;
+    throw new Error("explicit port recovery must not perform discovery");
+  };
+
+  try {
+    const result = await runWithRequestContext({
+      agentId: "agent-explicit-port",
+      portOverride: 32151,
+      targetInstance: {
+        port: 32151,
+        projectPath: "D:/UnityProjects/ExplicitProject",
+        projectName: "ExplicitProject",
+      },
+      expectedProjectPath: "D:/UnityProjects/ExplicitProject",
+      allowProjectPathRebind: false,
+    }, () => refreshRequestProjectPathBinding());
+
+    assert.equal(result, null);
+    assert.equal(fetchCount, 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 test("queue polling pauses operation time during a bounded reload outage", async () => {
