@@ -4,6 +4,7 @@ import { join, resolve } from "node:path";
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { getStructuredFailure } from "./live-tool-response.mjs";
 
 const serverRoot = resolve(new URL("..", import.meta.url).pathname.replace(/^\/(.:)/, "$1"));
 const projectPath = process.env.UNITY_EXPECTED_PROJECT_PATH;
@@ -26,15 +27,6 @@ const transport = new StdioClientTransport({
   stderr: "inherit",
 });
 
-function parseToolResponse(response) {
-  const text = [...response.content]
-    .reverse()
-    .find((block) => block.type === "text" && block.text.trimStart().startsWith("{"))
-    ?.text;
-  assert.ok(text, `No JSON response: ${JSON.stringify(response)}`);
-  return JSON.parse(text);
-}
-
 try {
   await client.connect(transport);
   const response = await client.callTool({
@@ -48,9 +40,7 @@ try {
     },
   }, undefined, { timeout: 360000 });
 
-  const value = parseToolResponse(response);
-  assert.equal(response.isError, true, JSON.stringify(response));
-  assert.equal(value.success, false, JSON.stringify(value));
+  const value = getStructuredFailure(response, "invalid Git package update");
   assert.equal(value.data?.success, undefined, "Editor failure remained nested under a success envelope");
   assert.ok(value.error || value.message, JSON.stringify(value));
   assert.deepEqual(await readFile(manifestPath), beforeManifest, "manifest.json changed after failed update");

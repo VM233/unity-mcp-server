@@ -2,6 +2,19 @@
 
 All notable changes to this package will be documented in this file.
 
+## [4.4.12] - 2026-08-02
+
+### Fixed
+- Treat structured queue-control failures as failures even when the Unity
+  endpoint returns HTTP 200, and reject status payloads that omit a valid queue
+  state instead of polling them until timeout.
+- Recover a reload-safe read when an older Unity plugin has reused its lost
+  ticket ID for another agent; owner mismatch remains non-retryable outside a
+  preceding reload outage.
+- Route every live MCP regression through one `structuredContent` consumer and
+  wait for persistent setup Jobs explicitly. Live validation no longer depends
+  on obsolete JSON copies in the human-readable text channel.
+
 ## [4.4.11] - 2026-08-02
 
 ### Fixed

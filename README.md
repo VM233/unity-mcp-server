@@ -192,6 +192,7 @@ The server automatically discovers all running Unity Editor instances on startup
 - **Port Identity Validation** — When restoring a saved connection, the server verifies the instance identity (project name + path) matches the expected target. If Unity restarts and a different project grabs the port, the server detects this and re-discovers the correct instance. An in-flight call whose port was derived from `expectedProjectPath` follows that same verified project to its newly registered port; a caller-supplied `port` remains immutable.
 - **Bound Mutations** — Every mutating request carries the selected instance's expected project path/name; the Editor rejects unbound or misrouted writes.
 - **Idempotent Queue Control** — Stable request keys survive retries, and `unity_queue_cancel` cancels queued work owned by the current agent without preempting an executing Unity API call.
+- **Structured Queue Adoption** — Queue control reads honor structured failures even when an Editor endpoint returns HTTP 200. Missing states and ownership failures fail closed instead of being mistaken for work that is still running.
 - **Persistent Code and Project Tools** — Execute-code and long project tools
   return durable Jobs with `jobs/get`, `jobs/cancel`, exact-argument
   `idempotencyKey` reuse, and explicit `jobs/cleanup` contracts.

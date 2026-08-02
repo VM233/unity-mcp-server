@@ -182,10 +182,23 @@ async function fetchQueueStatusRaw(ticketId, timeoutMs = 10000) {
     };
   }
 
-  return {
-    success: true,
-    data: await response.json(),
-  };
+  const data = await response.json();
+  if (!isQueueTicketStatusEnvelope(data)) {
+    const normalized = normalizeEditorCommandResult(data);
+    if (!normalized.success) {
+      return {
+        success: false,
+        statusCode: response.status,
+        structuredFailure: true,
+        retryable: Boolean(normalized.retryable),
+        error: normalized.error,
+        errorCode: normalized.errorCode,
+        data,
+      };
+    }
+  }
+
+  return { success: true, data };
 }
 
 async function fetchQueueInfoRaw(timeoutMs = 5000) {
@@ -210,10 +223,19 @@ async function fetchQueueInfoRaw(timeoutMs = 5000) {
     };
   }
 
-  return {
-    success: true,
-    data: await response.json(),
-  };
+  const data = await response.json();
+  const normalized = normalizeEditorCommandResult(data);
+  return normalized.success
+    ? { success: true, data }
+    : {
+        success: false,
+        statusCode: response.status,
+        structuredFailure: true,
+        retryable: Boolean(normalized.retryable),
+        error: normalized.error,
+        errorCode: normalized.errorCode,
+        data,
+      };
 }
 
 async function readHttpErrorPayload(response) {
@@ -334,6 +356,36 @@ export function normalizeTerminalQueueStatus(statusData) {
   }
 
   return null;
+}
+
+const ACTIVE_QUEUE_STATUSES = new Set(["Queued", "Executing"]);
+const TERMINAL_QUEUE_STATUSES = new Set([
+  "Completed", "Failed", "TimedOut", "Canceled", "UncertainAfterReload",
+]);
+const LOST_QUEUE_TICKET_ERROR_CODES = new Set([
+  "ticket_not_found", "queue_ticket_not_found", "ticket_owner_mismatch",
+]);
+
+function isQueueTicketStatusEnvelope(value) {
+  return Boolean(
+    value && typeof value === "object" && !Array.isArray(value) &&
+    value.ticketId !== undefined &&
+    (ACTIVE_QUEUE_STATUSES.has(value.status) || TERMINAL_QUEUE_STATUSES.has(value.status))
+  );
+}
+
+function buildLostAliasedTicketResult(statusResult, ticketId, command) {
+  return {
+    success: false,
+    retryable: true,
+    errorCode: "queue_ticket_lost_after_reload",
+    error:
+      `Queue ticket ${ticketId} no longer identifies this agent's request after a Unity reload: ` +
+      statusResult.error,
+    causeErrorCode: statusResult.errorCode,
+    ticketId,
+    command,
+  };
 }
 
 export function normalizeEditorCommandResult(data) {
@@ -561,7 +613,8 @@ function summarizeFinalTicketStatus(statusResult) {
   if (!statusResult || typeof statusResult !== "object") return null;
   if (!statusResult.success) {
     return {
-      reachable: false,
+      reachable: statusResult.structuredFailure === true,
+      validTicket: false,
       statusCode: statusResult.statusCode,
       errorCode: statusResult.errorCode,
       error: statusResult.error,
@@ -688,6 +741,20 @@ export async function pollQueueStatus(ticketId, command, params = {}) {
           continue;
         }
 
+        if (statusResult.structuredFailure) {
+          finishTransient(Date.now());
+          if (sawTransientPollError && canReplayAfterLostTicket(command) &&
+              LOST_QUEUE_TICKET_ERROR_CODES.has(statusResult.errorCode)) {
+            return buildLostAliasedTicketResult(statusResult, ticketId, command);
+          }
+
+          return {
+            ...normalizeEditorCommandResult(statusResult.data),
+            ticketId,
+            command,
+          };
+        }
+
         if (statusResult.retryable) {
           beginTransient(pollAttemptStartedAt);
           sawTransientPollError = true;
@@ -750,6 +817,18 @@ export async function pollQueueStatus(ticketId, command, params = {}) {
 
       const terminalResult = normalizeTerminalQueueStatus(statusData);
       if (terminalResult) return terminalResult;
+
+      if (!ACTIVE_QUEUE_STATUSES.has(statusData?.status)) {
+        return {
+          success: false,
+          retryable: false,
+          errorCode: "invalid_queue_status",
+          error:
+            `Unity returned an invalid queue status envelope for ticket ${ticketId}.`,
+          ticketId,
+          command,
+        };
+      }
 
       // Still processing â€" wait before polling again
       await sleep(pollIntervalMs);
@@ -917,8 +996,7 @@ export async function getQueueInfo() {
       return normalizeEditorCommandResult(await readHttpErrorPayload(response));
     }
 
-    const data = await response.json();
-    return { success: true, data };
+    return normalizeEditorCommandResult(await response.json());
   } catch (error) {
     return {
       success: false,
@@ -945,7 +1023,9 @@ export async function getTicketStatus(ticketId) {
     }
 
     const data = await response.json();
-    return { success: true, data };
+    return isQueueTicketStatusEnvelope(data)
+      ? { success: true, data }
+      : normalizeEditorCommandResult(data);
   } catch (error) {
     return {
       success: false,
@@ -966,7 +1046,7 @@ export async function cancelTicket(ticketId) {
     if (!response.ok) {
       return normalizeEditorCommandResult(await readHttpErrorPayload(response));
     }
-    return { success: true, data: await response.json() };
+    return normalizeEditorCommandResult(await response.json());
   } catch (error) {
     return { success: false, error: `Failed to cancel ticket: ${error.message}` };
   }

@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { getStructuredEnvelope } from "./live-tool-response.mjs";
 
 const serverRoot = resolve(new URL("..", import.meta.url).pathname.replace(/^\/(.:)/, "$1"));
 const port = Number(process.env.UNITY_BRIDGE_PORT);
@@ -27,19 +28,9 @@ const transport = new StdioClientTransport({
   stderr: "inherit",
 });
 
-function parseToolResponse(response) {
-  assert.equal(response.isError, undefined, JSON.stringify(response));
-  const text = [...response.content]
-    .reverse()
-    .find((block) => block.type === "text" && block.text.trimStart().startsWith("{"))
-    ?.text;
-  assert.ok(text, JSON.stringify(response));
-  return JSON.parse(text);
-}
-
 try {
   await client.connect(transport);
-  const response = parseToolResponse(await client.callTool({
+  const envelope = getStructuredEnvelope(await client.callTool({
     name: "unity_asset_refresh",
     arguments: {
       port,
@@ -47,15 +38,15 @@ try {
       assetPaths: [assetPath],
       saveAssets: false,
     },
-  }));
+  }), "forced asset-refresh timeout recovery");
+  const job = envelope.result;
 
-  assert.equal(response.success, true, JSON.stringify(response));
-  assert.equal(response.recoveredAfterTransportFailure, true, JSON.stringify(response));
-  assert.ok(response.data?.jobId, JSON.stringify(response));
-  assert.equal(response.data.recoveredAfterTransportFailure, true, JSON.stringify(response));
-  assert.equal(response.data.transportFailure?.errorCode, "queue_poll_timeout",
-    JSON.stringify(response));
-  console.log(`Recovered asset refresh ${response.data.jobId} after forced outer poll timeout.`);
+  assert.ok(envelope.tags?.includes("recoveredAfterTransportFailure"),
+    JSON.stringify(envelope));
+  assert.ok(job?.jobId, JSON.stringify(envelope));
+  assert.equal(job.transportFailure?.errorCode, "queue_poll_timeout",
+    JSON.stringify(envelope));
+  console.log(`Recovered asset refresh ${job.jobId} after forced outer poll timeout.`);
 } finally {
   await transport.close().catch(() => {});
 }

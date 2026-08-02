@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { getStructuredResult } from "./live-tool-response.mjs";
 
 const serverRoot = resolve(new URL("..", import.meta.url).pathname.replace(/^\/(.:)/, "$1"));
 const targets = JSON.parse(process.env.UNITY_BINDING_TARGETS || "[]");
@@ -23,33 +24,8 @@ function normalizePath(value) {
   return String(value || "").replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
 }
 
-function parseToolResponse(response, label) {
-  assert.equal(response.isError, undefined, `${label}: MCP call failed: ${JSON.stringify(response)}`);
-  const text = [...response.content]
-    .reverse()
-    .find((block) => block.type === "text" && block.text.trimStart().startsWith("{"))
-    ?.text;
-  assert.ok(text, `${label}: no JSON response: ${JSON.stringify(response)}`);
-  return JSON.parse(text);
-}
-
-function unwrapSuccess(response, label) {
-  let value = parseToolResponse(response, label);
-  for (let depth = 0; depth < 4; depth++) {
-    if (value?.success === false) {
-      assert.fail(`${label}: ${JSON.stringify(value)}`);
-    }
-    if (value?.success === true && value.data && typeof value.data === "object") {
-      value = value.data;
-      continue;
-    }
-    break;
-  }
-  return value;
-}
-
 async function call(name, args, label = name) {
-  return unwrapSuccess(await client.callTool({ name, arguments: args }), label);
+  return getStructuredResult(await client.callTool({ name, arguments: args }), label);
 }
 
 async function waitForRefresh(target, start) {

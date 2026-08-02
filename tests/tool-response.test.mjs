@@ -17,6 +17,10 @@ import {
   readIntegerSetting,
 } from "../src/config.js";
 import { instanceTools } from "../src/tools/instance-tools.js";
+import {
+  getStructuredFailure,
+  getStructuredResult,
+} from "./live-tool-response.mjs";
 
 test("tool responses serialize objects into one stable text block", () => {
   const blocks = toContentBlocks({ value: 3 });
@@ -44,6 +48,34 @@ test("public MCP replies expose structuredContent and keep text human-readable",
   assert.equal(response.content[0].type, "text");
   assert.equal(response.content[0].text, "Tool completed successfully.");
   assert.doesNotMatch(response.content[0].text, /^\s*[{[]/);
+});
+
+test("live runners consume successful machine results from structuredContent", () => {
+  const response = buildToolResponse({
+    success: true,
+    data: { jobId: "job-1", status: "succeeded" },
+  });
+
+  assert.deepEqual(getStructuredResult(response, "live success"), {
+    jobId: "job-1",
+    status: "succeeded",
+  });
+});
+
+test("live runners consume failures without parsing the human text summary", () => {
+  const response = buildToolResponse({
+    success: false,
+    errorCode: "expected_failure",
+    error: "The requested operation failed.",
+    retryable: false,
+  });
+
+  assert.deepEqual(getStructuredFailure(response, "live failure"), {
+    success: false,
+    errorCode: "expected_failure",
+    error: "The requested operation failed.",
+    retryable: false,
+  });
 });
 
 test("project-tool success envelopes remain structured without JSON text parsing by clients", () => {

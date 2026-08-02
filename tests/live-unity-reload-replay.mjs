@@ -3,6 +3,10 @@ import { resolve } from "node:path";
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import {
+  getStructuredEnvelope,
+  getStructuredResult,
+} from "./live-tool-response.mjs";
 
 const serverRoot = resolve(new URL("..", import.meta.url).pathname.replace(/^\/(.:)/, "$1"));
 const bridgePort = Number(process.env.UNITY_BRIDGE_PORT || "7890");
@@ -21,11 +25,6 @@ const transport = new StdioClientTransport({
   stderr: "inherit",
 });
 
-function parseToolResult(result) {
-  const text = result.content?.find((item) => item.type === "text")?.text;
-  return text ? JSON.parse(text) : null;
-}
-
 async function withTimeout(promise, timeoutMs, message) {
   let timer;
   try {
@@ -40,14 +39,35 @@ async function withTimeout(promise, timeoutMs, message) {
   }
 }
 
+async function callResult(name, args, label, timeout = clientTimeoutMs) {
+  const response = await client.callTool(
+    { name, arguments: args }, undefined, { timeout });
+  return getStructuredResult(response, label);
+}
+
+async function waitForJob(start, label) {
+  let job = start;
+  for (let attempt = 0;
+       job?.jobId && !["succeeded", "failed", "canceled", "cancelled"]
+         .includes(job.status) && attempt < 120;
+       attempt++) {
+    await new Promise((resolveDelay) => setTimeout(resolveDelay, 50));
+    job = await callResult("unity_jobs_get", {
+      port: bridgePort,
+      jobId: start.jobId,
+      ...(start.jobAccessToken ? { jobAccessToken: start.jobAccessToken } : {}),
+    }, `${label} ${start.jobId}`);
+  }
+  assert.equal(job?.status, "succeeded", `${label}: ${JSON.stringify(job)}`);
+  return job;
+}
+
 try {
   await client.connect(transport);
 
-  const scheduleResult = parseToolResult(await client.callTool({
-    name: "unity_execute_code",
-    arguments: {
-      port: bridgePort,
-      code: `
+  const scheduleStart = await callResult("unity_execute_code", {
+    port: bridgePort,
+    code: `
 double reloadAt = EditorApplication.timeSinceStartup + 1.5;
 EditorApplication.CallbackFunction callback = null;
 callback = () =>
@@ -59,9 +79,9 @@ callback = () =>
 EditorApplication.update += callback;
 return new { scheduled = true, reloadAt };
 `,
-    },
-  }));
-  assert.equal(scheduleResult?.success, true);
+  }, "schedule script reload");
+  assert.ok(scheduleStart?.jobId, JSON.stringify(scheduleStart));
+  await waitForJob(scheduleStart, "schedule script reload");
 
   const waitPromise = client.callTool({
     name: "unity_wait_editor_idle",
@@ -73,19 +93,22 @@ return new { scheduled = true, reloadAt };
     },
   }, undefined, { timeout: clientTimeoutMs });
 
-  const waitResult = await withTimeout(waitPromise, clientTimeoutMs, "reload replay timed out");
-  const waitData = parseToolResult(waitResult);
+  const waitResponse = await withTimeout(
+    waitPromise, clientTimeoutMs, "reload replay timed out");
+  const waitEnvelope = getStructuredEnvelope(waitResponse, "reload idle wait");
+  const waitData = waitEnvelope.result;
+  const waitTags = new Set([
+    ...(waitEnvelope.tags || []),
+    ...(waitData?.tags || []),
+  ]);
 
-  if (waitData?.success !== true)
-    console.error(`Reload wait failure: ${JSON.stringify(waitData)}`);
-  assert.equal(waitData?.success, true);
-  if (waitData?.replayedAfterLostTicket) {
-    assert.ok(waitData?.replayCount >= 1);
+  assert.ok(waitTags.has("idle"), JSON.stringify(waitEnvelope));
+  assert.equal(waitTags.has("timedOut"), false, JSON.stringify(waitEnvelope));
+  if (waitTags.has("replayedAfterLostTicket")) {
+    assert.ok(waitEnvelope.replayCount >= 1, JSON.stringify(waitEnvelope));
   }
-  assert.equal(waitData?.data?.timedOut, false);
-  assert.equal(waitData?.data?.isIdle, true);
-  console.log(waitData?.replayedAfterLostTicket
-    ? `Reload-lost wait replayed successfully (${waitData.replayCount} replay).`
+  console.log(waitTags.has("replayedAfterLostTicket")
+    ? `Reload-lost wait replayed successfully (${waitEnvelope.replayCount} replay).`
     : "Reload wait completed on its persistent queue ticket.");
 } finally {
   await transport.close().catch(() => {});

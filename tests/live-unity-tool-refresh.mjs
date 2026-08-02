@@ -6,6 +6,10 @@ import { join, resolve } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { ToolListChangedNotificationSchema } from "@modelcontextprotocol/sdk/types.js";
+import {
+  getStructuredEnvelope,
+  getStructuredResult,
+} from "./live-tool-response.mjs";
 
 const serverRoot = resolve(new URL("..", import.meta.url).pathname.replace(/^\/(.:)/, "$1"));
 const tempRoot = mkdtempSync(join(tmpdir(), "unity-mcp-live-refresh-"));
@@ -78,26 +82,6 @@ async function withTimeout(promise, timeoutMs, message) {
   } finally {
     clearTimeout(timer);
   }
-}
-
-function getStructuredEnvelope(response, { expectSuccess = true } = {}) {
-  assert.ok(response.structuredContent &&
-    typeof response.structuredContent === "object" &&
-    !Array.isArray(response.structuredContent),
-  `response did not contain structuredContent: ${JSON.stringify(response)}`);
-  if (expectSuccess) {
-    assert.equal(response.structuredContent.success, true,
-      `tool returned a structured failure: ${JSON.stringify(response.structuredContent)}`);
-  }
-  const text = response.content?.find((block) => block.type === "text")?.text || "";
-  assert.ok(text, "response did not contain a human-readable text summary");
-  assert.equal(text.trimStart().startsWith("{"), false,
-    "public text content must not duplicate the JSON structured payload");
-  return response.structuredContent;
-}
-
-function getStructuredResult(response) {
-  return getStructuredEnvelope(response).result;
 }
 
 function assertEditorBindingSchema(tools, toolName) {
@@ -224,9 +208,8 @@ try {
     name: "unity_asset_get_refresh_job",
     arguments: { port: Number(environment.UNITY_BRIDGE_PORT) },
   });
-  const refreshJobEnvelope = getStructuredEnvelope(refreshJobResponse, {
-    expectSuccess: false,
-  });
+  const refreshJobEnvelope = getStructuredEnvelope(
+    refreshJobResponse, "refresh-job metadata probe", { expectSuccess: false });
   if (refreshJobEnvelope.success) {
     assert.ok(refreshJobEnvelope.result && typeof refreshJobEnvelope.result === "object");
   } else {

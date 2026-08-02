@@ -12,6 +12,9 @@ import {
   createRequestId,
   getQueueSubmitReconnectBudgetMs,
   getReloadReconnectBudgetMs,
+  getQueueInfo,
+  getTicketStatus,
+  cancelTicket,
   isTransientError,
   isTransientQueueSubmitError,
   normalizeEditorCommandResult,
@@ -440,7 +443,9 @@ test("an in-flight project-path binding follows the same project to its reload p
     CONFIG.queuePollMaxMs = 2;
 
     try {
-      for (const staleSignal of ["disconnect", "project-mismatch"]) {
+      for (const staleSignal of [
+        "disconnect", "project-mismatch", "structured-project-mismatch",
+      ]) {
         await t.test(staleSignal, async () => {
           const submissions = [];
           let oldTicketStatusRead = false;
@@ -467,13 +472,13 @@ test("an in-flight project-path binding follows the same project to its reload p
             if (target ===
                 `http://127.0.0.1:${oldPort}/api/queue/status?ticketId=1`) {
               oldTicketStatusRead = true;
-              if (staleSignal === "project-mismatch") {
+              if (staleSignal.endsWith("project-mismatch")) {
                 return Response.json({
                   success: false,
                   error: "The port now hosts another Unity project.",
                   errorCode: "target_project_mismatch",
                   retryable: false,
-                }, { status: 409 });
+                }, { status: staleSignal === "project-mismatch" ? 409 : 200 });
               }
 
               const error = new Error("fetch failed: ECONNRESET");
@@ -566,6 +571,104 @@ test("an explicit port binding never migrates through project-path recovery", as
 
     assert.equal(result, null);
     assert.equal(fetchCount, 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("same-port reload replays a read whose old ticket now belongs to another agent", async () => {
+  const originalFetch = globalThis.fetch;
+  const originalPollTimeout = CONFIG.queuePollTimeoutMs;
+  const originalRecoveryTimeout = CONFIG.queueReloadRecoveryTimeoutMs;
+  const originalPollInterval = CONFIG.queuePollIntervalMs;
+  const originalPollMax = CONFIG.queuePollMaxMs;
+  const submissions = [];
+  let staleStatusReads = 0;
+
+  globalThis.fetch = async (url, options = {}) => {
+    const target = String(url);
+    if (target.endsWith("/api/queue/submit")) {
+      submissions.push(options.headers["Idempotency-Key"]);
+      return Response.json({ ticketId: submissions.length === 1 ? 15244 : 16385 });
+    }
+    if (target.includes("/api/queue/status?ticketId=15244")) {
+      staleStatusReads++;
+      if (staleStatusReads === 1) {
+        const error = new Error("fetch failed: ECONNRESET");
+        error.code = "ECONNRESET";
+        throw error;
+      }
+      return Response.json({
+        success: false,
+        error: "Ticket belongs to another agent.",
+        errorCode: "ticket_owner_mismatch",
+        retryable: false,
+      });
+    }
+    if (target.includes("/api/queue/status?ticketId=16385")) {
+      return Response.json({
+        ticketId: 16385,
+        actionName: "asset/get-refresh-job",
+        status: "Completed",
+        result: { jobId: "refresh-same-port", status: "succeeded" },
+      });
+    }
+    throw new Error(`unexpected fetch ${target}`);
+  };
+  CONFIG.queuePollTimeoutMs = 500;
+  CONFIG.queueReloadRecoveryTimeoutMs = 200;
+  CONFIG.queuePollIntervalMs = 1;
+  CONFIG.queuePollMaxMs = 2;
+
+  try {
+    const result = await runWithRequestContext({
+      agentId: "agent-same-port-reload",
+      portOverride: 7890,
+      targetInstance: {
+        port: 7890,
+        projectPath: "D:/UnityProjects/MarbleBattlers",
+        projectName: "MarbleBattlers",
+      },
+      expectedProjectPath: "D:/UnityProjects/MarbleBattlers",
+      allowProjectPathRebind: false,
+    }, () => sendCommand("asset/get-refresh-job", {
+      jobId: "refresh-same-port",
+      timeoutMs: 500,
+    }));
+
+    assert.equal(result.success, true);
+    assert.equal(result.data.jobId, "refresh-same-port");
+    assert.equal(result.data.status, "succeeded");
+    assert.equal(result.replayedAfterLostTicket, true);
+    assert.equal(submissions.length, 2);
+    assert.equal(submissions[0], submissions[1]);
+  } finally {
+    globalThis.fetch = originalFetch;
+    CONFIG.queuePollTimeoutMs = originalPollTimeout;
+    CONFIG.queueReloadRecoveryTimeoutMs = originalRecoveryTimeout;
+    CONFIG.queuePollIntervalMs = originalPollInterval;
+    CONFIG.queuePollMaxMs = originalPollMax;
+  }
+});
+
+test("queue polling fails closed on 200 structured errors and invalid status envelopes", async () => {
+  const originalFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = async () => Response.json({
+      success: false,
+      error: "Ticket belongs to another agent.",
+      errorCode: "ticket_owner_mismatch",
+      retryable: false,
+    });
+    const denied = await pollQueueStatus(72, "asset/get-refresh-job", {});
+    assert.equal(denied.success, false);
+    assert.equal(denied.errorCode, "ticket_owner_mismatch");
+    assert.equal(denied.retryable, false);
+
+    globalThis.fetch = async () => Response.json({ success: true });
+    const invalid = await pollQueueStatus(73, "asset/get-refresh-job", {});
+    assert.equal(invalid.success, false);
+    assert.equal(invalid.errorCode, "invalid_queue_status");
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -832,6 +935,52 @@ test("plugin-declared queue tools use direct control endpoints", async () => {
     assert.equal(calls[1].options.method, "GET");
     assert.equal(calls[2].options.method, "POST");
     assert.deepEqual(JSON.parse(calls[2].options.body), { ticketId: 73 });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("direct queue control endpoints honor structured failures returned with HTTP 200", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    const target = String(url);
+    if (target.endsWith("/api/queue/info")) {
+      return Response.json({
+        success: false,
+        error: "Queue unavailable.",
+        errorCode: "queue_unavailable",
+        retryable: true,
+      });
+    }
+    if (target.includes("/api/queue/status?ticketId=74")) {
+      return Response.json({
+        success: false,
+        error: "Ticket belongs to another agent.",
+        errorCode: "ticket_owner_mismatch",
+        retryable: false,
+      });
+    }
+    if (target.endsWith("/api/queue/cancel")) {
+      return Response.json({
+        success: false,
+        error: "Request is already executing.",
+        errorCode: "request_not_cancelable",
+        retryable: false,
+      });
+    }
+    throw new Error(`unexpected fetch ${target}`);
+  };
+
+  try {
+    const info = await getQueueInfo();
+    const status = await getTicketStatus(74);
+    const canceled = await cancelTicket(75);
+    assert.equal(info.errorCode, "queue_unavailable");
+    assert.equal(status.errorCode, "ticket_owner_mismatch");
+    assert.equal(canceled.errorCode, "request_not_cancelable");
+    assert.equal(info.success, false);
+    assert.equal(status.success, false);
+    assert.equal(canceled.success, false);
   } finally {
     globalThis.fetch = originalFetch;
   }
