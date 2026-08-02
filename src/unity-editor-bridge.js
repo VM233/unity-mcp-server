@@ -14,6 +14,8 @@ import {
   getRequestExpectedProjectPath,
 } from "./request-context.js";
 import { logDebug, logWarn } from "./logger.js";
+import { isReleaseManagedReplaySafeReadRoute } from
+  "./tools/plugin-first-class-tools.js";
 
 // Dynamic bridge URL â€" resolved per-call based on selected instance
 function getBridgeUrl() {
@@ -105,6 +107,7 @@ export function isTransientError(error, response) {
 
 export function canReplayAfterLostTicket(command) {
   return (
+    isReleaseManagedReplaySafeReadRoute(command) ||
     command.startsWith("_meta/") ||
     command === "packages/list" ||
     command === "packages/search" ||

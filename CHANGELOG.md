@@ -2,6 +2,14 @@
 
 All notable changes to this package will be documented in this file.
 
+## [4.4.13] - 2026-08-02
+
+### Fixed
+- Replay release-managed routes whose plugin metadata marks them read-only and
+  idempotent when a domain reload discards their queue ticket. Compilation,
+  Console, scene search, and the other declared read tools no longer depend on
+  a drifting hand-written replay allowlist; mutations remain fail-closed.
+
 ## [4.4.12] - 2026-08-02
 
 ### Fixed

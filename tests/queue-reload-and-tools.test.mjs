@@ -393,12 +393,16 @@ test("non-retryable structured queue submission errors keep their Unity error co
     }
   });
 
-test("only explicitly replayable reload-safe routes are retried", () => {
+test("release-managed read metadata and explicit reload-safe routes control replay", () => {
+  assert.equal(canReplayAfterLostTicket("compilation/errors"), true);
+  assert.equal(canReplayAfterLostTicket("console/query"), true);
+  assert.equal(canReplayAfterLostTicket("search/scene"), true);
   assert.equal(canReplayAfterLostTicket("wait/editor-idle"), true);
   assert.equal(canReplayAfterLostTicket("testing/list-tests"), true);
   assert.equal(canReplayAfterLostTicket("testing/get-package-job"), true);
   assert.equal(canReplayAfterLostTicket("asset/refresh"), true);
   assert.equal(canReplayAfterLostTicket("asset/get-refresh-job"), true);
+  assert.equal(canReplayAfterLostTicket("component/set-reference"), false);
   assert.equal(canReplayAfterLostTicket("prefab-asset/remove-gameobject"), false);
 });
 
@@ -608,9 +612,9 @@ test("same-port reload replays a read whose old ticket now belongs to another ag
     if (target.includes("/api/queue/status?ticketId=16385")) {
       return Response.json({
         ticketId: 16385,
-        actionName: "asset/get-refresh-job",
+        actionName: "compilation/errors",
         status: "Completed",
-        result: { jobId: "refresh-same-port", status: "succeeded" },
+        result: { counts: { errors: 0, warnings: 0 } },
       });
     }
     throw new Error(`unexpected fetch ${target}`);
@@ -631,14 +635,10 @@ test("same-port reload replays a read whose old ticket now belongs to another ag
       },
       expectedProjectPath: "D:/UnityProjects/MarbleBattlers",
       allowProjectPathRebind: false,
-    }, () => sendCommand("asset/get-refresh-job", {
-      jobId: "refresh-same-port",
-      timeoutMs: 500,
-    }));
+    }, () => sendCommand("compilation/errors"));
 
     assert.equal(result.success, true);
-    assert.equal(result.data.jobId, "refresh-same-port");
-    assert.equal(result.data.status, "succeeded");
+    assert.deepEqual(result.data.counts, { errors: 0, warnings: 0 });
     assert.equal(result.replayedAfterLostTicket, true);
     assert.equal(submissions.length, 2);
     assert.equal(submissions[0], submissions[1]);
