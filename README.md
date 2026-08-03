@@ -89,6 +89,11 @@ Project-defined tools use this sequence:
 
 If a queued operation reaches its polling timeout, do not immediately submit the mutation again. Follow the returned `nextTool` and `nextToolArgs` to inspect the existing ticket first.
 
+Release-managed reads whose live plugin metadata declares them idempotent receive
+one fresh submission when Unity definitively reports that a domain reload lost
+the old queue ticket, including when reconnection consumed the configured
+recovery budget. Mutation routes remain fail-closed.
+
 ## Server hot reload
 
 The launcher watches the server implementation and package metadata. A valid update activates without replacing the host's stdio process; a failed candidate leaves the previous runtime active.

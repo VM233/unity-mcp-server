@@ -2,6 +2,23 @@
 
 All notable changes to this package will be documented in this file.
 
+## [4.4.16] - 2026-08-03
+
+### Fixed
+- Guarantee one fresh submission for a metadata-declared idempotent read when
+  Unity finally reports that its pre-reload queue ticket was lost, even if the
+  reconnect wait consumed the configured recovery budget. Mutations remain
+  fail-closed and the unconditional recovery is limited to one replay.
+
+### Changed
+- Synchronize the VM Unity MCP package-test metadata so omitted selectors use
+  `VMUnityMCP.PackageSmoke` and full regression remains explicit.
+
+### Tests
+- Tighten the existing same-port reload regression to cover a definitive lost
+  ticket that arrives after the normal replay budget has expired, without
+  adding another overlapping test.
+
 ## [4.4.15] - 2026-08-02
 
 ### Fixed

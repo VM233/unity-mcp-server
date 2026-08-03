@@ -2022,7 +2022,7 @@
         },
         "categories": {
           "type": "array",
-          "description": "Optional test categories.",
+          "description": "Optional test categories. VM Unity MCP defaults to VMUnityMCP.PackageSmoke when testNames, categories, and groupNames are all omitted; pass VMUnityMCP.FullRegression for the full suite.",
           "items": {
             "type": "string"
           }

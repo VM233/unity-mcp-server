@@ -497,6 +497,19 @@ function shouldRetryTransientConnection(command, params, startedAt, retryCount) 
   return retryCount < MAX_RETRIES;
 }
 
+function shouldReplayLostTicket(command, params, startedAt, replayCount, result) {
+  if (!result?.retryable || !canReplayAfterLostTicket(command)) return false;
+
+  // A reload may return the definitive missing/aliased-ticket response only as
+  // the reconnect budget expires. One fresh submission is still required to
+  // recover an idempotent read; otherwise the time spent waiting for Unity
+  // consumes the very budget that was meant to enable the replay.
+  if (result.errorCode === "queue_ticket_lost_after_reload" && replayCount === 0)
+    return true;
+
+  return shouldRetryTransientConnection(command, params, startedAt, replayCount);
+}
+
 function shouldRetryQueueSubmission(command, params, startedAt, retryCount, error) {
   const reconnectBudgetMs =
     getQueueSubmitReconnectBudgetMs(command, params, error);
@@ -926,9 +939,8 @@ export async function sendCommand(command, params = {}) {
         const recovered = await recoverReloadSafeCommand(command, requestId, result);
         if (recovered) return recovered;
       }
-      if (!result.success && result.retryable && canReplayAfterLostTicket(command) &&
-          shouldRetryTransientConnection(
-            command, params, startedAt, lostTicketReplayCount)) {
+      if (!result.success && shouldReplayLostTicket(
+          command, params, startedAt, lostTicketReplayCount, result)) {
         lostTicketReplayCount++;
         const delay = getTransientRetryDelayMs(
           command, params, startedAt, lostTicketReplayCount - 1);

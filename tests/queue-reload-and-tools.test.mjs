@@ -602,6 +602,7 @@ test("same-port reload replays a read whose old ticket now belongs to another ag
         error.code = "ECONNRESET";
         throw error;
       }
+      await new Promise((resolve) => setTimeout(resolve, 250));
       return Response.json({
         success: false,
         error: "Ticket belongs to another agent.",
@@ -619,7 +620,7 @@ test("same-port reload replays a read whose old ticket now belongs to another ag
     }
     throw new Error(`unexpected fetch ${target}`);
   };
-  CONFIG.queuePollTimeoutMs = 500;
+  CONFIG.queuePollTimeoutMs = 10;
   CONFIG.queueReloadRecoveryTimeoutMs = 200;
   CONFIG.queuePollIntervalMs = 1;
   CONFIG.queuePollMaxMs = 2;
@@ -637,7 +638,8 @@ test("same-port reload replays a read whose old ticket now belongs to another ag
       allowProjectPathRebind: false,
     }, () => sendCommand("compilation/errors"));
 
-    assert.equal(result.success, true);
+    assert.equal(result.success, true,
+      JSON.stringify({ result, submissions, staleStatusReads }));
     assert.deepEqual(result.data.counts, { errors: 0, warnings: 0 });
     assert.equal(result.replayedAfterLostTicket, true);
     assert.equal(submissions.length, 2);
