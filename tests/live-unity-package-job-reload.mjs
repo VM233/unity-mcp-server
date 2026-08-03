@@ -30,32 +30,39 @@ async function call(name, args, label) {
 
 try {
   await client.connect(transport);
-  const start = await call("unity_testing_run_package_tests", {
+  const start = await call("unity_advanced_tool", {
     expectedProjectPath: projectPath,
-    packageName,
-    mode: "EditMode",
-    testNames,
+    tool: "testing/run-package-tests",
+    params: {
+      packageName,
+      mode: "EditMode",
+      testNames,
+    },
   }, "start package tests");
-  assert.ok(start.workflowId, JSON.stringify(start));
+  assert.ok(start.jobId, JSON.stringify(start));
+  assert.ok(start.jobAccessToken, JSON.stringify(start));
 
   let job = start;
   let pollCount = 0;
   while (!["succeeded", "failed", "canceled", "cancelled"].includes(job.status)) {
     pollCount++;
-    job = await call("unity_testing_get_package_job", {
+    const polled = await call("unity_jobs_get", {
       expectedProjectPath: projectPath,
-      workflowId: start.workflowId,
-    }, `poll package workflow ${start.workflowId}`);
+      jobId: start.jobId,
+      jobType: "package-test",
+      jobAccessToken: start.jobAccessToken,
+    }, `poll package job ${start.jobId}`);
+    job = polled?.job?.snapshot || polled?.job || polled;
     if (!["succeeded", "failed", "canceled", "cancelled"].includes(job.status)) {
       await new Promise((resolveDelay) => setTimeout(resolveDelay, 250));
     }
   }
 
   assert.equal(job.status, "succeeded", JSON.stringify(job));
-  assert.equal(job.manifestRestored, true, JSON.stringify(job));
-  assert.equal(job.testResult?.summary?.failed, 0, JSON.stringify(job));
-  console.log(`Package workflow ${job.workflowId} survived reload across ${pollCount} poll(s); ` +
-    `${job.testResult?.summary?.passed || 0} test(s) passed and manifest was restored.`);
+  assert.equal(job.tags?.includes("manifestRestored"), true, JSON.stringify(job));
+  assert.equal(job.testResult?.progress?.failed, 0, JSON.stringify(job));
+  console.log(`Package job ${job.jobId} survived reload across ${pollCount} poll(s); ` +
+    `${job.testResult?.progress?.passed || 0} test(s) passed and manifest was restored.`);
 } finally {
   await transport.close().catch(() => {});
 }

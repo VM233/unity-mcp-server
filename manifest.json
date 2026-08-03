@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "unity-mcp",
   "display_name": "AnkleBreaker Unity MCP",
-  "version": "4.4.16",
+  "version": "4.4.17",
   "description": "Hot-reloadable multi-agent MCP server for Unity Editor with stable stdio, direct first-class tools, and fallback advanced routes.",
   "long_description": "AnkleBreaker Unity MCP connects Claude, Codex, and other MCP hosts to your Unity Editor with a direct core tool surface, plugin-declared first-class tools, and fallback advanced routes for rare metadata cases. This repository is independently maintained while retaining the attribution required by the AnkleBreaker Open License.\n\n**Key features:**\n- Stable stdio launcher hot-reloads server implementation changes without restarting the MCP host\n- Core tools and plugin-declared first-class tools are exposed directly with visible schemas\n- Fallback advanced route remains available for rare routes without concrete tool metadata\n- Multi-instance support: run multiple Unity Editors simultaneously, auto-port selection (7890-7899), shared instance registry\n- ParrelSync clone detection for multiplayer development workflows\n- Multi-agent async queue with fair round-robin scheduling\n- Read batching (up to 5/frame) and write serialization (1/frame)\n- Agent session tracking and action logging\n- Project Context auto-injection for project-aware AI assistance\n\n**Requires the companion Unity Editor plugin:** Install via Unity Package Manager -> Add package from git URL -> `https://github.com/VM233/VMUnityMCP.git`\n\nAfter installing the package, configure local bridge and port settings under Preferences -> Unity MCP, then use `unity_list_instances` to confirm the Editor is reachable.",
   "author": {

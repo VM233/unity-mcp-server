@@ -2,6 +2,17 @@
 
 All notable changes to this package will be documented in this file.
 
+## [4.4.17] - 2026-08-03
+
+### Fixed
+- Migrate the focused live Git-package reload regression from removed package-test
+  tool names and the obsolete `workflowId` contract to the intentional lazy route
+  plus the canonical durable `jobs/get` capability flow.
+
+### Documentation
+- Document the required environment and current start/poll path for the focused
+  package reload regression.
+
 ## [4.4.16] - 2026-08-03
 
 ### Fixed

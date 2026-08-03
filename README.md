@@ -137,6 +137,12 @@ Run the static test suite:
 npm test
 ```
 
+Run a focused Git-package reload regression by setting
+`UNITY_EXPECTED_PROJECT_PATH`, `UNITY_PACKAGE_TEST_NAME`, and a JSON array in
+`UNITY_PACKAGE_TEST_NAMES`, then execute `npm run test:package-job-reload`.
+The script starts the lazy `testing/run-package-tests` route through
+`unity_advanced_tool` and polls its durable Job through `unity_jobs_get`.
+
 Regenerate the tool audit after intentionally changing the release-managed tool surface:
 
 ```bash
