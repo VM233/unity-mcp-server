@@ -1,7 +1,7 @@
 {
   "name": "anklebreaker-unity-mcp",
-  "version": "4.4.17",
-  "description": "Hot-reloadable multi-agent Unity MCP server with stable stdio, structuredContent, selected-instance binding, persistent jobs, and live plugin metadata.",
+  "version": "5.0.0",
+  "description": "Composable Unity MCP server with a bounded bootstrap, searchable canonical catalog, exact typed-tool activation, stable stdio, and instance binding.",
   "type": "module",
   "main": "src/index.js",
   "bin": {
@@ -11,9 +11,8 @@
     "start": "node src/index.js",
     "dev": "node src/index.js",
     "test": "node scripts/sync-manifest-tools.mjs --check && node --test tests/*.test.mjs",
-    "audit:tools": "node scripts/generate-tool-audit-report.mjs",
+    "audit:tools": "node scripts/audit-tool-architecture.mjs",
     "sync:manifest-tools": "node scripts/sync-manifest-tools.mjs",
-    "sync:plugin-tool-snapshot": "node scripts/sync-live-plugin-tools.mjs",
     "test:live": "node tests/live-unity-tool-refresh.mjs",
     "test:multi-instance": "node tests/live-unity-multi-instance-binding.mjs",
     "test:error-propagation": "node tests/live-unity-error-propagation.mjs",

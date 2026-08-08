@@ -1,6 +1,10 @@
 const TOOLS_SKIP_EDITOR_BINDING_INJECT = new Set([
   "unity_select_instance",
   "unity_list_instances",
+  "unity_mcp_health",
+  "unity_tools_list",
+  "unity_tools_search",
+  "unity_tools_get",
 ]);
 
 export function injectEditorBindingSchema(name, inputSchema) {

@@ -2,6 +2,39 @@
 
 All notable changes to this package will be documented in this file.
 
+## [5.0.0] - 2026-08-08
+
+### Added
+- Add a bounded 12-tool bootstrap with `unity_tools_list`, intent-ranked
+  `unity_tools_search`, and exact `unity_tools_get` activation.
+- Bind one paginated canonical Unity/project/package catalog to the selected
+  Editor instance, track its revision, reconcile schema changes and removals,
+  and emit `tools/list_changed` when the callable surface changes.
+- Add deterministic module, category, capability, operation, effect, and
+  precondition filters with compact search results sized for Codex tool use.
+
+### Changed
+- Make the selected Unity Editor's `_meta/tools` pages the only authority for
+  Unity and project tool contracts. Full schemas are loaded only for exact
+  activation, while activated tools remain directly callable by their typed
+  MCP name.
+- Keep media-return adapters separate from catalog ownership, so asset and
+  material previews retain image content without duplicating their schemas.
+- Update server instructions so the first 512 characters tell Codex to search,
+  get, and call canonical tools instead of guessing routes.
+
+### Removed
+- Remove the generic advanced executor, the three-stage project-tool API,
+  first-class tiers and allowlists, generated plugin snapshots, and the static
+  duplicate Editor tool registry.
+- Remove the former baseline/report pipeline that audited the duplicate static
+  surface; `audit:tools` now enforces the composable architecture itself.
+
+### Tests
+- Cover bootstrap bounds, deterministic multilingual search ranking, compact
+  results, exact activation, schema refresh/removal, instance rebinding,
+  project-tool discovery, media adapters, and architecture boundaries.
+
 ## [4.4.17] - 2026-08-03
 
 ### Fixed

@@ -30,14 +30,24 @@ async function call(name, args, label) {
 
 try {
   await client.connect(transport);
-  const start = await call("unity_advanced_tool", {
-    expectedProjectPath: projectPath,
-    tool: "testing/run-package-tests",
-    params: {
-      packageName,
-      mode: "EditMode",
-      testNames,
-    },
+  const instanceResult = await call("unity_list_instances", {}, "list Unity instances");
+  const target = (instanceResult.instances || []).find((instance) =>
+    instance.projectPath?.replaceAll("\\", "/").toLowerCase() ===
+    projectPath.replaceAll("\\", "/").toLowerCase());
+  assert.ok(target, `No Unity instance matched ${projectPath}`);
+  await call("unity_select_instance", { port: target.port }, "select Unity instance");
+  const search = await call("unity_tools_search", {
+    query: "unity_testing_run_package_tests",
+  }, "find package test tool");
+  const packageTool = search.results.find((result) =>
+    result.name === "unity_testing_run_package_tests");
+  assert.ok(packageTool, JSON.stringify(search));
+  await call("unity_tools_get", { name: packageTool.name }, "activate package test tool");
+
+  const start = await call(packageTool.name, {
+    packageName,
+    mode: "EditMode",
+    testNames,
   }, "start package tests");
   assert.ok(start.jobId, JSON.stringify(start));
   assert.ok(start.jobAccessToken, JSON.stringify(start));
@@ -47,7 +57,6 @@ try {
   while (!["succeeded", "failed", "canceled", "cancelled"].includes(job.status)) {
     pollCount++;
     const polled = await call("unity_jobs_get", {
-      expectedProjectPath: projectPath,
       jobId: start.jobId,
       jobType: "package-test",
       jobAccessToken: start.jobAccessToken,

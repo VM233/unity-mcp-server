@@ -28,16 +28,14 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 
 import { hubTools } from "./tools/hub-tools.js";
-import { editorTools } from "./tools/editor-tools.js";
 import { contextTools } from "./tools/context-tools.js";
 import { instanceTools } from "./tools/instance-tools.js";
-import {
-  createAdvertisedToolRegistry,
-  fetchFirstClassPluginTools,
-  refreshPluginToolsMetadata,
-  sanitizeToolMetadata,
-  splitToolTiers,
-} from "./tool-tiers.js";
+import { createHealthTools } from "./tools/health-tools.js";
+import { ToolCatalog, hostTool } from "./catalog/tool-catalog.js";
+import { UnityToolCatalogSource } from "./catalog/unity-tool-catalog.js";
+import { sanitizeToolMetadata } from "./catalog/tool-metadata.js";
+import { createToolDiscoveryTools } from "./discovery/tool-discovery.js";
+import { AdvertisedToolRegistry } from "./exposure/advertised-tool-registry.js";
 import { getProjectContext } from "./unity-editor-bridge.js";
 import {
   autoSelectInstance,
@@ -66,6 +64,13 @@ import {
 const require = createRequire(import.meta.url);
 const { version: SERVER_VERSION } = require("../package.json");
 
+const SERVER_INSTRUCTIONS =
+  "Use only canonical typed tools. If the exact tool is visible, call it directly. " +
+  "Otherwise call unity_tools_search with the task intent, then unity_tools_get for one result; " +
+  "after the tool list refresh, invoke that canonical tool. Use unity_tools_list only for browsing. " +
+  "Never guess Unity routes or use generic executors. Follow asynchronous work only through " +
+  "unity_jobs_get, unity_jobs_cancel, and unity_jobs_cleanup.";
+
 // ─── Per-process agent identity ───
 // Each MCP stdio process = one Cowork agent.
 // Generate a unique ID so the Unity plugin can track and schedule fairly.
@@ -73,23 +78,99 @@ const PROCESS_AGENT_ID = process.env.UNITY_MCP_AGENT_ID ||
   `agent-${process.pid}-${randomBytes(3).toString("hex")}`;
 setDefaultRequestAgentId(PROCESS_AGENT_ID);
 
-// ─── Combine all tools (two-tier system) ───
-// Split editor tools into core (always exposed) and advanced (on-demand via meta-tool).
-// This keeps the tool count under ~70, preventing MCP client rejection caused by
-// oversized tool lists (268 tools / 125KB was ~5x beyond what clients handle).
-const { coreTools, metaTools, advancedCount, coreCount } =
-  splitToolTiers(editorTools);
-const ALL_TOOLS = [
+// ─── Canonical catalog and bounded bootstrap surface ───
+const unityCatalogSource = new UnityToolCatalogSource();
+const toolCatalog = new ToolCatalog({
+  unitySource: unityCatalogSource,
+  hostTools: [
+    ...instanceTools.map((tool) => hostTool(tool, {
+      moduleId: "host.instances",
+      category: "instance",
+      capability: "instance-binding",
+      operationKind: tool.name === "unity_select_instance" ? "select" : "inspect",
+      sideEffects: tool.name === "unity_select_instance"
+        ? ["changesHostBinding"]
+        : [],
+    })),
+    ...hubTools.map((tool) => hostTool(tool, {
+      moduleId: "host.hub",
+      category: "hub",
+      capability: "unity-hub",
+      searchTerms: ["Unity Editor installation", "Unity modules"],
+    })),
+    ...contextTools.map((tool) => hostTool(tool, {
+      moduleId: "host.context",
+      category: "context",
+      capability: "project-context",
+      operationKind: "inspect",
+      preconditions: ["projectBound"],
+    })),
+  ],
+});
+
+const healthTools = createHealthTools({
+  getCatalog: () => toolCatalog,
+  getSelectedInstance,
+});
+
+let advertisedTools;
+const discoveryTools = createToolDiscoveryTools({
+  catalog: toolCatalog,
+  refreshCatalog: refreshCatalogForSelectedInstance,
+  activateTool: activateCanonicalTool,
+});
+
+toolCatalog.addHostTools([
+  ...healthTools.map((tool) => hostTool(tool, {
+    moduleId: "host.health",
+    category: "health",
+    capability: "mcp-health",
+    operationKind: "inspect",
+  })),
+  ...discoveryTools.map((tool) => hostTool(tool, {
+    moduleId: "host.discovery",
+    category: "tools",
+    capability: "tool-discovery",
+    operationKind: tool.name === "unity_tools_get" ? "inspect" : "search",
+  })),
+]);
+
+const BOOTSTRAP_TOOLS = [
   ...instanceTools,
   ...hubTools,
-  ...coreTools,
-  ...metaTools,
-  ...contextTools,
+  ...healthTools,
+  ...discoveryTools,
 ];
-const advertisedTools = createAdvertisedToolRegistry(ALL_TOOLS);
+advertisedTools = new AdvertisedToolRegistry(BOOTSTRAP_TOOLS);
 console.error(
-  `[MCP] Tool tiers: ${coreCount} core + ${advancedCount} advanced (via unity_advanced_tool) = ${coreCount + advancedCount} total, ${ALL_TOOLS.length} exposed`
+  `[MCP] Canonical catalog bootstrap: ${BOOTSTRAP_TOOLS.length} exposed tools`
 );
+
+async function refreshCatalogForSelectedInstance() {
+  if (!getSelectedInstance()) {
+    return {
+      changed: false,
+      revision: toolCatalog.revision,
+      toolCount: toolCatalog.values().length,
+    };
+  }
+  return toolCatalog.refreshUnity();
+}
+
+async function activateCanonicalTool(tool) {
+  let changed = advertisedTools.activate(tool);
+  const metadata = tool.catalog || {};
+  const requiresJobTools = metadata.tags?.includes("longRunning") ||
+    Boolean(metadata.cleanupToolName);
+  if (requiresJobTools) {
+    for (const name of ["unity_jobs_get", "unity_jobs_cancel", "unity_jobs_cleanup"]) {
+      const dependency = toolCatalog.get(name);
+      if (dependency) changed = advertisedTools.activate(dependency) || changed;
+    }
+  }
+  if (changed) await server.sendToolListChanged();
+  return changed;
+}
 
 // ─── Per-Agent Session State ───
 // A SINGLE MCP process serves ALL agents/tasks in the same Claude Desktop session.
@@ -187,6 +268,7 @@ const server = new Server(
       tools: { listChanged: true },
       resources: {},
     },
+    instructions: SERVER_INSTRUCTIONS,
   }
 );
 
@@ -218,18 +300,11 @@ function toolWithEditorBindingSchema({
   return tool;
 }
 
-async function getExposedTools() {
-  const pluginTools = await fetchFirstClassPluginTools();
-  // Keep release-managed tools already advertised during this MCP process
-  // callable through transient Editor reloads. Live metadata replaces the
-  // schema and handler for a same-named route.
-  advertisedTools.remember(pluginTools);
+function getExposedTools() {
   return advertisedTools.values();
 }
 
-async function findExposedTool(name) {
-  const pluginTools = await fetchFirstClassPluginTools();
-  advertisedTools.remember(pluginTools);
+function findExposedTool(name) {
   return advertisedTools.get(name);
 }
 
@@ -319,6 +394,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         !name.startsWith("unity_hub_") &&
         name !== "unity_list_instances" &&
         name !== "unity_select_instance" &&
+        name !== "unity_mcp_health" &&
         name !== "unity_get_project_context"
       ) {
         return buildToolResponse(createToolError(
@@ -338,6 +414,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         !name.startsWith("unity_hub_") &&
         name !== "unity_list_instances" &&
         name !== "unity_select_instance" &&
+        name !== "unity_mcp_health" &&
         name !== "unity_get_project_context"
       ) {
         return buildToolResponse(createToolError(
@@ -347,12 +424,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         ));
       }
 
-      tool = await findExposedTool(name);
+      tool = findExposedTool(name);
       if (!tool) {
         return buildToolResponse(createToolError(
           "unknown_tool",
           `Unknown tool: ${name}`,
-          { tool: name }
+          { tool: name, nextTool: "unity_tools_get" }
         ));
       }
 
@@ -362,6 +439,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       const result = await tool.handler(handlerArgs);
+      if (name === "unity_select_instance" && getSelectedInstance()) {
+        const catalogRefresh = await refreshCatalogForSelectedInstance();
+        if (catalogRefresh.changed && advertisedTools.reconcile(toolCatalog)) {
+          await server.sendToolListChanged();
+        }
+      }
       const sizeGuard = guardToolResponseSize(buildToolResponse(result), {
         softLimitBytes: CONFIG.responseSoftLimitBytes,
         hardLimitBytes: CONFIG.responseHardLimitBytes,
@@ -445,9 +528,10 @@ function startPluginToolMetadataRefresh() {
   const refresh = async () => {
     if (stopped) return;
     try {
-      const result = await refreshPluginToolsMetadata();
-      if (result.changed) {
-        console.error("[MCP] Unity plugin tool metadata changed; notifying MCP clients");
+      const result = await refreshCatalogForSelectedInstance();
+      const exposedChanged = result.changed && advertisedTools.reconcile(toolCatalog);
+      if (exposedChanged) {
+        console.error("[MCP] Canonical Unity tool catalog changed; notifying MCP clients");
         await server.sendToolListChanged();
       }
     } catch (error) {

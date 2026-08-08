@@ -14,14 +14,16 @@ Originally created by [AnkleBreaker Studio](https://github.com/AnkleBreaker-Stud
 - Project-defined tools and project context supplied by the selected Unity project
 - Server hot reload while the MCP host keeps the same stdio connection
 
-The selected Editor package's live metadata is authoritative for available tools and schemas. `manifest.json` contains the release-managed direct tool surface; less common routes are discovered at runtime.
+The selected Editor package's live metadata is authoritative for every Unity,
+package, and project tool. `manifest.json` contains only the bounded bootstrap;
+typed Unity tools are discovered and activated from the selected instance.
 
 ## Architecture
 
 ```text
-MCP host <-> Node.js server <-> VM Unity MCP Editor package <-> Unity Editor
-                     |
-                     +-> Unity Hub CLI
+MCP host <-> bootstrap + active typed tools <-> canonical instance catalog
+              |                                  |
+              +-> Unity Hub CLI                  +-> VM Unity MCP <-> Editor
 ```
 
 The Node.js server owns MCP transport, tool exposure, instance discovery and binding, queue polling, and Unity Hub commands. The Unity package owns Editor-side routes, capability metadata, and Unity API execution.
@@ -73,21 +75,33 @@ Open a Unity project containing the Editor package. The server selects the only 
 
 ## Tool access
 
-Use directly exposed `unity_*` tools first.
+The initial MCP surface is deliberately limited to 12 tools: instance binding,
+Unity Hub, health, and `unity_tools_list/search/get`. This keeps Codex tool
+selection small without hiding any Editor capability.
 
-For a route that is not directly exposed:
+For normal work:
 
-1. Call `unity_list_advanced_tools` with a category and pagination.
-2. Request schemas only for the relevant page when needed.
-3. Call `unity_advanced_tool` with the returned tool name or raw route and its `params`.
+1. Call `unity_tools_search` with the task intent. Add `moduleId`, `category`,
+   `capability`, `operationKind`, `effects`, or `preconditions` only when they
+   materially narrow the request. The default result is at most five compact
+   candidates and never contains full schemas.
+2. Call `unity_tools_get` with one exact returned `name`. If the name is already
+   known, start here instead of searching.
+3. Call the newly activated typed tool with its published schema.
 
-Project-defined tools use this sequence:
+`unity_tools_get` returns the full input/output contract and adds that exact
+tool to the MCP surface. Long-running activations also make `unity_jobs_get`,
+`unity_jobs_cancel`, and `unity_jobs_cleanup` available. Project-defined and
+package-defined tools use the same workflow and become ordinary typed calls;
+there is no generic route executor or separate project-tool envelope.
 
-1. `unity_project_tools_list`
-2. `unity_project_tools_get`
-3. `unity_project_tools_execute`
+Changing the selected Unity instance binds a different catalog revision. Tools
+whose contract is absent or changed are removed or refreshed and the server
+emits `tools/list_changed`.
 
-If a queued operation reaches its polling timeout, do not immediately submit the mutation again. Follow the returned `nextTool` and `nextToolArgs` to inspect the existing ticket first.
+If a queued operation reaches its polling timeout, do not immediately submit
+the mutation again. Activate the returned ticket-status tool through
+`unity_tools_get`, then inspect the existing ticket first.
 
 Release-managed reads whose live plugin metadata declares them idempotent receive
 one fresh submission when Unity definitively reports that a domain reload lost
@@ -140,8 +154,8 @@ npm test
 Run a focused Git-package reload regression by setting
 `UNITY_EXPECTED_PROJECT_PATH`, `UNITY_PACKAGE_TEST_NAME`, and a JSON array in
 `UNITY_PACKAGE_TEST_NAMES`, then execute `npm run test:package-job-reload`.
-The script starts the lazy `testing/run-package-tests` route through
-`unity_advanced_tool` and polls its durable Job through `unity_jobs_get`.
+The script finds and activates `unity_testing_run_package_tests` through the
+canonical catalog, then polls its durable Job through `unity_jobs_get`.
 
 Regenerate the tool audit after intentionally changing the release-managed tool surface:
 

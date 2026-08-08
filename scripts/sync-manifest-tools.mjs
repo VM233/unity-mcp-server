@@ -2,15 +2,11 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
-import { contextTools } from "../src/tools/context-tools.js";
-import { editorTools } from "../src/tools/editor-tools.js";
+import { createToolDiscoveryTools } from "../src/discovery/tool-discovery.js";
+import { createHealthTools } from "../src/tools/health-tools.js";
 import { hubTools } from "../src/tools/hub-tools.js";
 import { instanceTools } from "../src/tools/instance-tools.js";
-import { staticFirstClassPluginTools } from "../src/tools/plugin-first-class-tools.js";
-import {
-  sanitizeToolMetadata,
-  splitToolTiers,
-} from "../src/tool-tiers.js";
+import { sanitizeToolMetadata } from "../src/catalog/tool-metadata.js";
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = dirname(scriptDirectory);
@@ -18,24 +14,29 @@ const manifestPath = join(repositoryRoot, "manifest.json");
 const packagePath = join(repositoryRoot, "package.json");
 const packageMetadata = JSON.parse(readFileSync(packagePath, "utf8"));
 
-const { coreTools, metaTools } = splitToolTiers(editorTools);
+const inertCatalog = {
+  revision: "manifest",
+  values: () => [],
+  get: () => null,
+};
+const healthTools = createHealthTools({
+  getCatalog: () => inertCatalog,
+  getSelectedInstance: () => null,
+});
+const discoveryTools = createToolDiscoveryTools({
+  catalog: inertCatalog,
+  refreshCatalog: async () => ({ changed: false }),
+  activateTool: async () => false,
+});
 const toolsByName = new Map();
 for (const tool of [
   ...instanceTools,
   ...hubTools,
-  ...coreTools,
-  ...metaTools,
-  ...contextTools,
+  ...healthTools,
+  ...discoveryTools,
 ]) {
   toolsByName.set(tool.name, {
     name: tool.name,
-    description: sanitizeToolMetadata(tool.description),
-  });
-}
-
-for (const tool of staticFirstClassPluginTools) {
-  toolsByName.set(tool.toolName, {
-    name: tool.toolName,
     description: sanitizeToolMetadata(tool.description),
   });
 }

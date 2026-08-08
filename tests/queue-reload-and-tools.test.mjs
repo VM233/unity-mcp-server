@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -25,24 +25,13 @@ import {
 } from "../src/unity-editor-bridge.js";
 import { runWithRequestContext } from "../src/request-context.js";
 import { injectEditorBindingSchema } from "../src/tool-schema.js";
+import { invokeWithToolAdapter } from
+  "../src/catalog/tool-invocation-adapters.js";
 import {
   discoverInstances,
   normalizeProjectPath,
   refreshRequestProjectPathBinding,
 } from "../src/instance-discovery.js";
-import { editorTools } from "../src/tools/editor-tools.js";
-import { hubTools } from "../src/tools/hub-tools.js";
-import { instanceTools } from "../src/tools/instance-tools.js";
-import { contextTools } from "../src/tools/context-tools.js";
-import { staticFirstClassPluginTools } from "../src/tools/plugin-first-class-tools.js";
-import {
-  createPluginToolsCachePayload,
-  createAdvertisedToolRegistry,
-  invokeFirstClassPluginRoute,
-  isPluginToolsCacheCompatible,
-  pluginToolsFingerprint,
-  splitToolTiers,
-} from "../src/tool-tiers.js";
 
 test("UncertainAfterReload is a non-retryable failed terminal status", () => {
   const result = normalizeTerminalQueueStatus({
@@ -121,10 +110,11 @@ test("asset preview unwraps bridge data into valid MCP media blocks", async () =
   });
 
   try {
-    const preview = editorTools.find(
-      (tool) => tool.name === "unity_graphics_asset_preview");
     const result = await runWithRequestContext(testRequestContext(), () =>
-      preview.handler({ assetPath: "Assets/Preview.prefab" }));
+      invokeWithToolAdapter("graphics/asset-preview", () =>
+        sendCommand("graphics/asset-preview", {
+          assetPath: "Assets/Preview.prefab",
+        })));
 
     assert.equal(Array.isArray(result), true);
     assert.deepEqual(result[0], {
@@ -151,11 +141,12 @@ test("asset preview reports a structured failure instead of emitting undefined i
     });
 
     try {
-      const preview = editorTools.find(
-        (tool) => tool.name === "unity_graphics_asset_preview");
       const result = await runWithRequestContext(testRequestContext(), () =>
-        preview.handler({ assetPath: "Assets/Preview.prefab" }));
-      const failure = JSON.parse(result);
+        invokeWithToolAdapter("graphics/asset-preview", () =>
+          sendCommand("graphics/asset-preview", {
+            assetPath: "Assets/Preview.prefab",
+          })));
+      const failure = result;
 
       assert.equal(failure.success, false);
       assert.equal(failure.errorCode, "asset_preview_payload_missing");
@@ -178,10 +169,11 @@ test("material info preserves its optional inline preview after bridge unwrappin
     });
 
     try {
-      const materialInfo = editorTools.find(
-        (tool) => tool.name === "unity_graphics_material_info");
       const result = await runWithRequestContext(testRequestContext(), () =>
-        materialInfo.handler({ assetPath: "Assets/Preview.mat" }));
+        invokeWithToolAdapter("graphics/material-info", () =>
+          sendCommand("graphics/material-info", {
+            assetPath: "Assets/Preview.mat",
+          })));
 
       assert.equal(Array.isArray(result), true);
       assert.equal(result[0].data, previewBase64);
@@ -194,7 +186,7 @@ test("material info preserves its optional inline preview after bridge unwrappin
     }
   });
 
-test("test runner reads the started job before performing its early poll", async () => {
+test("test runner returns the started job without hidden follow-up polling", async () => {
   const originalFetch = globalThis.fetch;
   let submitCount = 0;
   globalThis.fetch = async (url) => {
@@ -214,31 +206,17 @@ test("test runner reads the started job before performing its early poll", async
         },
       });
     }
-    if (target.includes("/api/queue/status?ticketId=2")) {
-      return Response.json({
-        ticketId: 2,
-        actionName: "testing/get-job",
-        status: "Completed",
-        result: {
-          success: true,
-          data: { jobId: "test-job-1", status: "succeeded", passed: 3 },
-        },
-      });
-    }
     throw new Error(`unexpected fetch ${target}`);
   };
 
   try {
-    const runTests = editorTools.find(
-      (tool) => tool.name === "unity_testing_run_tests");
     const result = await runWithRequestContext(testRequestContext(), () =>
-      runTests.handler({ mode: "EditMode" }));
+      sendCommand("testing/run-tests", { mode: "EditMode" }));
 
-    assert.equal(submitCount, 2);
-    assert.deepEqual(JSON.parse(result), {
+    assert.equal(submitCount, 1);
+    assert.deepEqual(result.data, {
       jobId: "test-job-1",
-      status: "succeeded",
-      passed: 3,
+      status: "running",
     });
   } finally {
     globalThis.fetch = originalFetch;
@@ -393,10 +371,10 @@ test("non-retryable structured queue submission errors keep their Unity error co
     }
   });
 
-test("release-managed read metadata and explicit reload-safe routes control replay", () => {
-  assert.equal(canReplayAfterLostTicket("compilation/errors"), true);
-  assert.equal(canReplayAfterLostTicket("console/query"), true);
-  assert.equal(canReplayAfterLostTicket("search/scene"), true);
+test("only explicit transport-safe routes control lost-ticket replay", () => {
+  assert.equal(canReplayAfterLostTicket("compilation/errors"), false);
+  assert.equal(canReplayAfterLostTicket("console/query"), false);
+  assert.equal(canReplayAfterLostTicket("search/scene"), false);
   assert.equal(canReplayAfterLostTicket("wait/editor-idle"), true);
   assert.equal(canReplayAfterLostTicket("testing/list-tests"), true);
   assert.equal(canReplayAfterLostTicket("testing/get-package-job"), true);
@@ -580,7 +558,7 @@ test("an explicit port binding never migrates through project-path recovery", as
   }
 });
 
-test("same-port reload replays a read whose old ticket now belongs to another agent", async () => {
+test("same-port reload replays catalog metadata whose old ticket belongs to another agent", async () => {
   const originalFetch = globalThis.fetch;
   const originalPollTimeout = CONFIG.queuePollTimeoutMs;
   const originalRecoveryTimeout = CONFIG.queueReloadRecoveryTimeoutMs;
@@ -613,7 +591,7 @@ test("same-port reload replays a read whose old ticket now belongs to another ag
     if (target.includes("/api/queue/status?ticketId=16385")) {
       return Response.json({
         ticketId: 16385,
-        actionName: "compilation/errors",
+        actionName: "_meta/tools",
         status: "Completed",
         result: { counts: { errors: 0, warnings: 0 } },
       });
@@ -636,7 +614,7 @@ test("same-port reload replays a read whose old ticket now belongs to another ag
       },
       expectedProjectPath: "D:/UnityProjects/MarbleBattlers",
       allowProjectPathRebind: false,
-    }, () => sendCommand("compilation/errors"));
+    }, () => sendCommand("_meta/tools"));
 
     assert.equal(result.success, true,
       JSON.stringify({ result, submissions, staleStatusReads }));
@@ -866,21 +844,14 @@ test("a non-terminal queue ticket remains a timeout failure", async () => {
     assert.equal(result.success, false);
     assert.equal(result.errorCode, "queue_poll_timeout");
     assert.equal(result.retryable, false);
-    assert.match(result.error, /unity_advanced_tool/);
-    assert.equal(result.nextTool, "unity_advanced_tool");
+    assert.match(result.error, /unity_tools_get/);
+    assert.equal(result.nextTool, "unity_tools_get");
     assert.deepEqual(result.nextToolArgs, {
-      tool: "unity_queue_ticket_status",
-      params: { ticketId: 71 },
+      name: "unity_queue_ticket_status",
     });
     assert.equal(result.lastKnownTicket.status, "Queued");
     assert.equal(result.queueState.totalQueued, 1);
 
-    const { metaTools } = splitToolTiers(editorTools);
-    const advancedTool = metaTools.find((tool) => tool.name === result.nextTool);
-    const recovered = JSON.parse(await advancedTool.handler(result.nextToolArgs));
-    assert.equal(recovered.success, true);
-    assert.equal(recovered.data.ticketId, 71);
-    assert.equal(recovered.data.status, "Queued");
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -909,7 +880,7 @@ test("queue submission failure never falls back to a direct command endpoint", a
   }
 });
 
-test("plugin-declared queue tools use direct control endpoints", async () => {
+test("queue control functions use direct control endpoints", async () => {
   const originalFetch = globalThis.fetch;
   const calls = [];
   globalThis.fetch = async (url, options = {}) => {
@@ -925,9 +896,9 @@ test("plugin-declared queue tools use direct control endpoints", async () => {
   };
 
   try {
-    const info = await invokeFirstClassPluginRoute("queue/info");
-    const status = await invokeFirstClassPluginRoute("queue/status", { ticketId: 72 });
-    const canceled = await invokeFirstClassPluginRoute("queue/cancel", { ticketId: 73 });
+    const info = await getQueueInfo();
+    const status = await getTicketStatus(72);
+    const canceled = await cancelTicket(73);
 
     assert.equal(info.success, true);
     assert.equal(status.data.status, "Completed");
@@ -1035,7 +1006,7 @@ test("project identity comparison preserves casing on case-sensitive hosts", () 
   );
 });
 
-test("first-class Editor schemas expose explicit project binding", () => {
+test("canonical Editor schemas expose explicit project binding", () => {
   for (const name of ["unity_asset_refresh", "unity_execute_code", "unity_play_mode"]) {
     const schema = injectEditorBindingSchema(name, {
       type: "object",
@@ -1055,15 +1026,6 @@ test("first-class Editor schemas expose explicit project binding", () => {
   assert.equal(injectEditorBindingSchema("unity_hub_list_projects", {
     type: "object", properties: {},
   }).properties.expectedProjectPath, undefined);
-});
-
-test("execute code schema exposes one-off namespace imports and project configuration", () => {
-  const executeCode = editorTools.find((tool) => tool.name === "unity_execute_code");
-  assert.ok(executeCode);
-  assert.equal(executeCode.inputSchema.properties.usings.type, "array");
-  assert.equal(executeCode.inputSchema.properties.usings.items.type, "string");
-  assert.match(executeCode.inputSchema.properties.usings.description, /Project Settings > Unity MCP/);
-  assert.equal(executeCode.inputSchema.properties.includeStackTrace.type, "boolean");
 });
 
 test("asset refresh recovery returns persistent job truth instead of transport failure", () => {
@@ -1096,220 +1058,6 @@ test("generated idempotency keys are unique command-scoped values", () => {
   const second = createRequestId("asset/create-folder");
   assert.notEqual(first, second);
   assert.match(first, /asset\/create-folder/);
-});
-
-test("plugin tool metadata fingerprint is order independent and schema sensitive", () => {
-  const first = [
-    { toolName: "unity_asset_refresh", route: "asset/refresh", tags: ["firstClass"], inputSchema: { type: "object" } },
-    { toolName: "unity_asset_list", route: "asset/list", tags: ["firstClass"], inputSchema: { type: "object" } },
-  ];
-  const reordered = [first[1], first[0]];
-  const changed = [
-    first[1],
-    { ...first[0], inputSchema: { type: "object", required: ["value"] } },
-  ];
-
-  assert.equal(pluginToolsFingerprint(first), pluginToolsFingerprint(reordered));
-  assert.notEqual(pluginToolsFingerprint(first), pluginToolsFingerprint(changed));
-});
-
-test("cold-start plugin metadata cache is bound to the release snapshot", () => {
-  const current = createPluginToolsCachePayload([
-    { toolName: "unity_prefab_asset_configure_component" },
-  ], 1234);
-
-  assert.equal(isPluginToolsCacheCompatible(current), true);
-  assert.equal(isPluginToolsCacheCompatible({
-    ...current,
-    releaseFingerprint: "stale-release-snapshot",
-  }), false);
-  assert.equal(isPluginToolsCacheCompatible({
-    ...current,
-    schemaVersion: current.schemaVersion - 1,
-  }), false);
-});
-
-test("advertised tools remain callable across volatile instance catalog refreshes", () => {
-  const core = { name: "unity_editor_ping", handler: () => "pong" };
-  const battleToolV1 = {
-    name: "unity_pt_battle_get_runtime_ready_state",
-    handler: () => "battle-v1",
-  };
-  const registry = createAdvertisedToolRegistry([core]);
-
-  registry.remember([battleToolV1]);
-  registry.remember([]);
-
-  assert.equal(registry.get(battleToolV1.name), battleToolV1);
-  assert.equal(registry.get(battleToolV1.name).handler(), "battle-v1");
-
-  const battleToolV2 = {
-    name: battleToolV1.name,
-    handler: () => "battle-v2",
-  };
-  registry.remember([battleToolV2]);
-  assert.equal(registry.get(battleToolV1.name), battleToolV2);
-  assert.equal(registry.get(battleToolV1.name).handler(), "battle-v2");
-});
-
-test("default tool surface stays bounded and exposes only canonical consolidated tools", () => {
-  const { coreTools, metaTools } = splitToolTiers(editorTools);
-  const exposedByName = new Map(
-    [...instanceTools, ...hubTools, ...coreTools, ...metaTools, ...contextTools]
-      .map((tool) => [tool.name, tool])
-  );
-  for (const tool of staticFirstClassPluginTools) {
-    if (!exposedByName.has(tool.toolName)) {
-      exposedByName.set(tool.toolName, {
-        name: tool.toolName,
-        description: tool.description,
-        inputSchema: tool.inputSchema,
-      });
-    }
-  }
-
-  const exposed = [...exposedByName.values()];
-  assert.ok(exposed.length <= 106, `expected <=106 tools, got ${exposed.length}`);
-  assert.ok(JSON.stringify({ tools: exposed }).length <= 60_000);
-  assert.equal(JSON.stringify(exposed).includes("Alias for"), false);
-  assert.equal(exposedByName.has("unity_prefab_asset_batch_edit"), false);
-  assert.equal(exposedByName.has("unity_asset_move_batch"), false);
-  assert.equal(exposedByName.has("unity_component_batch_wire"), false);
-  assert.equal(exposedByName.has("unity_localization_upsert_entries"), false);
-  assert.equal(exposedByName.has("unity_console_log"), false);
-  assert.equal(exposedByName.has("unity_console_query"), true);
-  assert.equal(exposedByName.has("unity_project_tools_list"), true);
-  assert.equal(exposedByName.has("unity_project_tools_get"), true);
-  assert.equal(exposedByName.has("unity_project_tools_execute"), true);
-  assert.equal([...exposedByName.keys()].some((name) => name.startsWith("unity_uma_")), false);
-
-  const projectToolList = exposedByName.get("unity_project_tools_list");
-  const projectToolGet = exposedByName.get("unity_project_tools_get");
-  assert.equal("includeSchema" in projectToolList.inputSchema.properties, false);
-  assert.deepEqual(projectToolGet.inputSchema.required, ["toolName"]);
-
-  const retiredToolNames = [
-    "unity_asset_instantiate_prefab",
-    "unity_search_assets",
-    "unity_selection_find_by_type",
-    "unity_graphics_scene_capture",
-    "unity_graphics_game_capture",
-    "unity_graphics_prefab_render",
-    "unity_graphics_texture_info",
-    "unity_texture_set_sprite",
-    "unity_texture_set_normalmap",
-    "unity_prefab_asset_instantiate_prefab",
-    "unity_uitoolkit_wait_refresh",
-  ];
-  const declaredToolNames = new Set([
-    ...editorTools.map((tool) => tool.name),
-    ...staticFirstClassPluginTools.map((tool) => tool.toolName),
-  ]);
-  const manifest = JSON.parse(
-    readFileSync(new URL("../manifest.json", import.meta.url), "utf8"));
-  const manifestToolNames = new Set(manifest.tools.map((tool) => tool.name));
-  for (const toolName of retiredToolNames) {
-    assert.equal(declaredToolNames.has(toolName), false, toolName);
-    assert.equal(exposedByName.has(toolName), false, toolName);
-    assert.equal(manifestToolNames.has(toolName), false, toolName);
-  }
-
-  for (const toolName of [
-    "unity_asset_list",
-    "unity_scene_instantiate_prefab",
-    "unity_build_get_job",
-    "unity_uitoolkit_refresh",
-  ]) {
-    assert.equal(exposedByName.has(toolName), true, toolName);
-  }
-
-  const staleStaticRoutes = [
-    "asset/instantiate-prefab",
-    "search/assets",
-    "selection/find-by-type",
-    "graphics/scene-capture",
-    "graphics/game-capture",
-    "graphics/prefab-render",
-    "graphics/texture-info",
-    "texture/set-sprite",
-    "texture/set-normalmap",
-    "prefab-asset/instantiate-prefab",
-    "uitoolkit/wait-refresh",
-  ];
-  const staticRoutes = new Set(staticFirstClassPluginTools.map((tool) => tool.route));
-  for (const route of staleStaticRoutes) {
-    assert.equal(staticRoutes.has(route), false, route);
-  }
-
-  const assetList = exposedByName.get("unity_asset_list");
-  assert.ok(assetList.inputSchema.properties.limit);
-  assert.equal(assetList.inputSchema.properties.maxResults, undefined);
-
-  const sceneInstantiate = exposedByName.get("unity_scene_instantiate_prefab");
-  assert.deepEqual(sceneInstantiate.inputSchema.required, ["prefabPath"]);
-  assert.ok(sceneInstantiate.inputSchema.properties.parent);
-  assert.equal(sceneInstantiate.inputSchema.properties.assetPath, undefined);
-
-  assert.equal(exposedByName.has("unity_prefab_asset_transaction_edit"), false);
-
-  const configureComponent = exposedByName.get("unity_prefab_asset_configure_component");
-  assert.ok(configureComponent);
-  assert.deepEqual(configureComponent.inputSchema.required, ["assetPath", "componentType"]);
-  assert.ok(configureComponent.inputSchema.properties.createPathIfMissing);
-  assert.ok(configureComponent.inputSchema.properties.properties);
-  assert.ok(configureComponent.inputSchema.properties.references.items.properties.referenceAssetPath);
-
-  const assetMove = exposedByName.get("unity_asset_move");
-  assert.deepEqual(assetMove.inputSchema.required, ["moves"]);
-  assert.ok(assetMove.inputSchema.properties.execution);
-
-  const setReference = exposedByName.get("unity_component_set_reference");
-  assert.deepEqual(setReference.inputSchema.required, ["references"]);
-  assert.ok(setReference.inputSchema.properties.execution.properties.continueOnError);
-
-  assert.equal(exposedByName.has("unity_localization_upsert_entry"), false);
-
-  const refreshJob = exposedByName.get("unity_asset_get_refresh_job");
-  assert.ok(refreshJob);
-  assert.deepEqual(Object.keys(refreshJob.inputSchema.properties),
-    ["jobId", "refreshRequestId", "clear", "timeoutMs"]);
-});
-
-test("scene tools advertise modal-free explicit save behavior", () => {
-  const openScene = editorTools.find((tool) => tool.name === "unity_scene_open");
-  const saveScene = editorTools.find((tool) => tool.name === "unity_scene_save");
-  const newScene = editorTools.find((tool) => tool.name === "unity_scene_new");
-
-  assert.match(openScene.description, /without modal dialogs/i);
-  assert.match(newScene.description, /without modal dialogs/i);
-  assert.deepEqual(Object.keys(saveScene.inputSchema.properties).sort(),
-    ["overwrite", "path"]);
-  assert.match(saveScene.description, /explicit asset path/i);
-});
-
-test("prefab add component exposes atomic initial serialized properties", () => {
-  const addComponent = editorTools.find(
-    (tool) => tool.name === "unity_prefab_add_component"
-  );
-
-  assert.ok(addComponent);
-  assert.match(addComponent.description, /optionally initialize/i);
-  assert.deepEqual(addComponent.inputSchema.required,
-    ["assetPath", "componentType"]);
-  const properties = addComponent.inputSchema.properties.properties;
-  assert.equal(properties.type, "object");
-  assert.equal(properties.additionalProperties, true);
-  assert.match(properties.description, /before the new component is saved/i);
-});
-
-test("prefab add GameObject uses the bridge parent-path contract", () => {
-  const addGameObject = editorTools.find(
-    (tool) => tool.name === "unity_prefab_add_gameobject"
-  );
-
-  assert.ok(addGameObject);
-  assert.ok(addGameObject.inputSchema.properties.parentPrefabPath);
-  assert.equal(addGameObject.inputSchema.properties.prefabPath, undefined);
 });
 
 test("asset refresh queue failure is reconciled by exact persistent request ID", async () => {

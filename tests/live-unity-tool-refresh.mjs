@@ -1,95 +1,27 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { resolve } from "node:path";
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { ToolListChangedNotificationSchema } from "@modelcontextprotocol/sdk/types.js";
-import {
-  getStructuredEnvelope,
-  getStructuredResult,
-} from "./live-tool-response.mjs";
+import { getStructuredResult } from "./live-tool-response.mjs";
 
 const serverRoot = resolve(new URL("..", import.meta.url).pathname.replace(/^\/(.:)/, "$1"));
-const tempRoot = mkdtempSync(join(tmpdir(), "unity-mcp-live-refresh-"));
-const registryPath = join(tempRoot, "instances.json");
-const cachePath = join(tempRoot, "plugin-tools-metadata-cache-v5.json");
-
-writeFileSync(cachePath, JSON.stringify({
-  schemaVersion: 5,
-  updatedAt: 0,
-  tools: [{
-    route: "asset/import",
-    toolName: "unity_asset_import",
-    tags: ["firstClass"],
-    description: "Stale test metadata.",
-    inputSchema: { type: "object", properties: {} },
-  }, {
-    route: "jobs/get",
-    toolName: "unity_jobs_get",
-    tags: ["firstClass"],
-    description: "Stale Job metadata with a malformed output schema.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        jobId: { type: "string", description: "Job identifier." },
-      },
-      required: ["jobId"],
-    },
-    outputSchema: {
-      type: "object",
-      properties: {
-        tags: ["[type, array]"],
-      },
-    },
-  }],
-}));
-
-const environment = Object.fromEntries(
-  Object.entries({
-    ...process.env,
-    UNITY_INSTANCE_REGISTRY: registryPath,
-    UNITY_BRIDGE_PORT: process.env.UNITY_BRIDGE_PORT || "7890",
-  }).filter(([, value]) => value !== undefined)
-);
-
-const client = new Client({ name: "unity-mcp-live-refresh-test", version: "1.0.0" },
+const expectedProjectPath = process.env.UNITY_EXPECTED_PROJECT_PATH;
+const client = new Client({ name: "unity-mcp-live-catalog-test", version: "1.0.0" },
   { capabilities: {} });
-let resolveListChanged;
-const listChanged = new Promise((resolveNotification) => {
-  resolveListChanged = resolveNotification;
-});
-client.setNotificationHandler(ToolListChangedNotificationSchema, () => resolveListChanged());
-
 const transport = new StdioClientTransport({
   command: process.execPath,
-  args: [join(serverRoot, "src", "index.js")],
+  args: [resolve(serverRoot, "src", "index.js")],
   cwd: serverRoot,
-  env: environment,
+  env: process.env,
   stderr: "inherit",
 });
 
-async function withTimeout(promise, timeoutMs, message) {
-  let timer;
-  try {
-    return await Promise.race([
-      promise,
-      new Promise((_, reject) => {
-        timer = setTimeout(() => reject(new Error(message)), timeoutMs);
-      }),
-    ]);
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-function assertEditorBindingSchema(tools, toolName) {
-  const tool = tools.find((candidate) => candidate.name === toolName);
-  assert.ok(tool, `${toolName} was not exposed`);
-  assert.ok(tool.inputSchema.properties.port, `${toolName} did not expose port`);
-  assert.ok(tool.inputSchema.properties.expectedProjectPath,
-    `${toolName} did not expose expectedProjectPath`);
+async function call(name, args = {}) {
+  const response = await client.callTool(
+    { name, arguments: args }, undefined, { timeout: 120000 });
+  return getStructuredResult(response, name);
 }
 
 try {
@@ -97,195 +29,51 @@ try {
   assert.equal(client.getServerCapabilities()?.tools?.listChanged, true);
 
   const initial = await client.listTools();
-  const initialChars = JSON.stringify(initial).length;
-  // A warm metadata cache may already contain the current plugin's complete
-  // first-class surface. The static-only unit test keeps the cold core surface
-  // under 105; live cached/refreshed lists share the larger live bound.
-  assert.ok(initial.tools.length <= 155,
-    `expected initial tools/list at or below 155 tools, got ${initial.tools.length}`);
-  assert.ok(initialChars < 150_000,
-    `expected initial tools/list below 150000 chars, got ${initialChars}`);
-  assert.equal(initial.tools.some((tool) => tool.description?.startsWith("IMPORTANT:")), false);
-  const initialRefreshJob = initial.tools.find((tool) => tool.name === "unity_asset_get_refresh_job");
-  assert.ok(initialRefreshJob);
-  assert.ok(initialRefreshJob.inputSchema.properties.jobId);
-  assert.ok(initialRefreshJob.inputSchema.properties.clear);
-  assert.ok(initialRefreshJob.inputSchema.properties.port);
-  assert.ok(initialRefreshJob.inputSchema.properties.expectedProjectPath);
-  for (const toolName of ["unity_asset_refresh", "unity_execute_code", "unity_play_mode"]) {
-    assertEditorBindingSchema(initial.tools, toolName);
-  }
-  for (const toolName of [
-    "unity_project_tools_list",
-    "unity_project_tools_get",
-    "unity_project_tools_execute",
-  ]) {
-    assert.equal(initial.tools.some((tool) => tool.name === toolName), true);
-  }
-  const initialJobsGet = initial.tools.find(
-    (tool) => tool.name === "unity_jobs_get");
-  assert.ok(initialJobsGet);
-  assert.equal(
-    initialJobsGet.outputSchema.properties.result.properties.tags.type,
-    "array",
-    "malformed cached Job metadata must not replace the release schema"
-  );
-  assert.equal(initial.tools.some((tool) => tool.name.startsWith("unity_uma_")), false);
+  assert.deepEqual(initial.tools.map((tool) => tool.name), [
+    "unity_hub_available_releases",
+    "unity_hub_get_install_path",
+    "unity_hub_install_editor",
+    "unity_hub_install_modules",
+    "unity_hub_list_editors",
+    "unity_hub_set_install_path",
+    "unity_list_instances",
+    "unity_mcp_health",
+    "unity_select_instance",
+    "unity_tools_get",
+    "unity_tools_list",
+    "unity_tools_search",
+  ]);
 
-  await withTimeout(listChanged, 60000, "tool list change notification timed out");
+  const instanceResult = await call("unity_list_instances");
+  const instances = instanceResult.instances || [];
+  assert.ok(instances.length > 0, "No Unity Editor instance was discovered");
+  const target = expectedProjectPath
+    ? instances.find((instance) =>
+      instance.projectPath?.replaceAll("\\", "/").toLowerCase() ===
+      expectedProjectPath.replaceAll("\\", "/").toLowerCase())
+    : instances[0];
+  assert.ok(target, `No Unity instance matched ${expectedProjectPath}`);
+  await call("unity_select_instance", { port: target.port });
 
-  const refreshed = await client.listTools();
-  const refreshedChars = JSON.stringify(refreshed).length;
-  for (const toolName of [
-    "unity_jobs_get",
-    "unity_jobs_cancel",
-    "unity_jobs_cleanup",
-    "unity_asset_import_settings_get",
-    "unity_asset_import_settings_set",
-    "unity_scene_workspace",
-    "unity_material_properties_get",
-    "unity_material_properties_set",
-  ]) {
-    assertEditorBindingSchema(refreshed.tools, toolName);
-  }
-  for (const toolName of [
-    "unity_jobs_get",
-    "unity_jobs_cancel",
-    "unity_jobs_cleanup",
-  ]) {
-    const tool = refreshed.tools.find((candidate) => candidate.name === toolName);
-    const jobResult = tool.outputSchema.properties.result;
-    const jobProperties = jobResult.properties;
-    assert.equal(jobProperties.tags.type, "array", `${toolName} tags schema`);
-    assert.equal(jobProperties.sideEffects.type, "array",
-      `${toolName} sideEffects schema`);
-    for (const [name, schema] of Object.entries(jobProperties)) {
-      assert.ok(schema.description?.trim(),
-        `${toolName} output property ${name} needs a description`);
-    }
-  }
-  assert.equal(refreshed.tools.some((tool) =>
-    tool.name === "unity_testing_run_package_tests"), false);
-  assert.equal(refreshed.tools.some((tool) =>
-    tool.name === "unity_prefab_asset_move_component"), false);
-  assert.equal(refreshed.tools.some((tool) =>
-    tool.name === "unity_prefab_asset_transaction_edit"), false);
-  assert.equal(refreshed.tools.some((tool) => tool.name === "unity_prefab_asset_batch_edit"), false);
-  assert.equal(refreshed.tools.some((tool) => tool.name === "unity_asset_move_batch"), false);
-  assert.equal(refreshed.tools.some((tool) => tool.name === "unity_component_batch_wire"), false);
-  assert.equal(refreshed.tools.some((tool) => tool.name === "unity_localization_upsert_entries"), false);
-  assert.equal(refreshed.tools.some((tool) => tool.name === "unity_project_tools_get"), true);
-  assert.equal(refreshed.tools.some((tool) => tool.name.startsWith("unity_uma_")), false);
-  const assetMove = refreshed.tools.find((tool) => tool.name === "unity_asset_move");
-  const setReference = refreshed.tools.find((tool) => tool.name === "unity_component_set_reference");
-  const refreshJob = refreshed.tools.find((tool) => tool.name === "unity_asset_get_refresh_job");
-  assert.deepEqual(assetMove.inputSchema.required, ["moves"]);
-  assert.deepEqual(setReference.inputSchema.required, ["references"]);
-  assert.ok(refreshJob.inputSchema.properties.jobId);
-  assert.ok(refreshJob.inputSchema.properties.refreshRequestId);
-  assert.ok(refreshJob.inputSchema.properties.clear);
-  for (const toolName of ["unity_asset_refresh", "unity_execute_code", "unity_play_mode"]) {
-    assertEditorBindingSchema(refreshed.tools, toolName);
-  }
-  assert.equal(refreshed.tools.some((tool) => tool.annotations?.title), false);
-  assert.equal(refreshed.tools.some((tool) =>
-    Object.values(tool.annotations || {}).some((value) => value === false)), false);
-  assert.equal(JSON.stringify(refreshed.tools).includes("Alias for"), false);
-  assert.ok(refreshed.tools.length <= 155,
-    `expected refreshed tools/list at or below 155 tools, got ${refreshed.tools.length}`);
-  assert.ok(refreshedChars < 150_000,
-    `expected refreshed tools/list below 150000 chars, got ${refreshedChars}`);
-  assert.equal(refreshed.tools.some((tool) => tool.description?.startsWith("IMPORTANT:")), false);
+  let listChanged;
+  const changed = new Promise((resolveChanged) => { listChanged = resolveChanged; });
+  client.setNotificationHandler(ToolListChangedNotificationSchema, () => listChanged());
 
-  const pingResponse = await client.callTool({
-    name: "unity_editor_ping",
-    arguments: { port: Number(environment.UNITY_BRIDGE_PORT) },
-  });
-  const pingResult = getStructuredResult(pingResponse);
-  assert.ok(pingResult && typeof pingResult === "object");
+  const search = await call("unity_tools_search", { query: "scene hierarchy" });
+  assert.ok(search.results.length > 0, JSON.stringify(search));
+  const candidate = search.results.find((result) =>
+    result.name === "unity_scene_hierarchy") || search.results[0];
+  const detail = await call("unity_tools_get", { name: candidate.name });
+  assert.equal(detail.tool.name, candidate.name);
+  assert.ok(detail.tool.inputSchema);
+  await Promise.race([changed, new Promise((resolveDelay) => setTimeout(resolveDelay, 1000))]);
 
-  const refreshJobResponse = await client.callTool({
-    name: "unity_asset_get_refresh_job",
-    arguments: { port: Number(environment.UNITY_BRIDGE_PORT) },
-  });
-  const refreshJobEnvelope = getStructuredEnvelope(
-    refreshJobResponse, "refresh-job metadata probe", { expectSuccess: false });
-  if (refreshJobEnvelope.success) {
-    assert.ok(refreshJobEnvelope.result && typeof refreshJobEnvelope.result === "object");
-  } else {
-    assert.ok(["job_owner_mismatch", "job_not_found"].includes(refreshJobEnvelope.errorCode),
-      `unexpected refresh-job failure: ${JSON.stringify(refreshJobEnvelope)}`);
-  }
-  assert.equal(JSON.stringify(refreshJobEnvelope).includes("Unknown route"), false);
-
-  const catalogResponse = await client.callTool({
-    name: "unity_list_advanced_tools",
-    arguments: { port: Number(environment.UNITY_BRIDGE_PORT) },
-  });
-  const catalog = getStructuredResult(catalogResponse);
-  const catalogChars = JSON.stringify(catalog).length;
-  assert.ok(catalogChars < 10_000);
-  assert.ok(Array.isArray(catalog.categories));
-  assert.ok(catalog.categories.every((category) => !Array.isArray(category.tools)));
-  assert.equal(catalog.categories.some((category) => category.name === "uma"), false);
-
-  const projectListResponse = await client.callTool({
-    name: "unity_project_tools_list",
-    arguments: {
-      limit: 100,
-      port: Number(environment.UNITY_BRIDGE_PORT),
-    },
-  });
-  const projectList = getStructuredResult(projectListResponse);
-  assert.ok(Array.isArray(projectList.tools));
-  assert.equal(projectList.tools.some((tool) => "inputSchema" in tool), false);
-  assert.equal(projectList.tools.some((tool) =>
-    ["readOnly", "dangerous", "longRunning", "requiresPlayMode",
-      "firstClass", "cleanupAvailable", "incrementalJob", "valid"]
-      .some((key) => key in tool)), false);
-  assert.equal(projectList.tools.every((tool) =>
-    !("tags" in tool) || Array.isArray(tool.tags)), true);
-
-  const selectedProjectTool = projectList.tools.find(
-    (tool) => tool.toolName === "vmframework/list-game-prefab-types"
-  );
-  assert.ok(selectedProjectTool);
-  const projectGetResponse = await client.callTool({
-    name: "unity_project_tools_get",
-    arguments: {
-      toolName: selectedProjectTool.toolName,
-      port: Number(environment.UNITY_BRIDGE_PORT),
-    },
-  });
-  const projectGet = getStructuredResult(projectGetResponse);
-  assert.equal(projectGet.tool.toolName, selectedProjectTool.toolName);
-  assert.ok(projectGet.tool.inputSchema);
-  assert.ok(projectGet.tool.outputSchema);
-  assert.equal(["readOnly", "dangerous", "longRunning", "requiresPlayMode",
-    "firstClass", "cleanupAvailable", "incrementalJob", "valid"]
-    .some((key) => key in projectGet.tool), false);
-
-  const prefabCatalogResponse = await client.callTool({
-    name: "unity_list_advanced_tools",
-    arguments: {
-      category: "prefab-asset",
-      includeSchema: true,
-      limit: 25,
-      port: Number(environment.UNITY_BRIDGE_PORT),
-    },
-  });
-  const prefabCatalog = getStructuredResult(prefabCatalogResponse);
-  const prefabCatalogChars = JSON.stringify(prefabCatalog).length;
-  assert.ok(prefabCatalogChars < 50_000);
-  assert.ok(prefabCatalog.tools.length <= 25);
-  assert.equal(prefabCatalog.tools.some((tool) =>
-    tool.route === "prefab-asset/transaction-edit"), true);
-  console.log(`tools/list: ${initial.tools.length} tools / ${initialChars} chars initially; ` +
-    `${refreshed.tools.length} tools / ${refreshedChars} chars after refresh.`);
-  console.log(`advanced catalog: ${catalogChars} chars summary; ` +
-    `${prefabCatalogChars} chars for prefab-asset schemas.`);
-  console.log("Live Unity tool metadata refreshed without reconnecting.");
+  const activated = await client.listTools();
+  assert.ok(activated.tools.some((tool) => tool.name === candidate.name));
+  assert.equal(activated.tools.some((tool) => tool.name === "unity_advanced_tool"), false);
+  assert.equal(activated.tools.some((tool) =>
+    tool.name.startsWith("unity_project_tools_")), false);
+  console.log(`Canonical catalog activated ${candidate.name} from ${search.results.length} candidate(s).`);
 } finally {
   await transport.close().catch(() => {});
-  rmSync(tempRoot, { recursive: true, force: true });
 }

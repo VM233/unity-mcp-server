@@ -14,8 +14,6 @@ import {
   getRequestExpectedProjectPath,
 } from "./request-context.js";
 import { logDebug, logWarn } from "./logger.js";
-import { isReleaseManagedReplaySafeReadRoute } from
-  "./tools/plugin-first-class-tools.js";
 
 // Dynamic bridge URL â€" resolved per-call based on selected instance
 function getBridgeUrl() {
@@ -107,7 +105,6 @@ export function isTransientError(error, response) {
 
 export function canReplayAfterLostTicket(command) {
   return (
-    isReleaseManagedReplaySafeReadRoute(command) ||
     command.startsWith("_meta/") ||
     command === "packages/list" ||
     command === "packages/search" ||
@@ -599,10 +596,7 @@ export async function buildQueuePollTimeoutResult(ticketId, command, timeoutMs, 
 
   const queueInfo = await fetchQueueInfoRaw()
     .catch((error) => ({ success: false, error: error.message }));
-  const nextToolArgs = {
-    tool: "unity_queue_ticket_status",
-    params: { ticketId },
-  };
+  const nextToolArgs = { name: "unity_queue_ticket_status" };
 
   return {
     success: false,
@@ -610,7 +604,7 @@ export async function buildQueuePollTimeoutResult(ticketId, command, timeoutMs, 
     errorCode: "queue_poll_timeout",
     error:
       `Queue polling timed out after ${timeoutMs}ms for ticket ${ticketId}. ` +
-      "Inspect the existing ticket with unity_advanced_tool before retrying the command.",
+      "Activate unity_queue_ticket_status with unity_tools_get, then inspect this ticket before retrying the command.",
     ticketId,
     command,
     pollTimedOut: true,
@@ -620,7 +614,7 @@ export async function buildQueuePollTimeoutResult(ticketId, command, timeoutMs, 
     reloadRecoveryElapsedMs: timing.reloadRecoveryElapsedMs ?? 0,
     lastKnownTicket: summarizeFinalTicketStatus(finalStatus),
     queueState: summarizeQueueState(queueInfo),
-    nextTool: "unity_advanced_tool",
+    nextTool: "unity_tools_get",
     nextToolArgs,
   };
 }

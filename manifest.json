@@ -2,9 +2,9 @@
   "manifest_version": "0.3",
   "name": "unity-mcp",
   "display_name": "AnkleBreaker Unity MCP",
-  "version": "4.4.17",
-  "description": "Hot-reloadable multi-agent MCP server for Unity Editor with stable stdio, direct first-class tools, and fallback advanced routes.",
-  "long_description": "AnkleBreaker Unity MCP connects Claude, Codex, and other MCP hosts to your Unity Editor with a direct core tool surface, plugin-declared first-class tools, and fallback advanced routes for rare metadata cases. This repository is independently maintained while retaining the attribution required by the AnkleBreaker Open License.\n\n**Key features:**\n- Stable stdio launcher hot-reloads server implementation changes without restarting the MCP host\n- Core tools and plugin-declared first-class tools are exposed directly with visible schemas\n- Fallback advanced route remains available for rare routes without concrete tool metadata\n- Multi-instance support: run multiple Unity Editors simultaneously, auto-port selection (7890-7899), shared instance registry\n- ParrelSync clone detection for multiplayer development workflows\n- Multi-agent async queue with fair round-robin scheduling\n- Read batching (up to 5/frame) and write serialization (1/frame)\n- Agent session tracking and action logging\n- Project Context auto-injection for project-aware AI assistance\n\n**Requires the companion Unity Editor plugin:** Install via Unity Package Manager -> Add package from git URL -> `https://github.com/VM233/VMUnityMCP.git`\n\nAfter installing the package, configure local bridge and port settings under Preferences -> Unity MCP, then use `unity_list_instances` to confirm the Editor is reachable.",
+  "version": "5.0.0",
+  "description": "Hot-reloadable multi-agent Unity MCP server with a bounded bootstrap and searchable canonical typed-tool catalog.",
+  "long_description": "AnkleBreaker Unity MCP connects Claude, Codex, and other MCP hosts to your Unity Editor through a canonical, instance-bound tool catalog. This repository is independently maintained while retaining the attribution required by the AnkleBreaker Open License.\n\n**Key features:**\n- Stable stdio launcher hot-reloads server implementation changes without restarting the MCP host\n- Bounded bootstrap with instance binding, Unity Hub, health, and list/search/get discovery\n- Intent-ranked discovery followed by exact typed-tool activation with full schemas\n- Unity, package, and project tools share one catalog contract and one connection binding\n- Multi-instance support: run multiple Unity Editors simultaneously, auto-port selection (7890-7899), shared instance registry\n- ParrelSync clone detection for multiplayer development workflows\n- Multi-agent async queue with fair round-robin scheduling\n- Read batching (up to 5/frame) and write serialization (1/frame)\n- Agent session tracking and action logging\n- Project Context discovery for project-aware AI assistance\n\n**Requires the companion Unity Editor plugin:** Install via Unity Package Manager -> Add package from git URL -> `https://github.com/VM233/VMUnityMCP.git`\n\nAfter installing the package, configure local bridge and port settings under Preferences -> Unity MCP, then use `unity_list_instances` to confirm the Editor is reachable.",
   "author": {
     "name": "AnkleBreaker Studio",
     "email": "francois@anklebreaker-studio.com",
@@ -116,264 +116,20 @@
       "description": "Set the default installation directory for Unity Editors."
     },
     {
-      "name": "unity_editor_ping",
-      "description": "Check if the Unity Editor bridge is running and responsive. Returns editor version, project name, and connection status."
+      "name": "unity_mcp_health",
+      "description": "Inspect the Unity MCP host binding and canonical catalog state without changing Unity. Use this before discovery when connection or project ownership is uncertain."
     },
     {
-      "name": "unity_editor_state",
-      "description": "Get one authoritative Unity Editor snapshot. Process state is encoded as presence-only tags: idle, playing, paused, compiling, updating, and changingPlayMode. Missing tags mean false; a stable Editor always includes idle, including during stable Play Mode."
+      "name": "unity_tools_list",
+      "description": "Browse the canonical Unity MCP tool catalog by module or category. Call without filters for bounded module and category counts; this tool never returns full schemas."
     },
     {
-      "name": "unity_scene_info",
-      "description": "Get information about the currently open scene(s), including name, path, dirty state, and root game objects."
+      "name": "unity_tools_search",
+      "description": "Find canonical typed Unity MCP tools from a natural-language task. Returns a small ranked set with boundaries, required arguments, preconditions, and side effects but no full schemas."
     },
     {
-      "name": "unity_scene_open",
-      "description": "Open a scene by its asset path without modal dialogs. Returns a structured error when any loaded scene has unsaved changes; save explicitly and retry."
-    },
-    {
-      "name": "unity_scene_save",
-      "description": "Save the current scene without modal dialogs. Untitled scenes require an explicit asset path."
-    },
-    {
-      "name": "unity_scene_hierarchy",
-      "description": "Read the active scene hierarchy, optionally returning compact matches filtered by component type."
-    },
-    {
-      "name": "unity_gameobject_create",
-      "description": "Create a new GameObject in the scene. Can specify primitive type (Cube, Sphere, Capsule, Cylinder, Plane, Quad), parent, and initial transform."
-    },
-    {
-      "name": "unity_gameobject_delete",
-      "description": "Delete a GameObject from the scene by path or name."
-    },
-    {
-      "name": "unity_gameobject_info",
-      "description": "Get detailed info about a specific GameObject: transform, components, children, active state, tags, layer."
-    },
-    {
-      "name": "unity_gameobject_set_transform",
-      "description": "Set the transform (position, rotation, scale) of a GameObject."
-    },
-    {
-      "name": "unity_component_add",
-      "description": "Add a component to a GameObject. Supports built-in types (Rigidbody, BoxCollider, AudioSource, Light, Camera, etc.) and custom scripts."
-    },
-    {
-      "name": "unity_component_remove",
-      "description": "Remove a component from a GameObject."
-    },
-    {
-      "name": "unity_component_get_properties",
-      "description": "Get all serialized properties of a component on a GameObject."
-    },
-    {
-      "name": "unity_component_set_property",
-      "description": "Set a serialized component property, including inherited Behaviour.enabled, on a scene GameObject."
-    },
-    {
-      "name": "unity_asset_list",
-      "description": "List assets below a Unity project folder with bounded pagination and an optional type filter."
-    },
-    {
-      "name": "unity_asset_import",
-      "description": "Preflight and import one or more external assets with shared TextureImporter defaults, image-content deduplication, configurable execution, per-item results, and rollback."
-    },
-    {
-      "name": "unity_asset_refresh",
-      "description": "Start a reload-safe AssetDatabase refresh job. Poll asset/get-refresh-job until it reaches a terminal state."
-    },
-    {
-      "name": "unity_asset_delete",
-      "description": "Delete an asset from the project."
-    },
-    {
-      "name": "unity_execute_code",
-      "description": "Start persistent arbitrary C# execution inside the Unity Editor. Returns a job for status, cancellation-before-start, idempotent reuse, and optional explicit cleanup. Recurring namespace imports can be configured in Project Settings > Unity MCP > Execute Code."
-    },
-    {
-      "name": "unity_build",
-      "description": "Start a persistent Player build job, optionally run the executable, and return immediately with a job ID. Poll build/get-job for the final BuildReport; no post-build asset refresh is required."
-    },
-    {
-      "name": "unity_console_clear",
-      "description": "Clear the Unity console log."
-    },
-    {
-      "name": "unity_get_compilation_errors",
-      "description": "Read tracked Unity compilation errors and warnings with bounded pagination and a separate obsolete-API warning summary."
-    },
-    {
-      "name": "unity_play_mode",
-      "description": "Enter, pause, resume, step one frame, or stop Play Mode and return only after Unity confirms the requested state."
-    },
-    {
-      "name": "unity_project_info",
-      "description": "Get project information: name, path, Unity version, render pipeline, packages, build settings."
-    },
-    {
-      "name": "unity_prefab_info",
-      "description": "Get detailed prefab information: overrides, variant status, added/removed components. Works on both prefab assets and scene instances."
-    },
-    {
-      "name": "unity_scene_stats",
-      "description": "Get comprehensive scene statistics: total objects, vertices, triangles, lights, cameras, colliders, and top component types."
-    },
-    {
-      "name": "unity_screenshot_game",
-      "description": "Capture the current Game View during active or paused Play Mode, suppress and restore Game View Gizmos and Stats by default or preserve them when they are the evidence subject, fail without creating an image in Edit Mode, and return only after the PNG is fully written and decodable."
-    },
-    {
-      "name": "unity_screenshot_scene",
-      "description": "Capture a screenshot of the Scene View camera. Returns immediately with the saved file path."
-    },
-    {
-      "name": "unity_queue_info",
-      "description": "Inspect queue capacity, active work, and per-agent depth."
-    },
-    {
-      "name": "unity_list_advanced_tools",
-      "description": "List fallback Unity tools organized by category. Prefer directly exposed unity_* tools first; use unity_advanced_tool only when no concrete tool exists or metadata is stale. Categories include: animation, prefab, physics, lighting, audio, shadergraph, terrain, particle, navmesh, ui, texture, profiler, memory, settings, input, asmdef, scriptableobject, constraint, lod, editorprefs, playerprefs, vfx, graphics, sceneview, and more."
-    },
-    {
-      "name": "unity_advanced_tool",
-      "description": "Fallback generic Unity entrypoint. Prefer directly exposed unity_* tools first. Use this only when no concrete tool exists, a route is new, or metadata is stale."
-    },
-    {
-      "name": "unity_get_project_context",
-      "description": "Get project-specific context and documentation that the team has prepared for AI agents. This includes project guidelines, architecture docs, game design documents, networking rules, and any other project knowledge stored in Assets/MCP/Context/. Call this without arguments to get ALL context, or specify a category for a specific document. IMPORTANT: Call this early in your session to understand the project's conventions and architecture."
-    },
-    {
-      "name": "unity_editor_execute_code",
-      "description": "Start an owner-scoped persistent Job that compiles and executes a C# method body in the Unity Editor, with exact-argument idempotency, bounded result serialization, optional typed Unity structs, cancellation, and explicit cleanup code."
-    },
-    {
-      "name": "unity_packages_list",
-      "description": "List installed Unity packages with bounded pagination."
-    },
-    {
-      "name": "unity_packages_update_git",
-      "description": "Update a Git-based Unity package and return the resolved packages-lock hash."
-    },
-    {
-      "name": "unity_wait_editor_idle",
-      "description": "Wait until the Unity Editor is idle after compilation, domain reload, package refresh, or asset import."
-    },
-    {
-      "name": "unity_search_scene",
-      "description": "Search loaded scene GameObjects with composable name, component, tag, layer, and shader filters plus stable pagination."
-    },
-    {
-      "name": "unity_build_get_job",
-      "description": "Poll the current or latest persistent Player build job and return its final BuildReport and optional run result."
-    },
-    {
-      "name": "unity_scene_instantiate_prefab",
-      "description": "Instantiate a prefab asset into the currently open scene."
-    },
-    {
-      "name": "unity_serialized_object_get",
-      "description": "Read serialized properties from a scene object, component, or asset via SerializedObject."
-    },
-    {
-      "name": "unity_serialized_object_set",
-      "description": "Set one serialized property on a scene object, component, or asset via SerializedObject. SerializeReference values use '$managedReferenceType' when their concrete type cannot be inferred."
-    },
-    {
-      "name": "unity_prefab_asset_configure_component",
-      "description": "Ensure and configure one component on a prefab asset GameObject, including serialized properties and ObjectReferences, in one atomic save."
-    },
-    {
-      "name": "unity_component_set_reference",
-      "description": "Assign one or more component ObjectReference properties with configurable immediate or frame-batched execution."
-    },
-    {
-      "name": "unity_asset_copy",
-      "description": "Copy one or more Unity asset files with parent-folder creation, overwrite snapshots, and rollback."
-    },
-    {
-      "name": "unity_asset_get_refresh_job",
-      "description": "Poll the current or latest reload-safe AssetDatabase refresh job."
-    },
-    {
-      "name": "unity_asset_rename",
-      "description": "Safely rename a Unity asset using AssetDatabase while preserving its .meta GUID, synchronizing Single Sprite names, and renaming matching Multiple Sprite prefixes without changing Sprite IDs."
-    },
-    {
-      "name": "unity_asset_move",
-      "description": "Preflight and move one or more Unity assets with configurable execution, GUID preservation, Sprite internal-name synchronization when filenames change, Multiple Sprite ID preservation, and rollback."
-    },
-    {
-      "name": "unity_console_query",
-      "description": "Query recent Unity Console entries with time, source, message, stack, and last-Play filters."
-    },
-    {
-      "name": "unity_uitoolkit_runtime_query",
-      "description": "Query runtime UIDocument UI Toolkit elements by VisualElementPath, name, class, type, or text."
-    },
-    {
-      "name": "unity_uitoolkit_refresh",
-      "description": "Refresh UI Toolkit assets, repaint runtime and Editor panels, and return after stable Editor frames."
-    },
-    {
-      "name": "unity_uitoolkit_edit_uxml",
-      "description": "Structurally edit UXML elements by VisualElementPath or authored name, then synchronously reimport the asset."
-    },
-    {
-      "name": "unity_uitoolkit_edit_uss",
-      "description": "Add, remove, or update USS selectors and declarations, then synchronously reimport the asset."
-    },
-    {
-      "name": "unity_testing_run_tests",
-      "description": "Start a Unity Test Runner job and return a job ID for polling."
-    },
-    {
-      "name": "unity_testing_get_job",
-      "description": "Poll a Unity Test Runner job, including progress, failures, and optional result details. EditMode tests can delay main-thread queue polling while they execute."
-    },
-    {
-      "name": "unity_project_tools_list",
-      "description": "List compact project-defined MCP tool summaries without parameter schemas."
-    },
-    {
-      "name": "unity_project_tools_get",
-      "description": "Get the complete descriptor and input schema for one project-defined MCP tool."
-    },
-    {
-      "name": "unity_project_tools_execute",
-      "description": "Execute a project-defined MCP tool after discovering it with project-tools/list and inspecting it with project-tools/get."
-    },
-    {
-      "name": "unity_jobs_get",
-      "description": "Get one persistent Unity MCP job snapshot with owner enforcement."
-    },
-    {
-      "name": "unity_jobs_cancel",
-      "description": "Request owner- or capability-token-checked cancellation of a persistent Unity MCP job and report the actual cancellation mode."
-    },
-    {
-      "name": "unity_jobs_cleanup",
-      "description": "Run the explicit persisted cleanup contract of a terminal execute-code or project-tool job. Cleanup is itself durable and status is read through jobs/get."
-    },
-    {
-      "name": "unity_asset_import_settings_get",
-      "description": "Read semantic TextureImporter, ModelImporter, or AudioImporter settings without exposing Unity's internal serialized fields."
-    },
-    {
-      "name": "unity_asset_import_settings_set",
-      "description": "Validate and update semantic TextureImporter, ModelImporter, or AudioImporter settings, optional platform overrides, and reimport behavior."
-    },
-    {
-      "name": "unity_scene_workspace",
-      "description": "List loaded scenes, open a scene additively or singly, close a loaded scene with an explicit dirty-scene policy, or set the active scene."
-    },
-    {
-      "name": "unity_material_properties_get",
-      "description": "Read a Material's shader, typed shader properties, textures, keywords, render queue, and instancing settings through Unity's public Material API."
-    },
-    {
-      "name": "unity_material_properties_set",
-      "description": "Transactionally set typed Material shader properties, texture references and transforms, keywords, render queue, and instancing settings."
+      "name": "unity_tools_get",
+      "description": "Get the complete contract for one canonical Unity MCP tool and activate that typed tool for direct invocation. Use an exact name returned by unity_tools_search or unity_tools_list."
     }
   ],
   "prompts": [
